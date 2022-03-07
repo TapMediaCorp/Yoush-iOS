@@ -1,6 +1,6 @@
 # Youh iOS
 
-[Download Session on the App Store](https://apps.apple.com/us/app/yoush/id1606501045)
+[Download Yoush on the App Store](https://apps.apple.com/us/app/yoush/id1606501045)
 
 ## Summary
 

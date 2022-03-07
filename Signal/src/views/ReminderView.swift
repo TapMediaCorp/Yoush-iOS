@@ -1,14 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
-public class ReminderView: UIView {
+class ReminderView: UIView {
 
     let label = UILabel()
 
-    public typealias Action = () -> Void
+    typealias Action = () -> Void
 
     var tapAction: Action?
 
@@ -30,12 +30,12 @@ public class ReminderView: UIView {
     }
     let mode: ReminderViewMode
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init?(coder aDecoder: NSCoder) {
         notImplemented()
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     override init(frame: CGRect) {
         notImplemented()
     }
@@ -52,13 +52,11 @@ public class ReminderView: UIView {
         setupSubviews()
     }
 
-    @objc
-    public class func nag(text: String, tapAction: Action?) -> ReminderView {
+    @objc public class func nag(text: String, tapAction: Action?) -> ReminderView {
         return ReminderView(mode: .nag, text: text, tapAction: tapAction)
     }
 
-    @objc
-    public class func explanation(text: String) -> ReminderView {
+    @objc public class func explanation(text: String) -> ReminderView {
         return ReminderView(mode: .explanation, text: text, tapAction: nil)
     }
 

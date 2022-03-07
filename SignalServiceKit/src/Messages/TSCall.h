@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/OWSReadTracking.h>
-#import <SignalServiceKit/TSInteraction.h>
+#import "OWSReadTracking.h"
+#import "TSInteraction.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -24,14 +24,11 @@ typedef NS_ENUM(NSUInteger, RPRecentCallType) {
     RPRecentCallTypeIncomingBusyElsewhere
 };
 
-typedef NS_CLOSED_ENUM(NSUInteger, TSRecentCallOfferType) { TSRecentCallOfferTypeAudio, TSRecentCallOfferTypeVideo };
-
 NSString *NSStringFromCallType(RPRecentCallType callType);
 
 @interface TSCall : TSInteraction <OWSReadTracking, OWSPreviewText>
 
 @property (nonatomic, readonly) RPRecentCallType callType;
-@property (nonatomic, readonly) TSRecentCallOfferType offerType;
 
 - (instancetype)initWithUniqueId:(NSString *)uniqueId
                        timestamp:(uint64_t)timestamp
@@ -51,8 +48,7 @@ NSString *NSStringFromCallType(RPRecentCallType callType);
 - (nullable instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)initWithCallType:(RPRecentCallType)callType
-                       offerType:(TSRecentCallOfferType)offerType
-                          thread:(TSContactThread *)thread
+                          thread:(TSThread *)thread
                  sentAtTimestamp:(uint64_t)sentAtTimestamp NS_DESIGNATED_INITIALIZER;
 
 // --- CODE GENERATION MARKER
@@ -68,9 +64,8 @@ NSString *NSStringFromCallType(RPRecentCallType callType);
                        timestamp:(uint64_t)timestamp
                   uniqueThreadId:(NSString *)uniqueThreadId
                         callType:(RPRecentCallType)callType
-                       offerType:(TSRecentCallOfferType)offerType
                             read:(BOOL)read
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:callType:offerType:read:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:callType:read:));
 
 // clang-format on
 

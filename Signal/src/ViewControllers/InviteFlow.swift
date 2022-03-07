@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -14,11 +14,10 @@ class InviteFlow: NSObject, MFMessageComposeViewControllerDelegate, MFMailCompos
         case message, mail, twitter
     }
 
-    private let installUrl = "https://signal.org/install/"
-    private let homepageUrl = "https://signal.org"
+    private let installUrl = "https://yoush.org/install/"
+    private let homepageUrl = "https://yoush.org"
 
     private weak var presentingViewController: UIViewController?
-    private var modalPresentationViewController: UIViewController?
 
     private var channel: Channel?
 
@@ -54,19 +53,29 @@ class InviteFlow: NSObject, MFMessageComposeViewControllerDelegate, MFMailCompos
         }
     }
 
-    func presentViewController(_ vc: UIViewController, animated: Bool, completion: (() -> Void)? = nil) {
-        let navController = OWSNavigationController(rootViewController: vc)
-        presentingViewController?.presentFormSheet(navController, animated: true)
-        modalPresentationViewController = navController
+    func pushViewController(_ vc: UIViewController, animated: Bool, completion: (() -> Void)? = nil) {
+        guard let presentingViewController = presentingViewController,
+            let presentingNavController = presentingViewController.navigationController else {
+                return owsFailDebug("presenting view controller missing")
+        }
+
+        presentingNavController.pushViewController(vc, animated: animated, completion: completion)
     }
 
     func popToPresentingViewController(animated: Bool, completion: (() -> Void)? = nil) {
-        guard let modalVC = modalPresentationViewController else {
-            owsFailDebug("Missing modal view controller")
-            return
+        guard var presentingViewController = presentingViewController,
+            let presentingNavController = presentingViewController.navigationController else {
+            return owsFailDebug("presenting view controller missing")
         }
-        modalVC.dismiss(animated: true, completion: completion)
-        self.modalPresentationViewController = nil
+
+        // The presenting view contrtoller may not directly be in the nav stack
+        // (like with the compose flow). So make sure we referenve the top view
+        // controller.
+        if let parentViewController = presentingViewController.parent, parentViewController != presentingNavController {
+            presentingViewController = parentViewController
+        }
+
+        presentingNavController.popToViewController(presentingViewController, animated: animated, completion: completion)
     }
 
     // MARK: Twitter
@@ -182,7 +191,7 @@ class InviteFlow: NSObject, MFMessageComposeViewControllerDelegate, MFMailCompos
         picker.contactsPickerDelegate = self
         picker.title = NSLocalizedString("INVITE_FRIENDS_PICKER_TITLE", comment: "Navbar title")
 
-        presentViewController(picker, animated: true)
+        pushViewController(picker, animated: true)
     }
 
     public func dismissAndSendSMSTo(phoneNumbers: [String]) {
@@ -256,7 +265,7 @@ class InviteFlow: NSObject, MFMessageComposeViewControllerDelegate, MFMailCompos
         picker.contactsPickerDelegate = self
         picker.title = NSLocalizedString("INVITE_FRIENDS_PICKER_TITLE", comment: "Navbar title")
 
-        presentViewController(picker, animated: true)
+        pushViewController(picker, animated: true)
     }
 
     private func sendMailTo(emails recipientEmails: [String]) {

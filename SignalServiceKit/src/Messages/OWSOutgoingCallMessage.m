@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSOutgoingCallMessage.h"
@@ -12,6 +12,15 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @implementation OWSOutgoingCallMessage
+
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
 
 - (instancetype)initWithThread:(TSThread *)thread
 {
@@ -114,18 +123,6 @@ NS_ASSUME_NONNULL_BEGIN
     return self;
 }
 
-- (instancetype)initWithThread:(TSThread *)thread opaqueMessage:(SSKProtoCallMessageOpaque *)opaqueMessage
-{
-    self = [self initWithThread:thread];
-    if (!self) {
-        return self;
-    }
-
-    _opaqueMessage = opaqueMessage;
-
-    return self;
-}
-
 #pragma mark - TSOutgoingMessage overrides
 
 - (BOOL)shouldSyncTranscript
@@ -133,10 +130,21 @@ NS_ASSUME_NONNULL_BEGIN
     return NO;
 }
 
-- (nullable NSData *)buildPlainTextData:(TSThread *)thread transaction:(SDSAnyWriteTransaction *)transaction
+- (BOOL)isSilent
 {
+    // Avoid "phantom messages" for "outgoing call messages".
+
+    return YES;
+}
+
+- (nullable NSData *)buildPlainTextData:(SignalRecipient *)recipient
+                                 thread:(TSThread *)thread
+                            transaction:(SDSAnyReadTransaction *)transaction
+{
+    OWSAssertDebug(recipient);
+
     SSKProtoContentBuilder *builder = [SSKProtoContent builder];
-    builder.callMessage = [self buildCallMessage:thread transaction:transaction];
+    builder.callMessage = [self buildCallMessage:recipient.address thread:thread transaction:transaction];
 
     NSError *error;
     NSData *_Nullable data = [builder buildSerializedDataAndReturnError:&error];
@@ -147,7 +155,9 @@ NS_ASSUME_NONNULL_BEGIN
     return data;
 }
 
-- (nullable SSKProtoCallMessage *)buildCallMessage:(TSThread *)thread transaction:(SDSAnyReadTransaction *)transaction
+- (nullable SSKProtoCallMessage *)buildCallMessage:(SignalServiceAddress *)address
+                                            thread:(TSThread *)thread
+                                       transaction:(SDSAnyReadTransaction *)transaction
 {
     SSKProtoCallMessageBuilder *builder = [SSKProtoCallMessage builder];
 
@@ -175,15 +185,12 @@ NS_ASSUME_NONNULL_BEGIN
         [builder setBusy:self.busyMessage];
     }
 
-    if (self.opaqueMessage) {
-        [builder setOpaque:self.opaqueMessage];
-    }
-
     if (self.destinationDeviceId) {
         [builder setDestinationDeviceID:self.destinationDeviceId.unsignedIntValue];
     }
 
     [ProtoUtils addLocalProfileKeyIfNecessary:thread
+                                      address:address
                            callMessageBuilder:builder
                                   transaction:transaction];
 
@@ -228,16 +235,6 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     return [NSString stringWithFormat:@"%@ with payload: %@", className, payload];
-}
-
-- (BOOL)shouldRecordSendLog
-{
-    return NO;
-}
-
-- (SealedSenderContentHint)contentHint
-{
-    return SealedSenderContentHintDefault;
 }
 
 @end

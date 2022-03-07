@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSSyncContactsMessage.h"
@@ -20,10 +20,20 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@interface OWSSyncContactsMessage ()
+
+@property (nonatomic, readonly) NSArray<SignalAccount *> *signalAccounts;
+@property (nonatomic, readonly) OWSIdentityManager *identityManager;
+@property (nonatomic, readonly) id<ProfileManagerProtocol> profileManager;
+
+@end
+
 @implementation OWSSyncContactsMessage
 
 - (instancetype)initWithThread:(TSThread *)thread
                 signalAccounts:(NSArray<SignalAccount *> *)signalAccounts
+               identityManager:(OWSIdentityManager *)identityManager
+                profileManager:(id<ProfileManagerProtocol>)profileManager
 {
     self = [super initWithThread:thread];
     if (!self) {
@@ -31,6 +41,8 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     _signalAccounts = signalAccounts;
+    _identityManager = identityManager;
+    _profileManager = profileManager;
 
     return self;
 }
@@ -39,6 +51,18 @@ NS_ASSUME_NONNULL_BEGIN
 {
     return [super initWithCoder:coder];
 }
+
+#pragma mark - Dependencies
+
+- (id<ContactsManagerProtocol>)contactsManager {
+    return SSKEnvironment.shared.contactsManager;
+}
+
+- (TSAccountManager *)tsAccountManager {
+    return TSAccountManager.sharedInstance;
+}
+
+#pragma mark -
 
 - (nullable SSKProtoSyncMessageBuilder *)syncMessageBuilderWithTransaction:(SDSAnyReadTransaction *)transaction
 {
@@ -66,6 +90,80 @@ NS_ASSUME_NONNULL_BEGIN
     SSKProtoSyncMessageBuilder *syncMessageBuilder = [SSKProtoSyncMessage builder];
     [syncMessageBuilder setContacts:contactsProto];
     return syncMessageBuilder;
+}
+
+- (nullable NSData *)buildPlainTextAttachmentDataWithTransaction:(SDSAnyReadTransaction *)transaction
+{
+    NSMutableArray<SignalAccount *> *signalAccounts = [self.signalAccounts mutableCopy];
+
+    SignalServiceAddress *_Nullable localAddress = [TSAccountManager localAddressWithTransaction:transaction];
+    OWSAssertDebug(localAddress.isValid);
+    if (localAddress) {
+        BOOL hasLocalAddress = NO;
+        for (SignalAccount *signalAccount in signalAccounts) {
+            hasLocalAddress |= signalAccount.recipientAddress.isLocalAddress;
+        }
+        if (!hasLocalAddress) {
+            // OWSContactsOutputStream requires all signalAccount to have a contact.
+            Contact *contact = [[Contact alloc] initWithSystemContact:[CNContact new]];
+            SignalAccount *signalAccount = [[SignalAccount alloc] initWithSignalServiceAddress:localAddress
+                                                                                       contact:contact
+                                                                      multipleAccountLabelText:nil];
+            [signalAccounts addObject:signalAccount];
+        }
+    }
+
+    // TODO use temp file stream to avoid loading everything into memory at once
+    // First though, we need to re-engineer our attachment process to accept streams (encrypting with stream,
+    // and uploading with streams).
+    NSOutputStream *dataOutputStream = [NSOutputStream outputStreamToMemory];
+    [dataOutputStream open];
+    OWSContactsOutputStream *contactsOutputStream =
+        [[OWSContactsOutputStream alloc] initWithOutputStream:dataOutputStream];
+
+    for (SignalAccount *signalAccount in signalAccounts) {
+        OWSRecipientIdentity *_Nullable recipientIdentity =
+            [self.identityManager recipientIdentityForAddress:signalAccount.recipientAddress];
+        NSData *_Nullable profileKeyData =
+            [self.profileManager profileKeyDataForAddress:signalAccount.recipientAddress transaction:transaction];
+
+        OWSDisappearingMessagesConfiguration *_Nullable disappearingMessagesConfiguration;
+        NSString *conversationColorName;
+
+        TSContactThread *_Nullable contactThread =
+            [TSContactThread getThreadWithContactAddress:signalAccount.recipientAddress transaction:transaction];
+
+        NSNumber *_Nullable isArchived;
+        NSNumber *_Nullable inboxPosition;
+        if (contactThread) {
+            isArchived = [NSNumber numberWithBool:contactThread.isArchived];
+            inboxPosition = [[AnyThreadFinder new] sortIndexObjcWithThread:contactThread transaction:transaction];
+            conversationColorName = contactThread.conversationColorName;
+            disappearingMessagesConfiguration =
+                [contactThread disappearingMessagesConfigurationWithTransaction:transaction];
+        } else {
+            conversationColorName =
+                [TSThread stableColorNameForNewConversationWithString:signalAccount.recipientAddress.stringForDisplay];
+        }
+
+        [contactsOutputStream writeSignalAccount:signalAccount
+                               recipientIdentity:recipientIdentity
+                                  profileKeyData:profileKeyData
+                                 contactsManager:self.contactsManager
+                           conversationColorName:conversationColorName
+               disappearingMessagesConfiguration:disappearingMessagesConfiguration
+                                      isArchived:isArchived
+                                   inboxPosition:inboxPosition];
+    }
+    
+    [dataOutputStream close];
+
+    if (contactsOutputStream.hasError) {
+        OWSFailDebug(@"Could not write contacts sync stream.");
+        return nil;
+    }
+
+    return [dataOutputStream propertyForKey:NSStreamDataWrittenToMemoryStreamKey];
 }
 
 @end

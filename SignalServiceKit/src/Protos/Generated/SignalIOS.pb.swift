@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-// *
+//*
 // Copyright (C) 2014-2016 Open Whisper Systems
 //
 // Licensed according to the LICENSE file in this repository.
@@ -48,7 +48,7 @@ struct IOSProtos_BackupSnapshot {
 
     /// @required
     var entityData: Data {
-      get {return _entityData ?? Data()}
+      get {return _entityData ?? SwiftProtobuf.Internal.emptyData}
       set {_entityData = newValue}
     }
     /// Returns true if `entityData` has been explicitly set.
@@ -142,7 +142,7 @@ struct IOSProtos_DeviceName {
 
   /// @required
   var ephemeralPublic: Data {
-    get {return _ephemeralPublic ?? Data()}
+    get {return _ephemeralPublic ?? SwiftProtobuf.Internal.emptyData}
     set {_ephemeralPublic = newValue}
   }
   /// Returns true if `ephemeralPublic` has been explicitly set.
@@ -152,7 +152,7 @@ struct IOSProtos_DeviceName {
 
   /// @required
   var syntheticIv: Data {
-    get {return _syntheticIv ?? Data()}
+    get {return _syntheticIv ?? SwiftProtobuf.Internal.emptyData}
     set {_syntheticIv = newValue}
   }
   /// Returns true if `syntheticIv` has been explicitly set.
@@ -162,7 +162,7 @@ struct IOSProtos_DeviceName {
 
   /// @required
   var ciphertext: Data {
-    get {return _ciphertext ?? Data()}
+    get {return _ciphertext ?? SwiftProtobuf.Internal.emptyData}
     set {_ciphertext = newValue}
   }
   /// Returns true if `ciphertext` has been explicitly set.
@@ -191,11 +191,8 @@ extension IOSProtos_BackupSnapshot: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.entity) }()
+      case 1: try decoder.decodeRepeatedMessageField(value: &self.entity)
       default: break
       }
     }
@@ -226,36 +223,29 @@ extension IOSProtos_BackupSnapshot.BackupEntity: SwiftProtobuf.Message, SwiftPro
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._entityData) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._collection) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._key) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
+      case 2: try decoder.decodeSingularBytesField(value: &self._entityData)
+      case 3: try decoder.decodeSingularStringField(value: &self._collection)
+      case 4: try decoder.decodeSingularStringField(value: &self._key)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._entityData {
+    }
+    if let v = self._entityData {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._collection {
+    }
+    if let v = self._collection {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._key {
+    }
+    if let v = self._key {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -290,32 +280,25 @@ extension IOSProtos_DeviceName: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._ephemeralPublic) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._syntheticIv) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._ciphertext) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._ephemeralPublic)
+      case 2: try decoder.decodeSingularBytesField(value: &self._syntheticIv)
+      case 3: try decoder.decodeSingularBytesField(value: &self._ciphertext)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._ephemeralPublic {
+    if let v = self._ephemeralPublic {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._syntheticIv {
+    }
+    if let v = self._syntheticIv {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._ciphertext {
+    }
+    if let v = self._ciphertext {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 

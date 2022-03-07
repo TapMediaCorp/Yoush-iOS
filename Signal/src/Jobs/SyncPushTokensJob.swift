@@ -1,44 +1,54 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
+import PromiseKit
 import SignalServiceKit
 
 @objc(OWSSyncPushTokensJob)
 class SyncPushTokensJob: NSObject {
 
-    @objc
-    public static let PushTokensDidChange = Notification.Name("PushTokensDidChange")
+    @objc public static let PushTokensDidChange = Notification.Name("PushTokensDidChange")
 
-    private let uploadOnlyIfStale: Bool
-
-    required init(uploadOnlyIfStale: Bool) {
-        self.uploadOnlyIfStale = uploadOnlyIfStale
+    // MARK: Dependencies
+    let accountManager: AccountManager
+    let preferences: OWSPreferences
+    var pushRegistrationManager: PushRegistrationManager {
+        return PushRegistrationManager.shared
     }
 
-    private static let hasUploadedTokensOnce = AtomicBool(false)
+    @objc var uploadOnlyIfStale = true
+
+    @objc
+    required init(accountManager: AccountManager, preferences: OWSPreferences) {
+        self.accountManager = accountManager
+        self.preferences = preferences
+    }
+
+    class func run(accountManager: AccountManager, preferences: OWSPreferences) -> Promise<Void> {
+        let job = self.init(accountManager: accountManager, preferences: preferences)
+        return job.run()
+    }
 
     func run() -> Promise<Void> {
         Logger.info("Starting.")
 
         return firstly {
             return self.pushRegistrationManager.requestPushTokens()
-        }.then(on: .global()) { (pushToken: String, voipToken: String?) -> Promise<Void> in
-            Logger.info("Fetched pushToken: \(redact(pushToken)), voipToken: \(redact(voipToken))")
-
+        }.then { (pushToken: String, voipToken: String) -> Promise<Void> in
+            Logger.info("finished: requesting push tokens")
             var shouldUploadTokens = false
 
             if self.preferences.getPushToken() != pushToken || self.preferences.getVoipToken() != voipToken {
-                Logger.info("Push tokens changed.")
+                Logger.debug("Push tokens changed.")
                 shouldUploadTokens = true
             } else if !self.uploadOnlyIfStale {
-                Logger.info("Forced uploading, even though tokens didn't change.")
+                Logger.debug("Forced uploading, even though tokens didn't change.")
                 shouldUploadTokens = true
-            } else if Self.appVersion.lastAppVersion != Self.appVersion.currentAppReleaseVersion {
+            }
+
+            if AppVersion.sharedInstance().lastAppVersion != AppVersion.sharedInstance().currentAppVersion {
                 Logger.info("Uploading due to fresh install or app upgrade.")
-                shouldUploadTokens = true
-            } else if !Self.hasUploadedTokensOnce.get() {
-                Logger.info("Uploading for app launch.")
                 shouldUploadTokens = true
             }
 
@@ -52,10 +62,8 @@ class SyncPushTokensJob: NSObject {
                 self.accountManager.updatePushTokens(pushToken: pushToken, voipToken: voipToken)
             }.done(on: .global()) { _ in
                 self.recordPushTokensLocally(pushToken: pushToken, voipToken: voipToken)
-
-                Self.hasUploadedTokensOnce.set(true)
             }
-        }.done(on: .global()) {
+        }.done {
             Logger.info("completed successfully.")
         }
     }
@@ -63,24 +71,25 @@ class SyncPushTokensJob: NSObject {
     // MARK: - objc wrappers, since objc can't use swift parameterized types
 
     @objc
-    class func run() {
-        run(uploadOnlyIfStale: true)
-    }
-
-    @objc
-    class func run(uploadOnlyIfStale: Bool) {
+    class func run(accountManager: AccountManager, preferences: OWSPreferences) {
         firstly {
-            SyncPushTokensJob(uploadOnlyIfStale: uploadOnlyIfStale).run()
-        }.done(on: .global()) {
+            self.run(accountManager: accountManager, preferences: preferences)
+        }.done {
             Logger.info("completed successfully.")
-        }.catch(on: .global()) { error in
+        }.catch { error in
             Logger.error("Error: \(error).")
         }
     }
 
+    @objc
+    func run() -> AnyPromise {
+        let promise: Promise<Void> = self.run()
+        return AnyPromise(promise)
+    }
+
     // MARK: 
 
-    private func recordPushTokensLocally(pushToken: String, voipToken: String?) {
+    private func recordPushTokensLocally(pushToken: String, voipToken: String) {
         assert(!Thread.isMainThread)
         Logger.warn("Recording push tokens locally. pushToken: \(redact(pushToken)), voipToken: \(redact(voipToken))")
 
@@ -90,18 +99,12 @@ class SyncPushTokensJob: NSObject {
             Logger.info("Recording new plain push token")
             self.preferences.setPushToken(pushToken)
             didTokensChange = true
-
-            // Tokens should now be aligned with stored tokens.
-            owsAssertDebug(pushToken == self.preferences.getPushToken())
         }
 
         if voipToken != self.preferences.getVoipToken() {
             Logger.info("Recording new voip token")
             self.preferences.setVoipToken(voipToken)
             didTokensChange = true
-
-            // Tokens should now be aligned with stored tokens.
-            owsAssertDebug(voipToken == self.preferences.getVoipToken())
         }
 
         if didTokensChange {
@@ -110,7 +113,6 @@ class SyncPushTokensJob: NSObject {
     }
 }
 
-private func redact(_ string: String?) -> String {
-    guard let string = string else { return "nil" }
+private func redact(_ string: String) -> String {
     return OWSIsDebugBuild() ? string : "[ READACTED \(string.prefix(2))...\(string.suffix(2)) ]"
 }

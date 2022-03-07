@@ -1,11 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
 import SignalMessaging
 import PureLayout
-import SignalUI
 
 class SAELoadViewController: UIViewController {
 
@@ -49,7 +48,7 @@ class SAELoadViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init?(coder aDecoder: NSCoder) {
         notImplemented()
     }
@@ -57,17 +56,14 @@ class SAELoadViewController: UIViewController {
     override func loadView() {
         super.loadView()
 
-        if #available(iOS 13, *) {
-            // Do nothing, you can swipe to cancel
-        } else {
-            self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel,
-                                                                    target: self,
-                                                                    action: #selector(cancelPressed))
-        }
-        self.view.backgroundColor = Theme.backgroundColor
+        self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel,
+                                                                target: self,
+                                                                action: #selector(cancelPressed))
+        self.navigationItem.title = "Signal"
+
+        self.view.backgroundColor = Theme.launchScreenBackground
 
         let activityIndicator = UIActivityIndicatorView(style: .whiteLarge)
-        activityIndicator.color = Theme.primaryIconColor
         self.activityIndicator = activityIndicator
         self.view.addSubview(activityIndicator)
         activityIndicator.autoCenterInSuperview()
@@ -78,18 +74,18 @@ class SAELoadViewController: UIViewController {
         self.view.addSubview(progressView)
         progressView.autoVCenterInSuperview()
         progressView.autoPinWidthToSuperview(withMargin: ScaleFromIPhone5(30))
-        progressView.progressTintColor = Theme.accentBlueColor
+        progressView.progressTintColor = UIColor.white
 
         updateProgressViewVisability()
 
         let label = UILabel()
-        label.textColor = Theme.primaryTextColor
-        label.font = .systemFont(ofSize: 17)
+        label.textColor = UIColor.white
+        label.font = UIFont.ows_semiboldFont(withSize: 18)
         label.text = NSLocalizedString("SHARE_EXTENSION_LOADING",
                                        comment: "Indicates that the share extension is still loading.")
         self.view.addSubview(label)
         label.autoHCenterInSuperview()
-        label.autoPinEdge(.top, to: .bottom, of: activityIndicator, withOffset: 12)
+        label.autoPinEdge(.top, to: .bottom, of: activityIndicator, withOffset: 25)
     }
 
     override func viewWillAppear(_ animated: Bool) {

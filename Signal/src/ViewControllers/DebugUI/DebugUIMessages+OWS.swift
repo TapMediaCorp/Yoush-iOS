@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -7,6 +7,18 @@ import Foundation
 #if DEBUG
 
 public extension DebugUIMessages {
+
+    // MARK: - Dependencies
+
+    static var messageReceiver: OWSMessageReceiver {
+        return SSKEnvironment.shared.messageReceiver
+    }
+
+    static var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    // MARK: -
 
     @objc
     class func deleteRandomMessages(count: UInt, thread: TSThread, transaction: SDSAnyWriteTransaction) {
@@ -41,6 +53,8 @@ public extension DebugUIMessages {
 
     @objc
     class func receiveUUIDEnvelopeInNewThread() {
+        assert(FeatureFlags.allowUUIDOnlyContacts)
+
         let senderClient = FakeSignalClient.generate(e164Identifier: nil)
         let localClient = LocalSignalClient()
         let runner = TestProtocolRunner()
@@ -55,18 +69,18 @@ public extension DebugUIMessages {
         let envelopeBuilder = try! fakeService.envelopeBuilder(fromSenderClient: senderClient)
         envelopeBuilder.setSourceUuid(senderClient.uuidIdentifier)
         let envelopeData = try! envelopeBuilder.buildSerializedData()
-        messageProcessor.processEncryptedEnvelopeData(envelopeData,
-                                                      serverDeliveryTimestamp: 0,
-                                                      envelopeSource: .debugUI) { _ in }
+        messageReceiver.handleReceivedEnvelopeData(envelopeData)
     }
 
     @objc
     class func createUUIDGroup() {
+        assert(FeatureFlags.allowUUIDOnlyContacts)
+
         let uuidMembers = (0...3).map { _ in CommonGenerator.address(hasPhoneNumber: false) }
         let members = uuidMembers + [TSAccountManager.localAddress!]
         let groupName = "UUID Group"
 
-        _ = GroupManager.localCreateNewGroup(members: members, name: groupName, disappearingMessageToken: .disabledToken, shouldSendMessage: true)
+        GroupManager.localCreateNewGroup(members: members, name: groupName, shouldSendMessage: true)
     }
 }
 

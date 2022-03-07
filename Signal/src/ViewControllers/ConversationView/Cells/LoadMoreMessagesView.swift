@@ -1,13 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
+@objc
 public class LoadMoreMessagesView: UICollectionReusableView {
 
+    @objc
     public static let reuseIdentifier = "LoadMoreMessagesView"
 
+    @objc
     public static let fixedHeight: CGFloat = 60
 
     // MARK: Init
@@ -32,6 +35,7 @@ public class LoadMoreMessagesView: UICollectionReusableView {
 
     // MARK: Public
 
+    @objc
     public func configureForDisplay() {
         label.textColor = Theme.secondaryTextAndIconColor
         label.font = UIFont.ows_semiboldFont(withSize: 16)

@@ -1,9 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/TSMessage.h>
-#import <SignalServiceKit/TSPaymentModels.h>
+#import "TSMessage.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -22,8 +21,6 @@ typedef NS_ENUM(NSInteger, TSOutgoingMessageState) {
     TSOutgoingMessageStateDelivered_OBSOLETE,
     // The message has been sent to the service.
     TSOutgoingMessageStateSent,
-    // The message is blocked behind some precondition.
-    TSOutgoingMessageStatePending
 };
 
 NSString *NSStringForOutgoingMessageState(TSOutgoingMessageState value);
@@ -38,12 +35,9 @@ typedef NS_CLOSED_ENUM(NSInteger, OWSOutgoingMessageRecipientState) {
     OWSOutgoingMessageRecipientStateSkipped,
     // The message has been sent to the service.  It may also have been delivered or read.
     OWSOutgoingMessageRecipientStateSent,
-    // The server rejected the message send request until some other condition is satisfied.
-    // Currently, this only flags messages that the server suspects may be spam.
-    OWSOutgoingMessageRecipientStatePending,
 
     OWSOutgoingMessageRecipientStateMin = OWSOutgoingMessageRecipientStateFailed,
-    OWSOutgoingMessageRecipientStateMax = OWSOutgoingMessageRecipientStatePending,
+    OWSOutgoingMessageRecipientStateMax = OWSOutgoingMessageRecipientStateSent,
 };
 
 NSString *NSStringForOutgoingMessageRecipientState(OWSOutgoingMessageRecipientState value);
@@ -55,6 +49,7 @@ typedef NS_ENUM(NSInteger, TSGroupMetaMessage) {
     TSGroupMetaMessageDeliver,
     TSGroupMetaMessageQuit,
     TSGroupMetaMessageRequestInfo,
+    TSGroupMetaMessagePinMessage,
 };
 
 @class SDSAnyWriteTransaction;
@@ -72,9 +67,7 @@ typedef NS_ENUM(NSInteger, TSGroupMetaMessage) {
 @property (atomic, nullable, readonly) NSNumber *deliveryTimestamp;
 // This property should only be set if state == .sent.
 @property (atomic, nullable, readonly) NSNumber *readTimestamp;
-// This property should only be set if state == .sent.
-@property (atomic, nullable, readonly) NSNumber *viewedTimestamp;
-// This property should only be set if state == .failed or state == .sending (with a prior failure)
+// This property should only be set if state == .failed
 @property (atomic, nullable, readonly) NSNumber *errorCode;
 
 @property (atomic, readonly) BOOL wasSentByUD;
@@ -126,7 +119,6 @@ typedef NS_ENUM(NSInteger, TSGroupMetaMessage) {
                   uniqueThreadId:(NSString *)uniqueThreadId
                    attachmentIds:(NSArray<NSString *> *)attachmentIds
                             body:(nullable NSString *)body
-                      bodyRanges:(nullable MessageBodyRanges *)bodyRanges
                     contactShare:(nullable OWSContact *)contactShare
                  expireStartedAt:(uint64_t)expireStartedAt
                        expiresAt:(uint64_t)expiresAt
@@ -149,7 +141,7 @@ typedef NS_ENUM(NSInteger, TSGroupMetaMessage) {
            mostRecentFailureText:(nullable NSString *)mostRecentFailureText
           recipientAddressStates:(nullable NSDictionary<SignalServiceAddress *,TSOutgoingMessageRecipientState *> *)recipientAddressStates
               storedMessageState:(TSOutgoingMessageState)storedMessageState
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:bodyRanges:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:customMessage:groupMetaMessage:hasLegacyMessageState:hasSyncedTranscript:isFromLinkedDevice:isVoiceMessage:legacyMessageState:legacyWasDelivered:mostRecentFailureText:recipientAddressStates:storedMessageState:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:customMessage:groupMetaMessage:hasLegacyMessageState:hasSyncedTranscript:isFromLinkedDevice:isVoiceMessage:legacyMessageState:legacyWasDelivered:mostRecentFailureText:recipientAddressStates:storedMessageState:));
 
 // clang-format on
 
@@ -199,16 +191,24 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 // This property won't be accurate for legacy messages.
 @property (atomic, readonly) BOOL isFromLinkedDevice;
 
+@property (nonatomic, readonly) BOOL isSilent;
+
 @property (nonatomic, readonly) BOOL isOnline;
 
 // NOTE: We do not persist this property; it is only used for
 //       group updates which we don't insert into the database.
 @property (nonatomic, readonly, nullable) NSData *changeActionsProtoData;
 
+//HoangHo:It a tempory property, so should comment it before generate data
+@property (strong, nonatomic) NSDictionary *customMetaData;
+
 /**
+ *
  * The data representation of this message, to be encrypted, before being sent.
  */
-- (nullable NSData *)buildPlainTextData:(TSThread *)thread transaction:(SDSAnyWriteTransaction *)transaction;
+- (nullable NSData *)buildPlainTextData:(SignalRecipient *)recipient
+                                 thread:(TSThread *)thread
+                            transaction:(SDSAnyReadTransaction *)transaction;
 
 /**
  * Intermediate protobuf representation
@@ -227,11 +227,7 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 // All recipients of this message.
 - (NSArray<SignalServiceAddress *> *)recipientAddresses;
 
-// The states for all recipients.
-@property (atomic, nullable, readonly)
-    NSDictionary<SignalServiceAddress *, TSOutgoingMessageRecipientState *> *recipientAddressStates;
-
-// All recipients of this message who we are currently trying to send to (pending, queued, uploading or during send).
+// All recipients of this message who we are currently trying to send to (queued, uploading or during send).
 - (NSArray<SignalServiceAddress *> *)sendingRecipientAddresses;
 
 // All recipients of this message to whom it has been sent (and possibly delivered or read).
@@ -242,9 +238,6 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 
 // All recipients of this message to whom it has been sent, delivered and read.
 - (NSArray<SignalServiceAddress *> *)readRecipientAddresses;
-
-// All recipients of this message to whom it has been sent, delivered and viewed.
-- (NSArray<SignalServiceAddress *> *)viewedRecipientAddresses;
 
 // Number of recipients of this message to whom it has been sent.
 - (NSUInteger)sentRecipientsCount;
@@ -297,7 +290,6 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 // messages repurpose the "timestamp" field to indicate when the
 // corresponding message was originally sent.
 - (void)updateWithDeliveredRecipient:(SignalServiceAddress *)recipientAddress
-                   recipientDeviceId:(uint32_t)deviceId
                    deliveryTimestamp:(NSNumber *_Nullable)deliveryTimestamp
                          transaction:(SDSAnyWriteTransaction *)transaction;
 
@@ -316,21 +308,10 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 
 // This method is used to record a successful "read" by one recipient.
 - (void)updateWithReadRecipient:(SignalServiceAddress *)recipientAddress
-              recipientDeviceId:(uint32_t)deviceId
                   readTimestamp:(uint64_t)readTimestamp
                     transaction:(SDSAnyWriteTransaction *)transaction;
 
-- (void)updateWithViewedRecipient:(SignalServiceAddress *)recipientAddress
-                recipientDeviceId:(uint32_t)deviceId
-                  viewedTimestamp:(uint64_t)viewedTimestamp
-                      transaction:(SDSAnyWriteTransaction *)transaction;
-
 - (nullable NSNumber *)firstRecipientReadTimestamp;
-
-- (void)updateWithRecipientAddressStates:
-            (nullable NSDictionary<SignalServiceAddress *, TSOutgoingMessageRecipientState *> *)recipientAddressStates
-                             transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(updateWith(recipientAddressStates:transaction:));
 
 - (NSString *)statusDescription;
 

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "FunctionalUtil.h"
@@ -34,25 +34,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 @implementation NSArray (FunctionalUtil)
-
-- (nullable id)firstSatisfying:(BOOL (^)(id))predicate
-{
+- (bool)any:(int (^)(id item))predicate {
     tskit_require(predicate != nil);
     for (id e in self) {
         if (predicate(e)) {
-            return e;
+            return true;
         }
     }
-    return nil;
+    return false;
 }
-
-- (BOOL)anySatisfy:(BOOL (^)(id item))predicate
-{
-    return [self firstSatisfying:predicate] != nil;
-}
-
-- (BOOL)allSatisfy:(BOOL (^)(id item))predicate
-{
+- (bool)all:(int (^)(id item))predicate {
     tskit_require(predicate != nil);
     for (id e in self) {
         if (!predicate(e)) {
@@ -61,7 +52,6 @@ NS_ASSUME_NONNULL_BEGIN
     }
     return true;
 }
-
 - (NSArray *)map:(id (^)(id item))projection {
     tskit_require(projection != nil);
 
@@ -71,9 +61,7 @@ NS_ASSUME_NONNULL_BEGIN
     }
     return r;
 }
-
-- (NSArray *)filter:(BOOL (^)(id item))predicate
-{
+- (NSArray *)filter:(int (^)(id item))predicate {
     tskit_require(predicate != nil);
 
     NSMutableArray *r = [NSMutableArray array];

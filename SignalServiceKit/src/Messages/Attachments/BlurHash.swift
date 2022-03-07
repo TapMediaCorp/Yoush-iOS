@@ -1,12 +1,21 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import blurhash
 
 @objc
 public class BlurHash: NSObject {
+
+    // MARK: - Dependencies
+
+    private class var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    // MARK: -
 
     // This should be generous.
     private static let maxLength = 100
@@ -38,31 +47,31 @@ public class BlurHash: NSObject {
     }
 
     public class func ensureBlurHash(for attachmentStream: TSAttachmentStream) -> Promise<Void> {
-        let (promise, future) = Promise<Void>.pending()
+        let (promise, resolver) = Promise<Void>.pending()
 
         DispatchQueue.global().async {
             guard attachmentStream.blurHash == nil else {
                 // Attachment already has a blurHash.
-                future.resolve()
+                resolver.fulfill(())
                 return
             }
             guard attachmentStream.isVisualMedia else {
                 // We only generate a blurHash for visual media.
-                future.resolve()
+                resolver.fulfill(())
                 return
             }
             guard attachmentStream.isValidVisualMedia else {
-                future.reject(OWSAssertionError("Invalid attachment."))
+                resolver.reject(OWSAssertionError("Invalid attachment."))
                 return
             }
             // Use the smallest available thumbnail; quality doesn't matter.
             // This is important for perf.
             guard let thumbnail: UIImage = attachmentStream.thumbnailImageSmallSync() else {
-                future.reject(OWSAssertionError("Could not load small thumbnail."))
+                resolver.reject(OWSAssertionError("Could not load small thumbnail."))
                 return
             }
             guard let normalized = normalize(image: thumbnail, backgroundColor: .white) else {
-                future.reject(OWSAssertionError("Could not normalize thumbnail."))
+                resolver.reject(OWSAssertionError("Could not normalize thumbnail."))
                 return
             }
             // blurHash uses a DCT transform, so these are AC and DC components.
@@ -70,18 +79,18 @@ public class BlurHash: NSObject {
             //
             // https://github.com/woltapp/blurhash/blob/master/Algorithm.md
             guard let blurHash = normalized.blurHash(numberOfComponents: (4, 3)) else {
-                future.reject(OWSAssertionError("Could not generate blurHash."))
+                resolver.reject(OWSAssertionError("Could not generate blurHash."))
                 return
             }
             guard self.isValidBlurHash(blurHash) else {
-                future.reject(OWSAssertionError("Generated invalid blurHash."))
+                resolver.reject(OWSAssertionError("Generated invalid blurHash."))
                 return
             }
             self.databaseStorage.write { transaction in
                 attachmentStream.update(withBlurHash: blurHash, transaction: transaction)
             }
             Logger.verbose("Generated blurHash.")
-            future.resolve()
+            resolver.fulfill(())
         }
 
         return promise
@@ -117,7 +126,7 @@ public class BlurHash: NSObject {
         // As long as we're normalizing the image, reduce the size.
         // The blurHash algorithm doesn't need more data.
         // This also places an upper bound on blurHash perf cost.
-        let srcSize = image.pixelSize
+        let srcSize = image.pixelSize()
         guard srcSize.width > 0, srcSize.height > 0 else {
             owsFailDebug("Invalid image size.")
             return nil

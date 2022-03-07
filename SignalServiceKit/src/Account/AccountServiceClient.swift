@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 // TODO define actual type, and validate length
 public typealias IdentityKey = Data
@@ -15,17 +16,23 @@ public enum AccountServiceClientError: Error {
 @objc
 public class AccountServiceClient: NSObject {
 
+    private let serviceClient: SignalServiceClient
+
+    override init() {
+        self.serviceClient = SignalServiceRestClient()
+    }
+
     // MARK: - Public
 
-    public func requestPreauthChallenge(recipientId: String, pushToken: String, isVoipToken: Bool) -> Promise<Void> {
-        return serviceClient.requestPreauthChallenge(recipientId: recipientId, pushToken: pushToken, isVoipToken: isVoipToken)
+    public func requestPreauthChallenge(recipientId: String, pushToken: String) -> Promise<Void> {
+        return serviceClient.requestPreauthChallenge(recipientId: recipientId, pushToken: pushToken)
     }
 
     public func requestVerificationCode(recipientId: String, preauthChallenge: String?, captchaToken: String?, transport: TSVerificationTransport) -> Promise<Void> {
         return serviceClient.requestVerificationCode(recipientId: recipientId,
                                                      preauthChallenge: preauthChallenge,
                                                      captchaToken: captchaToken,
-                                                     transport: transport).recover { error -> Void in
+                                                     transport: transport).recover { error in
                                                         if error.httpStatusCode == 402 {
                                                             throw AccountServiceClientError.captchaRequired
                                                         }

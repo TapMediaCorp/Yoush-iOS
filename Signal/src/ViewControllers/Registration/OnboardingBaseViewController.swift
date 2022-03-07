@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
+import PromiseKit
 
 @objc
 public class OnboardingBaseViewController: OWSViewController {
@@ -21,18 +22,18 @@ public class OnboardingBaseViewController: OWSViewController {
 
     // MARK: - Factory Methods
 
-    func createTitleLabel(text: String) -> UILabel {
+    func titleLabel(text: String) -> UILabel {
         let titleLabel = UILabel()
         titleLabel.text = text
         titleLabel.textColor = Theme.primaryTextColor
-        titleLabel.font = UIFont.ows_dynamicTypeTitle1Clamped.ows_semibold
+        titleLabel.font = UIFont.ows_dynamicTypeTitle1Clamped.ows_semibold()
         titleLabel.numberOfLines = 0
         titleLabel.lineBreakMode = .byWordWrapping
-        titleLabel.textAlignment = .center
+//        titleLabel.textAlignment = .center
         return titleLabel
     }
 
-    func createExplanationLabel(explanationText: String) -> UILabel {
+    func explanationLabel(explanationText: String) -> UILabel {
         let explanationLabel = UILabel()
         explanationLabel.textColor = Theme.secondaryTextAndIconColor
         explanationLabel.font = UIFont.ows_dynamicTypeSubheadlineClamped
@@ -55,34 +56,30 @@ public class OnboardingBaseViewController: OWSViewController {
     }
 
     func primaryButton(title: String, selector: Selector) -> OWSFlatButton {
-        let button = OWSFlatButton.button(
-            title: title,
-            font: UIFont.ows_dynamicTypeBodyClamped.ows_semibold,
-            titleColor: .white,
-            backgroundColor: .ows_accentBlue,
-            target: self,
-            selector: selector)
-        button.button.layer.cornerRadius = 14
-        button.contentEdgeInsets = UIEdgeInsets(hMargin: 4, vMargin: 14)
-        return button
+        return button(title: title, selector: selector, titleColor: .white, backgroundColor: .ows_accentBlue)
     }
 
     func linkButton(title: String, selector: Selector) -> OWSFlatButton {
-        let button = OWSFlatButton.button(
-            title: title,
-            font: UIFont.ows_dynamicTypeSubheadlineClamped,
-            titleColor: Theme.accentBlueColor,
-            backgroundColor: .clear,
-            target: self,
-            selector: selector)
-        button.enableMultilineLabel()
-        button.button.layer.cornerRadius = 8
-        button.contentEdgeInsets = UIEdgeInsets(hMargin: 4, vMargin: 8)
-        return button
+        return button(title: title, selector: selector, titleColor: Theme.accentBlueColor, backgroundColor: .clear)
     }
 
     func shouldShowBackButton() -> Bool {
         return onboardingController.isOnboardingModeOverriden
+    }
+
+    private func button(title: String, selector: Selector, titleColor: UIColor, backgroundColor: UIColor) -> OWSFlatButton {
+        let font = UIFont(name: Fonts.Roboto_Medium, size: 16)
+        let buttonHeight = OWSFlatButton.heightForFont(font!)
+        let button = OWSFlatButton.button(title: title,
+                                          font: font!,
+                                          titleColor: titleColor,
+                                          backgroundColor: backgroundColor,
+                                          target: self,
+                                          selector: selector)
+        button.autoSetDimension(.height, toSize: buttonHeight)
+        button.layer.cornerRadius = buttonHeight / 2
+        button.clipsToBounds = true
+        return button
     }
 
     public class func horizontallyWrap(primaryButton: UIView) -> UIView {
@@ -108,6 +105,8 @@ public class OnboardingBaseViewController: OWSViewController {
         super.viewDidLoad()
 
         primaryView.layoutMargins = primaryLayoutMargins
+
+        self.shouldBottomViewReserveSpaceForKeyboard = true
 
         if shouldShowBackButton() {
             let backButton = UIButton()
@@ -162,5 +161,9 @@ public class OnboardingBaseViewController: OWSViewController {
 
     public override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         return UIDevice.current.isIPad ? .all : .portrait
+    }
+
+    public override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
     }
 }

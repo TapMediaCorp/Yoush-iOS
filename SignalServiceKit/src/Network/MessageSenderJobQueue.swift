@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -27,7 +27,7 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
     public override init() {
         super.init()
 
-        AppReadiness.runNowOrWhenAppDidBecomeReadyAsync {
+        AppReadiness.runNowOrWhenAppDidBecomeReadyPolite {
             self.setup()
         }
     }
@@ -35,88 +35,13 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
     // MARK: 
 
     @objc(addMessage:transaction:)
-    @available(swift, obsoleted: 1.0)
     public func add(message: OutgoingMessagePreparer, transaction: SDSAnyWriteTransaction) {
-        self.add(
-            message: message,
-            removeMessageAfterSending: false,
-            exclusiveToCurrentProcessIdentifier: false,
-            isHighPriority: false,
-            future: nil,
-            transaction: transaction
-        )
-    }
-
-    public func add(
-        message: OutgoingMessagePreparer,
-        limitToCurrentProcessLifetime: Bool = false,
-        isHighPriority: Bool = false,
-        transaction: SDSAnyWriteTransaction
-    ) {
-        self.add(
-            message: message,
-            removeMessageAfterSending: false,
-            exclusiveToCurrentProcessIdentifier: limitToCurrentProcessLifetime,
-            isHighPriority: isHighPriority,
-            future: nil,
-            transaction: transaction
-        )
-    }
-
-    @objc
-    @available(swift, obsoleted: 1.0)
-    public func addPromise(
-        message: OutgoingMessagePreparer,
-        removeMessageAfterSending: Bool,
-        limitToCurrentProcessLifetime: Bool,
-        isHighPriority: Bool,
-        transaction: SDSAnyWriteTransaction
-    ) -> AnyPromise {
-        return AnyPromise(add(
-            .promise,
-            message: message,
-            removeMessageAfterSending: removeMessageAfterSending,
-            limitToCurrentProcessLifetime: limitToCurrentProcessLifetime,
-            isHighPriority: isHighPriority,
-            transaction: transaction
-        ))
-    }
-
-    public func add(
-        _ namespace: PromiseNamespace,
-        message: OutgoingMessagePreparer,
-        removeMessageAfterSending: Bool = false,
-        limitToCurrentProcessLifetime: Bool = false,
-        isHighPriority: Bool = false,
-        transaction: SDSAnyWriteTransaction
-    ) -> Promise<Void> {
-        return Promise { future in
-            self.add(
-                message: message,
-                removeMessageAfterSending: false,
-                exclusiveToCurrentProcessIdentifier: limitToCurrentProcessLifetime,
-                isHighPriority: isHighPriority,
-                future: future,
-                transaction: transaction
-            )
-        }
+        self.add(message: message, removeMessageAfterSending: false, transaction: transaction)
     }
 
     @objc(addMediaMessage:dataSource:contentType:sourceFilename:caption:albumMessageId:isTemporaryAttachment:)
-    public func add(mediaMessage: TSOutgoingMessage,
-                    dataSource: DataSource,
-                    contentType: String,
-                    sourceFilename: String?,
-                    caption: String?,
-                    albumMessageId: String?,
-                    isTemporaryAttachment: Bool) {
-        let attachmentInfo = OutgoingAttachmentInfo(dataSource: dataSource,
-                                                    contentType: contentType,
-                                                    sourceFilename: sourceFilename,
-                                                    caption: caption,
-                                                    albumMessageId: albumMessageId,
-                                                    isBorderless: false,
-                                                    isLoopingVideo: false)
+    public func add(mediaMessage: TSOutgoingMessage, dataSource: DataSource, contentType: String, sourceFilename: String?, caption: String?, albumMessageId: String?, isTemporaryAttachment: Bool) {
+        let attachmentInfo = OutgoingAttachmentInfo(dataSource: dataSource, contentType: contentType, sourceFilename: sourceFilename, caption: caption, albumMessageId: albumMessageId, isBorderless: false)
         let message = OutgoingMessagePreparer(mediaMessage, unsavedAttachmentInfos: [attachmentInfo])
         add(message: message, isTemporaryAttachment: isTemporaryAttachment)
     }
@@ -124,49 +49,19 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
     @objc(addMessage:isTemporaryAttachment:)
     public func add(message: OutgoingMessagePreparer, isTemporaryAttachment: Bool) {
         databaseStorage.asyncWrite { transaction in
-            self.add(
-                message: message,
-                removeMessageAfterSending: isTemporaryAttachment,
-                exclusiveToCurrentProcessIdentifier: false,
-                isHighPriority: false,
-                future: nil,
-                transaction: transaction
-            )
+            self.add(message: message,
+                     removeMessageAfterSending: isTemporaryAttachment,
+                     transaction: transaction)
+
         }
     }
 
-    private var jobFutures = AtomicDictionary<String, Future<Void>>()
-    private func add(
-        message: OutgoingMessagePreparer,
-        removeMessageAfterSending: Bool,
-        exclusiveToCurrentProcessIdentifier: Bool,
-        isHighPriority: Bool,
-        future: Future<Void>?,
-        transaction: SDSAnyWriteTransaction
-    ) {
+    private func add(message: OutgoingMessagePreparer, removeMessageAfterSending: Bool, transaction: SDSAnyWriteTransaction) {
         assert(AppReadiness.isAppReady || CurrentAppContext().isRunningTests)
         do {
             let messageRecord = try message.prepareMessage(transaction: transaction)
-            let jobRecord = try SSKMessageSenderJobRecord(
-                message: messageRecord,
-                removeMessageAfterSending: removeMessageAfterSending,
-                isHighPriority: isHighPriority,
-                label: self.jobRecordLabel,
-                transaction: transaction
-            )
-            if exclusiveToCurrentProcessIdentifier {
-                jobRecord.flagAsExclusiveForCurrentProcessIdentifier()
-            }
+            let jobRecord = try SSKMessageSenderJobRecord(message: messageRecord, removeMessageAfterSending: removeMessageAfterSending, label: self.jobRecordLabel, transaction: transaction)
             self.add(jobRecord: jobRecord, transaction: transaction)
-            if let future = future {
-                jobFutures[jobRecord.uniqueId] = future
-            }
-            transaction.addSyncCompletion {
-                BenchManager.startEvent(
-                    title: "Send Message Milestone: Pre-Network (\(messageRecord.timestamp))",
-                    eventId: "sendMessagePreNetwork-\(messageRecord.timestamp)"
-                )
-            }
         } catch {
             message.unpreparedMessage.update(sendingError: error, transaction: transaction)
         }
@@ -177,11 +72,8 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
     public typealias DurableOperationType = MessageSenderOperation
     @objc
     public static let jobRecordLabel: String = "MessageSender"
-    // per OWSOperation.retryIntervalForExponentialBackoff(failureCount:),
-    // 110 retries will yield ~24 hours of retry.
-    public static let maxRetries: UInt = 110
+    public static let maxRetries: UInt = 30
     public let requiresInternet: Bool = true
-    public var isEnabled: Bool { true }
     public var runningOperations = AtomicArray<MessageSenderOperation>()
 
     public var jobRecordLabel: String {
@@ -195,35 +87,24 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
 
     public var isSetup = AtomicBool(false)
 
-    public func didMarkAsReady(oldJobRecord: SSKMessageSenderJobRecord,
-                               transaction: SDSAnyWriteTransaction) {
-        if let messageId = oldJobRecord.messageId,
-           let message = TSOutgoingMessage.anyFetch(uniqueId: messageId,
-                                                    transaction: transaction) as? TSOutgoingMessage {
+    public func didMarkAsReady(oldJobRecord: SSKMessageSenderJobRecord, transaction: SDSAnyWriteTransaction) {
+        if let messageId = oldJobRecord.messageId, let message = TSOutgoingMessage.anyFetch(uniqueId: messageId, transaction: transaction) as? TSOutgoingMessage {
             message.updateAllUnsentRecipientsAsSending(transaction: transaction)
         }
     }
 
-    public func buildOperation(jobRecord: SSKMessageSenderJobRecord,
-                               transaction: SDSAnyReadTransaction) throws -> MessageSenderOperation {
+    public func buildOperation(jobRecord: SSKMessageSenderJobRecord, transaction: SDSAnyReadTransaction) throws -> MessageSenderOperation {
         let message: TSOutgoingMessage
         if let invisibleMessage = jobRecord.invisibleMessage {
             message = invisibleMessage
-        } else if let messageId = jobRecord.messageId,
-                  let fetchedMessage = TSOutgoingMessage.anyFetch(uniqueId: messageId,
-                                                                  transaction: transaction) as? TSOutgoingMessage {
+        } else if let messageId = jobRecord.messageId, let fetchedMessage = TSOutgoingMessage.anyFetch(uniqueId: messageId, transaction: transaction) as? TSOutgoingMessage {
             message = fetchedMessage
         } else {
             assert(jobRecord.messageId != nil)
             throw JobError.obsolete(description: "message no longer exists")
         }
 
-        let operation = MessageSenderOperation(
-            message: message,
-            jobRecord: jobRecord,
-            future: jobFutures.pop(jobRecord.uniqueId)
-        )
-        operation.queuePriority = jobRecord.isHighPriority ? .high : MessageSender.queuePriority(for: message)
+        let operation = MessageSenderOperation(message: message, jobRecord: jobRecord)
 
         // Media messages run on their own queue to not block future non-media sends,
         // but should not start sending until all previous operations have executed.
@@ -236,7 +117,7 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
         // send before A and B, but CAN send before C.
         if jobRecord.isMediaMessage, let sendQueue = senderQueues[message.uniqueThreadId] {
             let orderMaintainingOperation = Operation()
-            orderMaintainingOperation.queuePriority = operation.queuePriority
+            orderMaintainingOperation.queuePriority = MessageSender.queuePriority(for: message)
             sendQueue.addOperation(orderMaintainingOperation)
             operation.addDependency(orderMaintainingOperation)
         }
@@ -289,8 +170,7 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
     }
 
     @objc
-    public static func enumerateEnqueuedInteractions(transaction: SDSAnyReadTransaction,
-                                                     block: @escaping (TSInteraction, UnsafeMutablePointer<ObjCBool>) -> Void) {
+    public static func enumerateEnqueuedInteractions(transaction: SDSAnyReadTransaction, block: @escaping (TSInteraction, UnsafeMutablePointer<ObjCBool>) -> Void) {
 
         let finder = AnyJobRecordFinder<SSKMessageSenderJobRecord>()
         finder.enumerateJobRecords(label: self.jobRecordLabel, transaction: transaction) { job, stop in
@@ -301,8 +181,7 @@ public class MessageSenderJobQueue: NSObject, JobQueue {
             guard let messageId = job.messageId else {
                 return
             }
-            guard let interaction = TSInteraction.anyFetch(uniqueId: messageId,
-                                                           transaction: transaction) else {
+            guard let interaction = TSInteraction.anyFetch(uniqueId: messageId, transaction: transaction) else {
                 // Interaction may have been deleted.
                 Logger.warn("Missing interaction")
                 return
@@ -327,26 +206,32 @@ public class MessageSenderOperation: OWSOperation, DurableOperation {
     // MARK: Init
 
     let message: TSOutgoingMessage
-    private var future: Future<Void>?
 
-    init(message: TSOutgoingMessage, jobRecord: SSKMessageSenderJobRecord, future: Future<Void>?) {
+    init(message: TSOutgoingMessage, jobRecord: SSKMessageSenderJobRecord) {
         self.message = message
         self.jobRecord = jobRecord
-        self.future = future
 
         super.init()
+
+        self.queuePriority = MessageSender.queuePriority(for: message)
+    }
+
+    // MARK: Dependencies
+
+    var messageSender: MessageSender {
+        return SSKEnvironment.shared.messageSender
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
     }
 
     // MARK: OWSOperation
 
     override public func run() {
         self.messageSender.sendMessage(message.asPreparer,
-                                       success: {
-                                        self.reportSuccess()
-        },
-                                       failure: { error in
-                                        self.reportError(withUndefinedRetry: error)
-        })
+                                       success: reportSuccess,
+                                       failure: reportError(withUndefinedRetry:))
     }
 
     override public func didSucceed() {
@@ -357,27 +242,35 @@ public class MessageSenderOperation: OWSOperation, DurableOperation {
                 self.message.removeTemporaryAttachments(with: transaction)
             }
         }
-        future?.resolve()
     }
 
     override public func didReportError(_ error: Error) {
         Logger.debug("remainingRetries: \(self.remainingRetries)")
 
         databaseStorage.write { transaction in
-            self.durableOperationDelegate?.durableOperation(self, didReportError: error,
-                                                            transaction: transaction)
+            self.durableOperationDelegate?.durableOperation(self, didReportError: error, transaction: transaction)
         }
     }
 
     override public func retryInterval() -> TimeInterval {
-        return OWSOperation.retryIntervalForExponentialBackoff(failureCount: jobRecord.failureCount)
+        // Arbitrary backoff factor...
+        // With backOffFactor of 1.9
+        // try  1 delay:  0.00s
+        // try  2 delay:  0.19s
+        // ...
+        // try  5 delay:  1.30s
+        // ...
+        // try 11 delay: 61.31s
+        let backoffFactor = 1.9
+        let maxBackoff = 15 * kMinuteInterval
+
+        let seconds = 0.1 * min(maxBackoff, pow(backoffFactor, Double(self.jobRecord.failureCount)))
+        return seconds
     }
 
     override public func didFail(error: Error) {
         databaseStorage.write { transaction in
-            self.durableOperationDelegate?.durableOperation(self,
-                                                            didFailWithError: error,
-                                                            transaction: transaction)
+            self.durableOperationDelegate?.durableOperation(self, didFailWithError: error, transaction: transaction)
 
             self.message.update(sendingError: error, transaction: transaction)
 
@@ -385,6 +278,5 @@ public class MessageSenderOperation: OWSOperation, DurableOperation {
                 self.message.anyRemove(transaction: transaction)
             }
         }
-        future?.reject(error)
     }
 }

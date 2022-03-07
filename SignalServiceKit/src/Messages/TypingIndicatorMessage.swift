@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -43,6 +43,11 @@ public class TypingIndicatorMessage: TSOutgoingMessage {
     }
 
     @objc
+    public override var isSilent: Bool {
+        return true
+    }
+
+    @objc
     public override var isOnline: Bool {
         return true
     }
@@ -57,7 +62,8 @@ public class TypingIndicatorMessage: TSOutgoingMessage {
     }
 
     @objc
-    public override func buildPlainTextData(_ thread: TSThread,
+    public override func buildPlainTextData(_ recipient: SignalRecipient,
+                                            thread: TSThread,
                                             transaction: SDSAnyReadTransaction) -> Data? {
 
         let typingBuilder = SSKProtoTypingMessage.builder(timestamp: self.timestamp)
@@ -92,9 +98,15 @@ public class TypingIndicatorMessage: TSOutgoingMessage {
         return "typingIndicatorMessage"
     }
 
-    @objc
-    override var shouldRecordSendLog: Bool { false }
+    // MARK: 
 
-    @objc
-    override var contentHint: SealedSenderContentHint { .implicit }
+    @objc(stringForTypingIndicatorAction:)
+    public class func string(forTypingIndicatorAction action: TypingIndicatorAction) -> String {
+        switch action {
+        case .started:
+            return "started"
+        case .stopped:
+            return "stopped"
+        }
+    }
 }

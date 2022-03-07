@@ -1,25 +1,26 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc(OWSFakeStorageServiceManager)
-public class FakeStorageServiceManager: NSObject, StorageServiceManagerProtocol {
-    public func recordPendingDeletions(deletedAccountIds: [AccountId]) {}
-    public func recordPendingDeletions(deletedAddresses: [SignalServiceAddress]) {}
-    public func recordPendingDeletions(deletedGroupV1Ids: [Data]) {}
-    public func recordPendingDeletions(deletedGroupV2MasterKeys: [Data]) {}
+class FakeStorageServiceManager: NSObject, StorageServiceManagerProtocol {
+    func recordPendingDeletions(deletedAccountIds: [AccountId]) {}
+    func recordPendingDeletions(deletedAddresses: [SignalServiceAddress]) {}
+    func recordPendingDeletions(deletedGroupV1Ids: [Data]) {}
+    func recordPendingDeletions(deletedGroupV2MasterKeys: [Data]) {}
 
-    public func recordPendingUpdates(updatedAccountIds: [AccountId]) {}
-    public func recordPendingUpdates(updatedAddresses: [SignalServiceAddress]) {}
-    public func recordPendingUpdates(updatedGroupV1Ids: [Data]) {}
-    public func recordPendingUpdates(updatedGroupV2MasterKeys: [Data]) {}
-    public func recordPendingUpdates(groupModel: TSGroupModel) {}
-    public func recordPendingLocalAccountUpdates() {}
+    func recordPendingUpdates(updatedAccountIds: [AccountId]) {}
+    func recordPendingUpdates(updatedAddresses: [SignalServiceAddress]) {}
+    func recordPendingUpdates(updatedGroupV1Ids: [Data]) {}
+    func recordPendingUpdates(updatedGroupV2MasterKeys: [Data]) {}
+    func recordPendingUpdates(groupModel: TSGroupModel) {}
+    func recordPendingLocalAccountUpdates() {}
 
-    public func backupPendingChanges() {}
-    public func restoreOrCreateManifestIfNecessary() -> AnyPromise { AnyPromise(Promise.value(())) }
+    func backupPendingChanges() {}
+    func restoreOrCreateManifestIfNecessary() -> AnyPromise { AnyPromise(Promise.value(())) }
 
-    public func resetLocalData(transaction: SDSAnyWriteTransaction) {}
+    func resetLocalData(transaction: SDSAnyWriteTransaction) {}
 }

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSFakeCallMessageHandler.h"
@@ -10,21 +10,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation OWSFakeCallMessageHandler
 
-- (OWSCallMessageAction)actionForEnvelope:(SSKProtoEnvelope *)envelope
-                              callMessage:(SSKProtoCallMessage *)message
-                  serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-{
-    return OWSCallMessageActionProcess;
-}
-
 - (void)receivedOffer:(SSKProtoCallMessageOffer *)offer
-                 fromCaller:(SignalServiceAddress *)caller
-               sourceDevice:(uint32_t)device
-            sentAtTimestamp:(uint64_t)sentAtTimestamp
-    serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-    serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-          supportsMultiRing:(BOOL)supportsMultiRing
-                transaction:(SDSAnyWriteTransaction *)transaction
+           fromCaller:(SignalServiceAddress *)caller
+         sourceDevice:(uint32_t)device
+      sentAtTimestamp:(uint64_t)sentAtTimestamp
+    supportsMultiRing:(BOOL)supportsMultiRing
 {
     OWSLogInfo(@"");
 }
@@ -56,32 +46,6 @@ NS_ASSUME_NONNULL_BEGIN
         sourceDevice:(uint32_t)device
 {
     OWSLogInfo(@"");
-}
-
-- (void)receivedOpaque:(SSKProtoCallMessageOpaque *)opaque
-                 fromCaller:(SignalServiceAddress *)caller
-               sourceDevice:(uint32_t)device
-    serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-    serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-                transaction:(SDSAnyWriteTransaction *)transaction
-{
-    OWSLogInfo(@"");
-}
-
-- (void)receivedGroupCallUpdateMessage:(SSKProtoDataMessageGroupCallUpdate *)update
-                             forThread:(TSGroupThread *)groupThread
-               serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-{
-    OWSLogInfo(@"");
-}
-
-- (void)externallyHandleCallMessageWithEnvelope:(SSKProtoEnvelope *)envelope
-                                  plaintextData:(NSData *)plaintextData
-                                wasReceivedByUD:(BOOL)wasReceivedByUD
-                        serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-                                    transaction:(SDSAnyWriteTransaction *)transaction
-{
-    OWSFailDebug(@"Can't handle externally.");
 }
 
 @end

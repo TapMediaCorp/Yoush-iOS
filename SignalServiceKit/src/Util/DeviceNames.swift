@@ -1,9 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Curve25519Kit
+import AxolotlKit
 
 public enum DeviceNameError: Error {
     case assertionFailure
@@ -73,11 +74,11 @@ public class DeviceNames: NSObject {
             owsFailDebug("Could not convert text to UTF-8.")
             throw DeviceNameError.assertionFailure
         }
-        guard let syntheticIVKey = Cryptography.computeSHA256HMAC(syntheticIVInput, key: masterSecret) else {
+        guard let syntheticIVKey = Cryptography.computeSHA256HMAC(syntheticIVInput, withHMACKey: masterSecret) else {
             owsFailDebug("Could not compute synthetic IV key.")
             throw DeviceNameError.assertionFailure
         }
-        guard let syntheticIV = Cryptography.computeSHA256HMAC(plaintextData, key: syntheticIVKey, truncatedToBytes: syntheticIVLength) else {
+        guard let syntheticIV = Cryptography.truncatedSHA256HMAC(plaintextData, withHMACKey: syntheticIVKey, truncation: syntheticIVLength) else {
             owsFailDebug("Could not compute synthetic IV.")
             throw DeviceNameError.assertionFailure
         }
@@ -91,11 +92,11 @@ public class DeviceNames: NSObject {
             owsFailDebug("Could not convert text to UTF-8.")
             throw DeviceNameError.assertionFailure
         }
-        guard let cipherKeyKey = Cryptography.computeSHA256HMAC(cipherKeyInput, key: masterSecret) else {
+        guard let cipherKeyKey = Cryptography.computeSHA256HMAC(cipherKeyInput, withHMACKey: masterSecret) else {
             owsFailDebug("Could not compute cipher key key.")
             throw DeviceNameError.assertionFailure
         }
-        guard let cipherKey = Cryptography.computeSHA256HMAC(syntheticIV, key: cipherKeyKey) else {
+        guard let cipherKey = Cryptography.computeSHA256HMAC(syntheticIV, withHMACKey: cipherKeyKey) else {
             owsFailDebug("Could not compute cipher key.")
             throw DeviceNameError.assertionFailure
         }
@@ -121,7 +122,7 @@ public class DeviceNames: NSObject {
 
         let proto: SignalIOSProtoDeviceName
         do {
-            proto = try SignalIOSProtoDeviceName(serializedData: protoData)
+            proto = try SignalIOSProtoDeviceName.parseData(protoData)
         } catch {
             // Not necessarily an error; might be a legacy device name.
             Logger.error("failed to parse proto")

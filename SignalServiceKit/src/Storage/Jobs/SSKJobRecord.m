@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "SSKJobRecord.h"
@@ -15,7 +15,6 @@ NSErrorDomain const SSKJobRecordErrorDomain = @"SignalServiceKit.JobRecord";
 
 @property (nonatomic) SSKJobRecordStatus status;
 @property (nonatomic) UInt64 sortId;
-@property (nonatomic, nullable) NSString *exclusiveProcessIdentifier;
 
 @end
 
@@ -49,7 +48,6 @@ NSErrorDomain const SSKJobRecordErrorDomain = @"SignalServiceKit.JobRecord";
 
 - (instancetype)initWithGrdbId:(int64_t)grdbId
                       uniqueId:(NSString *)uniqueId
-      exclusiveProcessIdentifier:(nullable NSString *)exclusiveProcessIdentifier
                     failureCount:(NSUInteger)failureCount
                            label:(NSString *)label
                           sortId:(unsigned long long)sortId
@@ -62,7 +60,6 @@ NSErrorDomain const SSKJobRecordErrorDomain = @"SignalServiceKit.JobRecord";
         return self;
     }
 
-    _exclusiveProcessIdentifier = exclusiveProcessIdentifier;
     _failureCount = failureCount;
     _label = label;
     _sortId = sortId;
@@ -85,26 +82,19 @@ NSErrorDomain const SSKJobRecordErrorDomain = @"SignalServiceKit.JobRecord";
     return @"JobRecord";
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-implementations"
+- (void)ydb_saveWithTransaction:(YapDatabaseReadWriteTransaction *)transaction
+{
+    // This is *only* for Yap. For GRDB we get the sortId from the DB autoincrement column
+    if (self.sortId == 0) {
+        self.sortId = [SSKIncrementingIdFinder nextIdWithKey:self.class.collection transaction:transaction];
+    }
+    [super ydb_saveWithTransaction:transaction];
+}
+#pragma clang diagnostic pop
+
 #pragma mark -
-
-+ (NSString *)currentProcessIdentifier
-{
-    static NSString *processIdentifier = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ processIdentifier = [NSUUID UUID].UUIDString; });
-    return processIdentifier;
-}
-
-- (void)flagAsExclusiveForCurrentProcessIdentifier
-{
-    self.exclusiveProcessIdentifier = [[self class] currentProcessIdentifier];
-}
-
-- (void)updateWithExclusiveForCurrentProcessIdentifierWithTransaction:(SDSAnyWriteTransaction *)transaction
-{
-    [self anyUpdateWithTransaction:transaction
-                             block:^(SSKJobRecord *record) { [record flagAsExclusiveForCurrentProcessIdentifier]; }];
-}
 
 - (void)updateStatus:(SSKJobRecordStatus)status transaction:(SDSAnyWriteTransaction *)transaction
 {

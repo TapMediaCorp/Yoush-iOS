@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalMetadataKit
 
 @objc
@@ -13,17 +14,17 @@ public enum SignalServiceError: Int, Error {
 // MARK: -
 
 public protocol SignalServiceClient {
-    func requestPreauthChallenge(recipientId: String, pushToken: String, isVoipToken: Bool) -> Promise<Void>
+    func requestPreauthChallenge(recipientId: String, pushToken: String) -> Promise<Void>
     func requestVerificationCode(recipientId: String, preauthChallenge: String?, captchaToken: String?, transport: TSVerificationTransport) -> Promise<Void>
     func verifySecondaryDevice(verificationCode: String, phoneNumber: String, authKey: String, encryptedDeviceName: Data) -> Promise<UInt32>
     func getAvailablePreKeys() -> Promise<Int>
     func registerPreKeys(identityKey: IdentityKey, signedPreKeyRecord: SignedPreKeyRecord, preKeyRecords: [PreKeyRecord]) -> Promise<Void>
     func setCurrentSignedPreKey(_ signedPreKey: SignedPreKeyRecord) -> Promise<Void>
-    func requestUDSenderCertificate(uuidOnly: Bool) -> Promise<Data>
+    func requestUDSenderCertificate() -> Promise<Data>
     func updatePrimaryDeviceAccountAttributes() -> Promise<Void>
     func getAccountUuid() -> Promise<UUID>
     func requestStorageAuth() -> Promise<(username: String, password: String)>
-    func getRemoteConfig() -> Promise<[String: RemoteConfigItem]>
+    func getRemoteConfig() -> Promise<[String: Bool]>
 
     // MARK: - Secondary Devices
 
@@ -32,25 +33,25 @@ public protocol SignalServiceClient {
 
 // MARK: -
 
-public enum RemoteConfigItem {
-    case isEnabled(isEnabled: Bool)
-    case value(value: AnyObject)
-}
-
-// MARK: -
-
 /// Based on libsignal-service-java's PushServiceSocket class
 @objc
 public class SignalServiceRestClient: NSObject, SignalServiceClient {
 
-    public static let shared = SignalServiceRestClient()
+    // MARK: - Dependencies
+
+    var networkManager: TSNetworkManager {
+        return TSNetworkManager.shared()
+    }
+
+    private var tsAccountManager: TSAccountManager {
+        return SSKEnvironment.shared.tsAccountManager
+    }
 
     // MARK: - Public
 
-    public func requestPreauthChallenge(recipientId: String, pushToken: String, isVoipToken: Bool) -> Promise<Void> {
+    public func requestPreauthChallenge(recipientId: String, pushToken: String) -> Promise<Void> {
         let request = OWSRequestFactory.requestPreauthChallengeRequest(recipientId: recipientId,
-                                                                       pushToken: pushToken,
-                                                                       isVoipToken: isVoipToken)
+                                                                       pushToken: pushToken)
         return networkManager.makePromise(request: request).asVoid()
     }
 
@@ -68,13 +69,10 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
         let request = OWSRequestFactory.availablePreKeysCountRequest()
         return firstly {
             networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
+        }.map { _, responseObject in
             Logger.debug("got response")
-            guard let json = response.responseBodyJson else {
-                throw OWSAssertionError("Missing or invalid JSON.")
-            }
-            guard let params = ParamParser(responseObject: json) else {
-                throw OWSAssertionError("Missing or invalid response.")
+            guard let params = ParamParser(responseObject: responseObject) else {
+                throw self.unexpectedServerResponseError()
             }
 
             let count: Int = try params.required(key: "count")
@@ -97,15 +95,12 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
         return networkManager.makePromise(request: request).asVoid()
     }
 
-    public func requestUDSenderCertificate(uuidOnly: Bool) -> Promise<Data> {
-        let request = OWSRequestFactory.udSenderCertificateRequest(uuidOnly: uuidOnly)
+    public func requestUDSenderCertificate() -> Promise<Data> {
+        let request = OWSRequestFactory.udSenderCertificateRequest()
         return firstly {
             self.networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
-            guard let json = response.responseBodyJson else {
-                throw OWSUDError.invalidData(description: "Missing or invalid JSON")
-            }
-            guard let parser = ParamParser(responseObject: json) else {
+        }.map { _, responseObject in
+            guard let parser = ParamParser(responseObject: responseObject) else {
                 throw OWSUDError.invalidData(description: "Invalid sender certificate response")
             }
 
@@ -125,20 +120,15 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
     public func getAccountUuid() -> Promise<UUID> {
         let request = OWSRequestFactory.accountWhoAmIRequest()
 
-        return firstly {
-            networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
-            guard let json = response.responseBodyJson else {
-                throw OWSAssertionError("Missing or invalid JSON.")
-            }
-            guard let parser = ParamParser(responseObject: json) else {
-                throw OWSAssertionError("Missing or invalid response.")
+        return networkManager.makePromise(request: request).map { _, responseObject in
+            guard let parser = ParamParser(responseObject: responseObject) else {
+                throw OWSErrorMakeUnableToProcessServerResponseError()
             }
 
             let uuidString: String = try parser.required(key: "uuid")
 
             guard let uuid = UUID(uuidString: uuidString) else {
-                throw OWSAssertionError("Missing or invalid uuid.")
+                throw OWSErrorMakeUnableToProcessServerResponseError()
             }
 
             return uuid
@@ -147,14 +137,9 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
 
     public func requestStorageAuth() -> Promise<(username: String, password: String)> {
         let request = OWSRequestFactory.storageAuthRequest()
-        return firstly {
-            networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
-            guard let json = response.responseBodyJson else {
-                throw OWSAssertionError("Missing or invalid JSON.")
-            }
-            guard let parser = ParamParser(responseObject: json) else {
-                throw OWSAssertionError("Missing or invalid response.")
+        return networkManager.makePromise(request: request).map { _, responseObject in
+            guard let parser = ParamParser(responseObject: responseObject) else {
+                throw OWSErrorMakeUnableToProcessServerResponseError()
             }
 
             let username: String = try parser.required(key: "username")
@@ -176,12 +161,9 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
 
         return firstly {
             networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
-            guard let json = response.responseBodyJson else {
-                throw OWSAssertionError("Missing or invalid JSON.")
-            }
-            guard let parser = ParamParser(responseObject: json) else {
-                throw OWSAssertionError("Missing or invalid response.")
+        }.map(on: .global()) { _, responseObject in
+            guard let parser = ParamParser(responseObject: responseObject) else {
+                throw OWSErrorMakeUnableToProcessServerResponseError()
             }
 
             let deviceId: UInt32 = try parser.required(key: "deviceId")
@@ -201,17 +183,12 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
     }
 
     // yields a map of ["feature_name": isEnabled]
-    public func getRemoteConfig() -> Promise<[String: RemoteConfigItem]> {
+    public func getRemoteConfig() -> Promise<[String: Bool]> {
         let request = OWSRequestFactory.getRemoteConfigRequest()
 
-        return firstly {
-            networkManager.makePromise(request: request)
-        }.map(on: .global()) { response in
-            guard let json = response.responseBodyJson else {
-                throw OWSAssertionError("Missing or invalid JSON.")
-            }
-            guard let parser = ParamParser(responseObject: json) else {
-                throw OWSAssertionError("Missing or invalid response.")
+        return networkManager.makePromise(request: request).map { _, responseObject in
+            guard let parser = ParamParser(responseObject: responseObject) else {
+                throw OWSErrorMakeUnableToProcessServerResponseError()
             }
 
             let config: [[String: Any]] = try parser.required(key: "config")
@@ -219,17 +196,12 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
             return try config.reduce([:]) { accum, item in
                 var accum = accum
                 guard let itemParser = ParamParser(responseObject: item) else {
-                    throw OWSAssertionError("Missing or invalid remote config item.")
+                    throw OWSErrorMakeUnableToProcessServerResponseError()
                 }
 
                 let name: String = try itemParser.required(key: "name")
                 let isEnabled: Bool = try itemParser.required(key: "enabled")
-
-                if let value: AnyObject = try itemParser.optional(key: "value") {
-                    accum[name] = RemoteConfigItem.value(value: value)
-                } else {
-                    accum[name] = RemoteConfigItem.isEnabled(isEnabled: isEnabled)
-                }
+                accum[name] = isEnabled
 
                 return accum
             }
@@ -241,5 +213,11 @@ public class SignalServiceRestClient: NSObject, SignalServiceClient {
     public func updateSecondaryDeviceCapabilities() -> Promise<Void> {
         let request = OWSRequestFactory.updateSecondaryDeviceCapabilitiesRequest()
         return self.networkManager.makePromise(request: request).asVoid()
+    }
+
+    // MARK: - Helpers
+
+    private func unexpectedServerResponseError() -> Error {
+        return OWSErrorMakeUnableToProcessServerResponseError()
     }
 }

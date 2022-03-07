@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSDisappearingMessagesConfiguration.h"
@@ -8,8 +8,6 @@
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
-
-static NSString *const kUniversalTimerThreadId = @"kUniversalTimerThreadId";
 
 @interface OWSDisappearingMessagesConfiguration ()
 
@@ -98,36 +96,49 @@ static NSString *const kUniversalTimerThreadId = @"kUniversalTimerThreadId";
     }
 
     return [[self alloc] initWithThreadId:threadId
-                                  enabled:OWSDisappearingMessagesConfigurationDefaultExpirationDuration > 0
+                                  enabled:NO
                           durationSeconds:OWSDisappearingMessagesConfigurationDefaultExpirationDuration];
 }
 
-+ (instancetype)fetchOrBuildDefaultUniversalConfigurationWithTransaction:(SDSAnyReadTransaction *)transaction
-{
-    return [self fetchOrBuildDefaultWithThreadId:kUniversalTimerThreadId transaction:transaction];
-}
-
-+ (NSArray<NSNumber *> *)presetDurationsSeconds
++ (NSArray<NSNumber *> *)validDurationsSeconds
 {
     return @[
+        @(5 * kSecondInterval),
+        @(10 * kSecondInterval),
         @(30 * kSecondInterval),
+        @(1 * kMinuteInterval),
         @(5 * kMinuteInterval),
+        @(30 * kMinuteInterval),
         @(1 * kHourInterval),
-        @(8 * kHourInterval),
+        @(6 * kHourInterval),
+        @(12 * kHourInterval),
         @(24 * kHourInterval),
-        @(1 * kWeekInterval),
-        @(4 * kWeekInterval)
+        @(1 * kWeekInterval)
     ];
 }
 
 + (uint32_t)maxDurationSeconds
 {
-    return kYearInterval;
+    static uint32_t max;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        max = [[self.validDurationsSeconds valueForKeyPath:@"@max.intValue"] unsignedIntValue];
+
+        // It's safe to update this assert if we add a larger duration
+        OWSAssertDebug(max == 1 * kWeekInterval);
+    });
+
+    return max;
+}
+
+- (NSUInteger)durationIndex
+{
+    return [[self.class validDurationsSeconds] indexOfObject:@(self.durationSeconds)];
 }
 
 - (NSString *)durationString
 {
-    return [NSString formatDurationLosslessWithDurationSeconds:self.durationSeconds];
+    return [NSString formatDurationSeconds:self.durationSeconds useShortFormat:NO];
 }
 
 - (BOOL)hasChangedWithTransaction:(SDSAnyReadTransaction *)transaction

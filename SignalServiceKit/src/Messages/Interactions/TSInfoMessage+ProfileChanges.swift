@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -19,19 +19,15 @@ public extension TSInfoMessage {
             let profileUpdateMessage = TSInfoMessage(
                 thread: thread,
                 messageType: .profileUpdate,
-                infoMessageUserInfo: [.profileChanges: profileChanges]
+                infoMessageUserInfo: [InfoMessageUserInfoKey.profileChanges.rawValue: profileChanges]
             )
-            profileUpdateMessage.wasRead = true
             profileUpdateMessage.anyInsert(transaction: transaction)
         }
 
         let contactThread = TSContactThread.getOrCreateThread(withContactAddress: address, transaction: transaction)
-        if contactThread.shouldThreadBeVisible {
-            saveProfileUpdateMessage(thread: contactThread)
-        }
+        saveProfileUpdateMessage(thread: contactThread)
 
         for groupThread in TSGroupThread.groupThreads(with: address, transaction: transaction) {
-            guard groupThread.groupModel.groupMembership.isLocalUserFullMember && groupThread.shouldThreadBeVisible else { continue }
             saveProfileUpdateMessage(thread: groupThread)
         }
     }
@@ -44,18 +40,8 @@ public class ProfileChanges: MTLModel {
     var oldNameComponents: PersonNameComponents?
     var newNameComponents: PersonNameComponents?
 
-    var oldFullName: String? {
-        guard let oldNameComponents = oldNameComponents else { return nil }
-        return OWSFormat.formatNameComponents(oldNameComponents).filterStringForDisplay()
-    }
-
-    var newFullName: String? {
-        guard let newNameComponents = newNameComponents else { return nil }
-        return OWSFormat.formatNameComponents(newNameComponents).filterStringForDisplay()
-    }
-
     var hasRenderableChanges: Bool {
-        return oldFullName != nil && newFullName != nil && oldFullName != newFullName
+        return oldNameComponents != nil && newNameComponents != nil && oldNameComponents != newNameComponents
     }
 
     init(oldProfile: OWSUserProfile, newProfile: OWSUserProfile) {
@@ -82,18 +68,33 @@ public class ProfileChanges: MTLModel {
         try super.init(dictionary: dictionaryValue)
     }
 
+    var contactsManager: ContactsManagerProtocol {
+        return SSKEnvironment.shared.contactsManager
+    }
+
     func descriptionForUpdate(transaction: SDSAnyReadTransaction) -> String? {
         guard let address = address else {
             owsFailDebug("Unexpectedly missing address for profile change")
             return nil
         }
 
-        guard let oldFullName = oldFullName, let newFullName = newFullName else {
-            owsFailDebug("Unexpectedly missing old and new full name")
+        guard let oldNameComponents = oldNameComponents, let newNameComponents = newNameComponents else {
+            owsFailDebug("Unexpectedly missing name change for profile change")
             return nil
         }
 
-        if contactsManager.hasNameInSystemContacts(for: address, transaction: transaction) {
+        let oldFullName = PersonNameComponentsFormatter.localizedString(
+            from: oldNameComponents,
+            style: .default,
+            options: []
+        )
+        let newFullName = PersonNameComponentsFormatter.localizedString(
+            from: newNameComponents,
+            style: .default,
+            options: []
+        )
+
+        if contactsManager.hasNameInSystemContacts(for: address) {
             let displayName = contactsManager.displayName(for: address, transaction: transaction)
 
             let formatString = NSLocalizedString(

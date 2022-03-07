@@ -1,10 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
-protocol GifPickerLayoutDelegate: AnyObject {
+protocol GifPickerLayoutDelegate: class {
     func imageInfosForLayout() -> [GiphyImageInfo]
 }
 
@@ -19,7 +19,7 @@ class GifPickerLayout: UICollectionViewLayout {
 
     // MARK: Initializers and Factory Methods
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init?(coder aDecoder: NSCoder) {
         notImplemented()
     }
@@ -102,7 +102,7 @@ class GifPickerLayout: UICollectionViewLayout {
             }
             let cellX = columnXs[column]
             let cellWidth = columnWidth
-            let cellHeight = UInt(CGFloat(columnWidth) / imageInfo.originalAspectRatio)
+            let cellHeight = UInt(columnWidth * imageInfo.originalRendition.height / imageInfo.originalRendition.width)
 
             let indexPath = NSIndexPath(row: cellIndex, section: 0)
             let itemAttributes = UICollectionViewLayoutAttributes(forCellWith: indexPath as IndexPath)

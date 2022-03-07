@@ -1,18 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
-protocol AttachmentFormatPickerDelegate: AnyObject {
-    func didTapCamera()
+protocol AttachmentFormatPickerDelegate: class {
+    func didTapCamera(withPhotoCapture: PhotoCapture?)
     func didTapGif()
     func didTapFile()
-    func didTapContact()
+    // func didTapContact()
     func didTapLocation()
-    func didTapPayment()
-
-    var isGroup: Bool { get }
 }
 
 class AttachmentFormatPickerView: UICollectionView {
@@ -26,14 +24,7 @@ class AttachmentFormatPickerView: UICollectionView {
     }
 
     private let collectionViewFlowLayout = UICollectionViewFlowLayout()
-
-    private var isGroup: Bool {
-        guard let attachmentFormatPickerDelegate = attachmentFormatPickerDelegate else {
-            owsFailDebug("Missing attachmentFormatPickerDelegate.")
-            return false
-        }
-        return attachmentFormatPickerDelegate.isGroup
-    }
+    private var photoCapture: PhotoCapture?
 
     init() {
         super.init(frame: .zero, collectionViewLayout: collectionViewFlowLayout)
@@ -54,6 +45,33 @@ class AttachmentFormatPickerView: UICollectionView {
         updateLayout()
     }
 
+    deinit {
+        stopCameraPreview()
+    }
+
+    func startCameraPreview() {
+        guard photoCapture == nil else { return }
+
+        let photoCapture = PhotoCapture()
+        photoCapture.delegate = self
+        self.photoCapture = photoCapture
+
+        // Force the preview view to load, otherwise it might
+        // load on the background thread while starting the session
+        _ = photoCapture.previewView
+
+        photoCapture.startVideoCapture().done { [weak self] in
+            self?.reloadData()
+        }.catch { error in
+            owsFailDebug("Error: \(error)")
+        }
+    }
+
+    func stopCameraPreview() {
+        photoCapture?.stopCapture()
+        photoCapture = nil
+    }
+
     private func updateLayout() {
         AssertIsOnMainThread()
 
@@ -70,55 +88,91 @@ class AttachmentFormatPickerView: UICollectionView {
     }
 }
 
-enum AttachmentType: String, CaseIterable, Dependencies {
+enum AttachmentType: String, CaseIterable {
     case camera
     case gif
     case file
-    case payment
-    case contact
+    // case contact
     case location
-
-    static var contactCases: [AttachmentType] {
-        if payments.shouldShowPaymentsUI {
-            return allCases
-        } else {
-            return everythingExceptPayments
-        }
-    }
-
-    static var groupCases: [AttachmentType] {
-        everythingExceptPayments
-    }
-
-    static var everythingExceptPayments: [AttachmentType] {
-        return allCases.filter { (value: AttachmentType) in
-            value != .payment
-        }
-    }
-
-    static func cases(isGroup: Bool) -> [AttachmentType] {
-        return isGroup ? groupCases : contactCases
-    }
 }
 
 // MARK: - UICollectionViewDelegate
 
 extension AttachmentFormatPickerView: UICollectionViewDelegate {
     public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        switch AttachmentType.cases(isGroup: isGroup)[indexPath.row] {
+        switch AttachmentType.allCases[indexPath.row] {
         case .camera:
-            attachmentFormatPickerDelegate?.didTapCamera()
-        case .contact:
-            attachmentFormatPickerDelegate?.didTapContact()
+            // Since we're trying to pass on our prepared capture session to
+            // the camera view, nil it out so we don't try and stop it here.
+
+            let photoCapture = self.photoCapture
+            self.photoCapture = nil
+            attachmentFormatPickerDelegate?.didTapCamera(withPhotoCapture: photoCapture)
+        // case .contact:
+        //     attachmentFormatPickerDelegate?.didTapContact()
         case .file:
             attachmentFormatPickerDelegate?.didTapFile()
         case .gif:
             attachmentFormatPickerDelegate?.didTapGif()
         case .location:
             attachmentFormatPickerDelegate?.didTapLocation()
-        case .payment:
-            attachmentFormatPickerDelegate?.didTapPayment()
         }
+    }
+}
+
+extension AttachmentFormatPickerView: PhotoCaptureDelegate {
+    func photoCaptureDidStartPhotoCapture(_ photoCapture: PhotoCapture) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCapture(_ photoCapture: PhotoCapture, didFinishProcessingAttachment attachment: SignalAttachment) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCapture(_ photoCapture: PhotoCapture, processingDidError error: Error) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCaptureDidBeginMovie(_ photoCapture: PhotoCapture) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCaptureDidCompleteMovie(_ photoCapture: PhotoCapture) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCaptureDidCancelMovie(_ photoCapture: PhotoCapture) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCaptureCanCaptureMoreItems(_ photoCapture: PhotoCapture) -> Bool {
+        owsFailDebug("\(#function) should never be called")
+        return false
+    }
+
+    func photoCaptureDidTryToCaptureTooMany(_ photoCapture: PhotoCapture) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    var zoomScaleReferenceHeight: CGFloat? {
+        owsFailDebug("\(#function) should never be called")
+        return nil
+    }
+
+    func photoCapture(_ photoCapture: PhotoCapture, didChangeOrientation orientation: AVCaptureVideoOrientation) {
+        photoCapture.updateVideoPreviewConnection(toOrientation: orientation)
+    }
+
+    func beginCaptureButtonAnimation(_ duration: TimeInterval) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func endCaptureButtonAnimation(_ duration: TimeInterval) {
+        owsFailDebug("\(#function) should never be called")
+    }
+
+    func photoCapture(_ photoCapture: PhotoCapture, didCompleteFocusingAtPoint focusPoint: CGPoint) {
+        // no-op
     }
 }
 
@@ -131,7 +185,7 @@ extension AttachmentFormatPickerView: UICollectionViewDataSource {
     }
 
     public func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection sectionIdx: Int) -> Int {
-        return AttachmentType.cases(isGroup: isGroup).count
+        return AttachmentType.allCases.count
     }
 
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -139,8 +193,8 @@ extension AttachmentFormatPickerView: UICollectionViewDataSource {
             owsFail("cell was unexpectedly nil")
         }
 
-        let type = AttachmentType.cases(isGroup: isGroup)[indexPath.item]
-        cell.configure(type: type)
+        let type = AttachmentType.allCases[indexPath.item]
+        cell.configure(type: type, cameraPreview: photoCapture?.previewView)
         return cell
     }
 }
@@ -153,6 +207,11 @@ class AttachmentFormatCell: UICollectionViewCell {
     let label = UILabel()
 
     var attachmentType: AttachmentType?
+    weak var cameraPreview: CapturePreviewView?
+
+    private var hasCameraAccess: Bool {
+        return AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+    }
 
     override init(frame: CGRect) {
 
@@ -168,7 +227,7 @@ class AttachmentFormatCell: UICollectionViewCell {
         imageView.autoSetDimensions(to: CGSize(square: 32))
         imageView.contentMode = .scaleAspectFit
 
-        label.font = UIFont.ows_dynamicTypeFootnoteClamped.ows_semibold
+        label.font = UIFont.ows_dynamicTypeFootnoteClamped.ows_semibold()
         label.textColor = Theme.attachmentKeyboardItemImageColor
         label.textAlignment = .center
         label.adjustsFontSizeToFitWidth = true
@@ -196,8 +255,9 @@ class AttachmentFormatCell: UICollectionViewCell {
         notImplemented()
     }
 
-    public func configure(type: AttachmentType) {
+    public func configure(type: AttachmentType, cameraPreview: CapturePreviewView?) {
         self.attachmentType = type
+        self.cameraPreview = cameraPreview
 
         let imageName: String
         let text: String
@@ -206,9 +266,9 @@ class AttachmentFormatCell: UICollectionViewCell {
         case .camera:
             text = NSLocalizedString("ATTACHMENT_KEYBOARD_CAMERA", comment: "A button to open the camera from the Attachment Keyboard")
             imageName = Theme.iconName(.attachmentCamera)
-        case .contact:
-            text = NSLocalizedString("ATTACHMENT_KEYBOARD_CONTACT", comment: "A button to select a contact from the Attachment Keyboard")
-            imageName = Theme.iconName(.attachmentContact)
+        // case .contact:
+        //     text = NSLocalizedString("ATTACHMENT_KEYBOARD_CONTACT", comment: "A button to select a contact from the Attachment Keyboard")
+        //     imageName = Theme.iconName(.attachmentContact)
         case .file:
             text = NSLocalizedString("ATTACHMENT_KEYBOARD_FILE", comment: "A button to select a file from the Attachment Keyboard")
             imageName = Theme.iconName(.attachmentFile)
@@ -218,9 +278,6 @@ class AttachmentFormatCell: UICollectionViewCell {
         case .location:
             text = NSLocalizedString("ATTACHMENT_KEYBOARD_LOCATION", comment: "A button to select a location from the Attachment Keyboard")
             imageName = Theme.iconName(.attachmentLocation)
-        case .payment:
-            text = NSLocalizedString("ATTACHMENT_KEYBOARD_PAYMENT", comment: "A button to select a payment from the Attachment Keyboard")
-            imageName = Theme.iconName(.attachmentPayment)
         }
 
         // The light theme images come with a background baked in, so we don't tint them.
@@ -233,6 +290,25 @@ class AttachmentFormatCell: UICollectionViewCell {
         label.text = text
 
         self.accessibilityIdentifier = UIView.accessibilityIdentifier(in: self, name: "format-\(type.rawValue)")
+
+        showLiveCameraIfAvailable()
+    }
+
+    func showLiveCameraIfAvailable() {
+        guard case .camera? = attachmentType, hasCameraAccess else { return }
+
+        // If we have access to the camera, we'll want to show it eventually.
+        // Style this in prepration for that.
+
+        imageView.setTemplateImageName("camera-outline-32", tintColor: .white)
+        label.textColor = .white
+        backgroundColor = UIColor.blue
+
+        guard let cameraPreview = cameraPreview else { return }
+
+        contentView.insertSubview(cameraPreview, belowSubview: imageView)
+        cameraPreview.autoPinEdgesToSuperviewEdges()
+        cameraPreview.contentMode = .scaleAspectFill
     }
 
     override public func prepareForReuse() {
@@ -243,5 +319,9 @@ class AttachmentFormatCell: UICollectionViewCell {
 
         label.textColor = Theme.attachmentKeyboardItemImageColor
         backgroundColor = Theme.attachmentKeyboardItemBackgroundColor
+
+        if let cameraPreview = cameraPreview, cameraPreview.superview == contentView {
+            cameraPreview.removeFromSuperview()
+        }
     }
 }

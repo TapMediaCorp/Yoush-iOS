@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct StickerPackRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        StickerPackSerializer.table
+        return StickerPackSerializer.table
     }
 
-    public static var databaseTableName: String {
-        StickerPackSerializer.table.tableName
-    }
+    public static let databaseTableName: String = StickerPackSerializer.table.tableName
 
     public var id: Int64?
 
@@ -52,7 +50,7 @@ public struct StickerPackRecord: SDSRecord {
     }
 
     public static func columnName(_ column: StickerPackRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -68,7 +66,7 @@ public struct StickerPackRecord: SDSRecord {
 
 public extension StickerPackRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -156,15 +154,15 @@ extension StickerPack: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        StickerPackRecord.databaseTableName
+        return StickerPackRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        StickerPackSerializer.table
+        return StickerPackSerializer.table
     }
 }
 
@@ -218,24 +216,23 @@ extension StickerPackSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var authorColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "author", columnType: .unicodeString, isOptional: true) }
-    static var coverColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "cover", columnType: .blob) }
-    static var dateCreatedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "dateCreated", columnType: .double) }
-    static var infoColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "info", columnType: .blob) }
-    static var isInstalledColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isInstalled", columnType: .int) }
-    static var itemsColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "items", columnType: .blob) }
-    static var titleColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "title", columnType: .unicodeString, isOptional: true) }
+    static let authorColumn = SDSColumnMetadata(columnName: "author", columnType: .unicodeString, isOptional: true)
+    static let coverColumn = SDSColumnMetadata(columnName: "cover", columnType: .blob)
+    static let dateCreatedColumn = SDSColumnMetadata(columnName: "dateCreated", columnType: .double)
+    static let infoColumn = SDSColumnMetadata(columnName: "info", columnType: .blob)
+    static let isInstalledColumn = SDSColumnMetadata(columnName: "isInstalled", columnType: .int)
+    static let itemsColumn = SDSColumnMetadata(columnName: "items", columnType: .blob)
+    static let titleColumn = SDSColumnMetadata(columnName: "title", columnType: .unicodeString, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: StickerPack.collection(),
-                         tableName: "model_StickerPack",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: StickerPack.collection(),
+                                               tableName: "model_StickerPack",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
@@ -245,9 +242,8 @@ extension StickerPackSerializer {
         infoColumn,
         isInstalledColumn,
         itemsColumn,
-        titleColumn
+        titleColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -415,6 +411,8 @@ public extension StickerPack {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return StickerPack.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(StickerPackRecord.databaseTableName) WHERE \(stickerPackColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -445,20 +443,28 @@ public extension StickerPack {
                             batchSize: UInt,
                             block: @escaping (StickerPack, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            StickerPack.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? StickerPack else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = StickerPack.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = StickerPack.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -486,6 +492,10 @@ public extension StickerPack {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: StickerPack.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -517,6 +527,8 @@ public extension StickerPack {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: StickerPack.collection())
         case .grdbRead(let grdbTransaction):
             return StickerPackRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -526,6 +538,8 @@ public extension StickerPack {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: StickerPack.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try StickerPackRecord.deleteAll(grdbTransaction.database)
@@ -545,20 +559,24 @@ public extension StickerPack {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -570,6 +588,8 @@ public extension StickerPack {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: StickerPack.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(StickerPackRecord.databaseTableName) WHERE \(stickerPackColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -589,7 +609,7 @@ public extension StickerPack {
             let cursor = try StickerPackRecord.fetchCursor(transaction.database, sqlRequest)
             return StickerPackCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return StickerPackCursor(transaction: transaction, cursor: nil)
         }
@@ -662,3 +682,4 @@ public extension StickerPack {
     }
 }
 #endif
+                                          

@@ -1,9 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import AVFoundation
+import PromiseKit
 import Lottie
 
 protocol PhotoCaptureViewControllerDelegate: AnyObject {
@@ -18,29 +19,24 @@ enum PhotoCaptureError: Error {
     case assertionError(description: String)
     case initializationFailed
     case captureFailed
-    case invalidVideo
 }
 
-extension PhotoCaptureError: LocalizedError, UserErrorDescriptionProvider {
+extension PhotoCaptureError: LocalizedError {
     var localizedDescription: String {
         switch self {
         case .initializationFailed:
             return NSLocalizedString("PHOTO_CAPTURE_UNABLE_TO_INITIALIZE_CAMERA", comment: "alert title")
         case .captureFailed:
             return NSLocalizedString("PHOTO_CAPTURE_UNABLE_TO_CAPTURE_IMAGE", comment: "alert title")
-        case .assertionError, .invalidVideo:
+        case .assertionError:
             return NSLocalizedString("PHOTO_CAPTURE_GENERIC_ERROR", comment: "alert title, generic error preventing user from capturing a photo")
         }
     }
 }
 
-// MARK: -
-
-@objc
-class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate {
+class PhotoCaptureViewController: OWSViewController {
 
     weak var delegate: PhotoCaptureViewControllerDelegate?
-    var interactiveDismiss: PhotoCaptureInteractiveDismiss!
 
     @objc public lazy var photoCapture = PhotoCapture()
 
@@ -66,7 +62,6 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
     override func loadView() {
         self.view = UIView()
         self.view.backgroundColor = Theme.darkThemeBackgroundColor
-        definesPresentationContext = true
 
         view.addSubview(previewView)
 
@@ -120,12 +115,6 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
         view.addGestureRecognizer(tapToFocusGesture)
         view.addGestureRecognizer(doubleTapToSwitchCameraGesture)
 
-        if let navController = self.navigationController {
-            interactiveDismiss = PhotoCaptureInteractiveDismiss(viewController: navController)
-            interactiveDismiss.interactiveDismissDelegate = self
-            interactiveDismiss.addGestureRecognizer(to: view)
-        }
-
         tapToFocusGesture.require(toFail: doubleTapToSwitchCameraGesture)
     }
 
@@ -142,7 +131,6 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
         UIViewController.attemptRotationToDeviceOrientation()
         photoCapture.updateVideoPreviewConnection(toOrientation: previewOrientation)
         updateIconOrientations(isAnimated: false, captureOrientation: previewOrientation)
-        resumePhotoCapture()
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -151,19 +139,16 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
             BenchEventComplete(eventId: "Show-Camera")
             VolumeButtons.shared?.addObserver(observer: photoCapture)
         }
-        UIApplication.shared.isIdleTimerDisabled = true
     }
 
     override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
+        super.viewWillAppear(animated)
         isVisible = false
         VolumeButtons.shared?.removeObserver(photoCapture)
-        pausePhotoCapture()
-        UIApplication.shared.isIdleTimerDisabled = false
     }
 
     override var prefersStatusBarHidden: Bool {
-        guard !CurrentAppContext().hasActiveCall else {
+        guard !OWSWindowManager.shared.hasCall else {
             return false
         }
 
@@ -196,19 +181,8 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
             // we pin to a constant rather than margin, because on notched devices the
             // safeAreaInsets/margins change as the device rotates *EVEN THOUGH* the interface
             // is locked to portrait.
-            // Only grab this once -- otherwise when we swipe to dismiss this is updated and the top bar jumps to having zero offset
-            if topBarOffset.constant == 0 {
-                topBarOffset.constant = max(view.safeAreaInsets.top, view.safeAreaInsets.left, view.safeAreaInsets.bottom)
-            }
+            topBarOffset.constant = max(view.safeAreaInsets.top, view.safeAreaInsets.left, view.safeAreaInsets.bottom)
         }
-    }
-
-    func interactiveDismissDidBegin(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-    }
-    func interactiveDismissDidFinish(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-        dismiss(animated: true)
-    }
-    func interactiveDismissDidCancel(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
     }
 
     // MARK: -
@@ -515,48 +489,28 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
     }
 
     var hasCaptureStarted = false
-
-    private func captureReady() {
-      self.hasCaptureStarted = true
-      BenchEventComplete(eventId: "Show-Camera")
-    }
-
     private func setupPhotoCapture() {
         photoCapture.delegate = self
         captureButton.delegate = photoCapture
 
+        let captureReady = { [weak self] in
+            guard let self = self else { return }
+            self.hasCaptureStarted = true
+            BenchEventComplete(eventId: "Show-Camera")
+        }
+
         // If the session is already running, we're good to go.
         guard !photoCapture.session.isRunning else {
-            return self.captureReady()
+            return captureReady()
         }
 
         firstly {
-            photoCapture.prepareVideoCapture()
+            photoCapture.startVideoCapture()
+        }.done {
+            captureReady()
         }.catch { [weak self] error in
             guard let self = self else { return }
             self.showFailureUI(error: error)
-        }
-    }
-
-    private func pausePhotoCapture() {
-        guard photoCapture.session.isRunning else { return }
-        firstly {
-            photoCapture.stopCapture()
-        }.done { [weak self] in
-            self?.hasCaptureStarted = false
-        }.catch { [weak self] error in
-            self?.showFailureUI(error: error)
-        }
-    }
-
-    private func resumePhotoCapture() {
-        guard !photoCapture.session.isRunning else { return }
-        firstly {
-            photoCapture.resumeCapture()
-        }.done { [weak self] in
-            self?.captureReady()
-        }.catch { [weak self] error in
-            self?.showFailureUI(error: error)
         }
     }
 
@@ -564,9 +518,9 @@ class PhotoCaptureViewController: OWSViewController, InteractiveDismissDelegate 
         Logger.error("error: \(error)")
 
         OWSActionSheets.showActionSheet(title: nil,
-                                        message: error.userErrorDescription,
-                                        buttonTitle: CommonStrings.dismissButton,
-                                        buttonAction: { [weak self] _ in self?.dismiss(animated: true) })
+                            message: error.localizedDescription,
+                            buttonTitle: CommonStrings.dismissButton,
+                            buttonAction: { [weak self] _ in self?.dismiss(animated: true) })
     }
 
     private func updateFlashModeControl() {
@@ -614,16 +568,6 @@ extension PhotoCaptureViewController: PhotoCaptureDelegate {
     }
 
     func photoCapture(_ photoCapture: PhotoCapture, processingDidError error: Error) {
-        isRecordingMovie = false
-        topBar.recordingTimerView.stopCounting()
-        updateNavigationItems()
-        delegate?.photoCaptureViewController(self, isRecordingMovie: isRecordingMovie)
-
-        if case PhotoCaptureError.invalidVideo = error {
-            // Don't show an error if the user aborts recording before video
-            // recording has begun.
-            return
-        }
         showFailureUI(error: error)
     }
 

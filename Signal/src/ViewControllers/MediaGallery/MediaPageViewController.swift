@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
+import PromiseKit
 
 // Objc wrapper for the MediaGalleryItem struct
 @objc
@@ -25,7 +26,7 @@ fileprivate extension MediaDetailViewController {
     }
 }
 
-class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate, MediaDetailViewControllerDelegate, MediaGalleryDelegate, InteractivelyDismissableViewController {
+class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSource, UIPageViewControllerDelegate, MediaDetailViewControllerDelegate, MediaGalleryDelegate {
 
     var mediaInteractiveDismiss: MediaInteractiveDismiss!
 
@@ -58,17 +59,11 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
     @objc
     convenience init(initialMediaAttachment: TSAttachment, thread: TSThread) {
-        self.init(initialMediaAttachment: initialMediaAttachment,
-                  thread: thread,
-                  showingSingleMessage: false)
+        self.init(initialMediaAttachment: initialMediaAttachment, thread: thread, showingSingleMessage: false)
     }
 
-    convenience init(initialMediaAttachment: TSAttachment,
-                     thread: TSThread,
-                     showingSingleMessage: Bool = false) {
-        self.init(initialMediaAttachment: initialMediaAttachment,
-                  mediaGallery: MediaGallery(thread: thread),
-                  showingSingleMessage: showingSingleMessage)
+    convenience init(initialMediaAttachment: TSAttachment, thread: TSThread, showingSingleMessage: Bool = false) {
+        self.init(initialMediaAttachment: initialMediaAttachment, mediaGallery: MediaGallery(thread: thread), showingSingleMessage: showingSingleMessage)
     }
 
     init(initialMediaAttachment: TSAttachment, mediaGallery: MediaGallery, showingSingleMessage: Bool = false) {
@@ -88,17 +83,19 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
         delegate = self
         transitioningDelegate = self
 
-        let galleryItem = mediaGallery.ensureLoadedForDetailView(focusedAttachment: initialMediaAttachment)
+        let galleryItem: MediaGalleryItem? = databaseStorage.uiRead { transaction in
+            self.mediaGallery.buildGalleryItem(attachment: initialMediaAttachment, transaction: transaction)
+        }
 
         guard let initialItem = galleryItem else {
             owsFailDebug("unexpectedly failed to build initialDetailItem.")
             return
         }
 
+        mediaGallery.ensureLoadedForDetailView(focusedItem: initialItem)
         mediaGallery.addDelegate(self)
 
-        guard let initialPage = buildGalleryPage(galleryItem: initialItem,
-                                                 shouldAutoPlayVideo: true) else {
+        guard let initialPage = buildGalleryPage(galleryItem: initialItem) else {
             owsFailDebug("unexpectedly unable to build initial gallery item")
             return
         }
@@ -113,6 +110,12 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
     deinit {
         Logger.debug("deinit")
+    }
+
+    // MARK: - Dependencies
+
+    var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
     }
 
     // MARK: - Subview
@@ -147,7 +150,7 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
         // Navigation
 
-        mediaInteractiveDismiss = MediaInteractiveDismiss(targetViewController: self)
+        mediaInteractiveDismiss = MediaInteractiveDismiss(mediaPageViewController: self)
         mediaInteractiveDismiss.addGestureRecognizer(to: view)
 
         // Even though bars are opaque, we want content to be layed out behind them.
@@ -334,7 +337,7 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
     lazy var videoPauseBarButton: UIBarButtonItem = {
         let videoPauseBarButton = UIBarButtonItem(barButtonSystemItem: .pause, target: self, action:
-                                                    #selector(didPressPauseBarButton))
+            #selector(didPressPauseBarButton))
         videoPauseBarButton.tintColor = Theme.darkThemePrimaryColor
         return videoPauseBarButton
     }()
@@ -385,11 +388,6 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
     }
 
     @objc
-    public func performInteractiveDismissal(animated: Bool) {
-        dismissSelf(animated: true)
-    }
-
-    @objc
     public func didPressShare(_ sender: UIBarButtonItem) {
         guard let currentViewController = self.viewControllers?[0] as? MediaDetailViewController else {
             owsFailDebug("currentViewController was unexpectedly nil")
@@ -404,21 +402,23 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
     @objc
     public func didPressForward(_ sender: Any) {
         let galleryItem: MediaGalleryItem = currentItem
+        var fetchedItem: ConversationViewItem?
+        databaseStorage.uiRead { transaction in
+            let message = galleryItem.message
+            let thread = message.thread(transaction: transaction)
+            let conversationStyle = ConversationStyle(thread: thread)
+            fetchedItem = ConversationInteractionViewItem(interaction: message,
+                                                          thread: thread,
+                                                          transaction: transaction,
+                                                          conversationStyle: conversationStyle)
+        }
 
-        guard let renderItem = buildRenderItem(forGalleryItem: galleryItem) else {
+        guard let viewItem = fetchedItem else {
             owsFailDebug("viewItem was unexpectedly nil")
             return
         }
 
-        // Only forward media.
-        let selectionType: CVSelectionType = .primaryContent
-        let selectionItem = CVSelectionItem(interactionId: renderItem.interaction.uniqueId,
-                                            interactionType: renderItem.interaction.interactionType,
-                                            isForwardable: true,
-                                            selectionType: selectionType)
-        ForwardMessageViewController.present(forSelectionItems: [selectionItem],
-                                             from: self,
-                                             delegate: self)
+        ForwardMessageNavigationController.present(for: viewItem, from: self, delegate: self)
     }
 
     @objc
@@ -430,9 +430,9 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
         let actionSheet = ActionSheetController(title: nil, message: nil)
         let deleteAction = ActionSheetAction(title: CommonStrings.deleteButton,
-                                             style: .destructive) { _ in
-            let deletedItem = currentViewController.galleryItem
-            self.mediaGallery.delete(items: [deletedItem], initiatedBy: self, deleteFromDB: true)
+                                         style: .destructive) { _ in
+                                            let deletedItem = currentViewController.galleryItem
+                                            self.mediaGallery.delete(items: [deletedItem], initiatedBy: self, deleteFromDB: true)
         }
         actionSheet.addAction(OWSActionSheets.cancelAction)
         actionSheet.addAction(deleteAction)
@@ -481,15 +481,6 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
 
     func mediaGallery(_ mediaGallery: MediaGallery, deletedSections: IndexSet, deletedItems: [IndexPath]) {
         // no-op
-    }
-
-    func mediaGallery(_ mediaGallery: MediaGallery, didReloadItemsInSections sections: IndexSet) {
-        let attachment = self.currentItem.attachmentStream
-        guard let reloadedItem = mediaGallery.ensureLoadedForDetailView(focusedAttachment: attachment) else {
-            owsFailDebug("failed to reload")
-            return
-        }
-        self.setCurrentItem(reloadedItem, direction: .forward, animated: false)
     }
 
     @objc
@@ -609,8 +600,7 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
         return nextPage
     }
 
-    private func buildGalleryPage(galleryItem: MediaGalleryItem,
-                                  shouldAutoPlayVideo: Bool = false) -> MediaDetailViewController? {
+    private func buildGalleryPage(galleryItem: MediaGalleryItem) -> MediaDetailViewController? {
 
         if let cachedPage = cachedPages[galleryItem] {
             Logger.debug("cache hit.")
@@ -618,34 +608,27 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
         }
 
         Logger.debug("cache miss.")
+        var fetchedItem: ConversationViewItem?
+        databaseStorage.uiRead { transaction in
+            let message = galleryItem.message
+            let thread = message.thread(transaction: transaction)
+            let conversationStyle = ConversationStyle(thread: thread)
+            fetchedItem = ConversationInteractionViewItem(interaction: message,
+                                                          thread: thread,
+                                                          transaction: transaction,
+                                                          conversationStyle: conversationStyle)
+        }
 
-        let viewController = MediaDetailViewController(galleryItemBox: GalleryItemBox(galleryItem),
-                                                       shouldAutoPlayVideo: shouldAutoPlayVideo)
+        guard let viewItem = fetchedItem else {
+            owsFailDebug("viewItem was unexpectedly nil")
+            return nil
+        }
+
+        let viewController = MediaDetailViewController(galleryItemBox: GalleryItemBox(galleryItem), viewItem: viewItem)
         viewController.delegate = self
 
         cachedPages[galleryItem] = viewController
         return viewController
-    }
-
-    private func buildRenderItem(forGalleryItem galleryItem: MediaGalleryItem) -> CVRenderItem? {
-
-        return databaseStorage.read { transaction in
-            let interactionId = galleryItem.message.uniqueId
-            guard let interaction = TSInteraction.anyFetch(uniqueId: interactionId,
-                                                           transaction: transaction) else {
-                owsFailDebug("Missing interaction.")
-                return nil
-            }
-            guard let thread = TSThread.anyFetch(uniqueId: interaction.uniqueThreadId,
-                                                 transaction: transaction) else {
-                owsFailDebug("Missing thread.")
-                return nil
-            }
-            return CVLoader.buildStandaloneRenderItem(interaction: interaction,
-                                                      thread: thread,
-                                                      containerView: self.view,
-                                                      transaction: transaction)
-        }
     }
 
     public func dismissSelf(animated isAnimated: Bool, completion: (() -> Void)? = nil) {
@@ -679,6 +662,10 @@ class MediaPageViewController: UIPageViewController, UIPageViewControllerDataSou
     }
 
     // MARK: Dynamic Header
+
+    private var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
 
     private func senderName(message: TSMessage) -> String {
         switch message {
@@ -825,10 +812,10 @@ extension MediaPageViewController: CaptionContainerViewDelegate {
 }
 
 extension MediaPageViewController: MediaPresentationContextProvider {
-    func mediaPresentationContext(item: Media, in coordinateSpace: UICoordinateSpace) -> MediaPresentationContext? {
+    func mediaPresentationContext(galleryItem: MediaGalleryItem, in coordinateSpace: UICoordinateSpace) -> MediaPresentationContext? {
         let mediaView = currentViewController.mediaView
 
-        guard nil != mediaView.superview else {
+        guard let mediaSuperview = mediaView.superview else {
             owsFailDebug("superview was unexpectedly nil")
             return nil
         }
@@ -902,10 +889,10 @@ extension MediaPageViewController: UIViewControllerTransitioningDelegate {
 
     public func interactionControllerForDismissal(using animator: UIViewControllerAnimatedTransitioning) -> UIViewControllerInteractiveTransitioning? {
         guard let animator = animator as? MediaDismissAnimationController,
-              let interactionController = animator.interactionController,
-              interactionController.interactionInProgress
-        else {
-            return nil
+            let interactionController = animator.interactionController,
+            interactionController.interactionInProgress
+            else {
+                return nil
         }
         return interactionController
     }
@@ -914,16 +901,29 @@ extension MediaPageViewController: UIViewControllerTransitioningDelegate {
 // MARK: -
 
 extension MediaPageViewController: ForwardMessageDelegate {
-    public func forwardMessageFlowDidComplete(items: [ForwardMessageItem],
-                                              recipientThreads: [TSThread]) {
+    public func forwardMessageFlowDidComplete(viewItem: ConversationViewItem,
+                                              threads: [TSThread]) {
         dismiss(animated: true) {
-            ForwardMessageViewController.finalizeForward(items: items,
-                                                         recipientThreads: recipientThreads,
-                                                         fromViewController: self)
+            self.didForwardMessage(viewItem: viewItem, threads: threads)
         }
     }
 
     public func forwardMessageFlowDidCancel() {
         dismiss(animated: true)
+    }
+
+    func didForwardMessage(viewItem: ConversationViewItem,
+                           threads: [TSThread]) {
+        guard threads.count == 1 else {
+            return
+        }
+        guard let thread = threads.first else {
+            owsFailDebug("Missing thread.")
+            return
+        }
+        guard thread.uniqueId != viewItem.interaction.uniqueThreadId else {
+            return
+        }
+        SignalApp.shared().presentConversation(for: thread, animated: true)
     }
 }

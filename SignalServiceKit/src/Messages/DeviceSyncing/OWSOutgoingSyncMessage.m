@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSOutgoingSyncMessage.h"
@@ -73,14 +73,16 @@ NS_ASSUME_NONNULL_BEGIN
     return proto;
 }
 
-- (nullable SSKProtoSyncMessageBuilder *)syncMessageBuilderWithTransaction:(SDSAnyReadTransaction *)transaction
+- (nullable SSKProtoSyncMessageBuilder *)syncMessageBuilderWithTransaction:(SDSAnyReadTransaction *)transaction;
 {
     OWSAbstractMethod();
 
     return [SSKProtoSyncMessage builder];
 }
 
-- (nullable NSData *)buildPlainTextData:(TSThread *)thread transaction:(SDSAnyWriteTransaction *)transaction
+- (nullable NSData *)buildPlainTextData:(SignalRecipient *)recipient
+                                 thread:(TSThread *)thread
+                            transaction:(SDSAnyReadTransaction *)transaction
 {
     SSKProtoSyncMessage *_Nullable syncMessage = [self buildSyncMessageWithTransaction:transaction];
     if (!syncMessage) {

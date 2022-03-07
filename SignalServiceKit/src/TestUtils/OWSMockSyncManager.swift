@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 #if TESTABLE_BUILD
 
@@ -37,10 +38,6 @@ public class OWSMockSyncManager: NSObject, SyncManagerProtocol {
     }
 
     public func sendFetchLatestStorageManifestSyncMessage() {
-        Logger.info("")
-    }
-
-    public func sendFetchLatestSubscriptionStatusSyncMessage() {
         Logger.info("")
     }
 
@@ -106,12 +103,10 @@ public class OWSMockSyncManager: NSObject, SyncManagerProtocol {
     }
 
     @objc
-    public func syncGroups(transaction: SDSAnyWriteTransaction, completion: @escaping Completion) {
+    public func syncGroups(transaction: SDSAnyWriteTransaction) {
         Logger.info("")
 
         syncGroupsHook?()
-
-        completion()
     }
 }
 

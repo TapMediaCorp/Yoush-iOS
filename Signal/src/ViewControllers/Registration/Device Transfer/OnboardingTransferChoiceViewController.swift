@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
@@ -33,7 +33,7 @@ public class OnboardingTransferChoiceViewController: OnboardingBaseViewControlle
 
         view.backgroundColor = Theme.backgroundColor
 
-        let titleLabel = self.createTitleLabel(
+        let titleLabel = self.titleLabel(
             text: NSLocalizedString("DEVICE_TRANSFER_CHOICE_TITLE",
                                     comment: "The title for the device transfer 'choice' view")
         )
@@ -73,10 +73,10 @@ public class OnboardingTransferChoiceViewController: OnboardingBaseViewControlle
                                              comment: "The body for the device transfer 'choice' view 'register' option")
         }
 
-        let explanationLabel = self.createExplanationLabel(explanationText: explanationText)
+        let explanationLabel = self.explanationLabel(explanationText: explanationText)
         explanationLabel.accessibilityIdentifier = "onboarding.transferChoice." + "explanationLabel"
 
-        let warningLabel = self.createExplanationLabel(
+        let warningLabel = self.explanationLabel(
             explanationText: NSLocalizedString("DEVICE_TRANSFER_CHOICE_WARNING",
                                                comment: "A warning for the device transfer 'choice' view indicating you can only have one device registered with your number")
         )
@@ -158,7 +158,7 @@ public class OnboardingTransferChoiceViewController: OnboardingBaseViewControlle
         titleLabel.text = title
         titleLabel.numberOfLines = 0
         titleLabel.lineBreakMode = .byWordWrapping
-        titleLabel.font = UIFont.ows_dynamicTypeBody.ows_semibold
+        titleLabel.font = UIFont.ows_dynamicTypeBody.ows_semibold()
         titleLabel.textColor = Theme.primaryTextColor
 
         let bodyLabel = UILabel()

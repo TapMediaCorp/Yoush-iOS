@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -7,6 +7,7 @@ import Foundation
 class EmojiReactorsTableView: UITableView {
     struct ReactorItem {
         let address: SignalServiceAddress
+        let conversationColorName: ConversationColorName
         let displayName: String
         let emoji: String
     }
@@ -15,7 +16,13 @@ class EmojiReactorsTableView: UITableView {
         didSet { reloadData() }
     }
 
-    init() {
+    var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
+    let finder: ReactionFinder
+    init(finder: ReactionFinder) {
+        self.finder = finder
         super.init(frame: .zero, style: .plain)
 
         dataSource = self
@@ -29,14 +36,31 @@ class EmojiReactorsTableView: UITableView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(for reactions: [OWSReaction], transaction: SDSAnyReadTransaction) {
-        reactorItems = reactions.compactMap { reaction in
+    func configureForAll(transaction: SDSAnyReadTransaction) {
+        reactorItems = finder.allReactions(transaction: transaction.unwrapGrdbRead).compactMap { reaction in
+            let thread = TSContactThread.getWithContactAddress(reaction.reactor, transaction: transaction)
             let displayName = contactsManager.displayName(for: reaction.reactor, transaction: transaction)
 
             return ReactorItem(
                 address: reaction.reactor,
+                conversationColorName: thread?.conversationColorName ?? .default,
                 displayName: displayName,
                 emoji: reaction.emoji
+            )
+        }
+    }
+
+    func configure(for emoji: String?, transaction: SDSAnyReadTransaction) {
+        guard let emoji = emoji else { return configureForAll(transaction: transaction) }
+        reactorItems = finder.reactors(for: emoji, transaction: transaction.unwrapGrdbRead).compactMap { address in
+            let thread = TSContactThread.getWithContactAddress(address, transaction: transaction)
+            let displayName = contactsManager.displayName(for: address, transaction: transaction)
+
+            return ReactorItem(
+                address: address,
+                conversationColorName: thread?.conversationColorName ?? .default,
+                displayName: displayName,
+                emoji: emoji
             )
         }
     }
@@ -69,7 +93,8 @@ extension EmojiReactorsTableView: UITableViewDataSource {
 private class EmojiReactorCell: UITableViewCell {
     static let reuseIdentifier = "EmojiReactorCell"
 
-    let avatarView = ConversationAvatarView(sizeClass: .thirtySix, localUserDisplayMode: .asUser)
+    let avatarView = AvatarImageView()
+    let avatarDiameter: CGFloat = 36
     let nameLabel = UILabel()
     let emojiLabel = UILabel()
 
@@ -83,7 +108,8 @@ private class EmojiReactorCell: UITableViewCell {
 
         contentView.addSubview(avatarView)
         avatarView.autoPinLeadingToSuperviewMargin()
-        avatarView.autoVCenterInSuperview()
+        avatarView.autoPinHeightToSuperviewMargins()
+        avatarView.autoSetDimensions(to: CGSize(square: avatarDiameter))
 
         contentView.addSubview(nameLabel)
         nameLabel.autoPinLeading(toTrailingEdgeOf: avatarView, offset: 8)
@@ -103,18 +129,20 @@ private class EmojiReactorCell: UITableViewCell {
 
     func configure(item: EmojiReactorsTableView.ReactorItem) {
 
-        nameLabel.textColor = Theme.primaryTextColor
+        let avatarBuilder = OWSContactAvatarBuilder(
+            address: item.address,
+            colorName: item.conversationColorName,
+            diameter: UInt(avatarDiameter)
+        )
 
         emojiLabel.text = item.emoji
 
         if item.address.isLocalAddress {
             nameLabel.text = NSLocalizedString("REACTIONS_DETAIL_YOU", comment: "Text describing the local user in the reaction details pane.")
+            avatarView.image = OWSProfileManager.shared().localProfileAvatarImage() ?? avatarBuilder.buildDefaultImage()
         } else {
             nameLabel.text = item.displayName
-        }
-
-        avatarView.updateWithSneakyTransactionIfNecessary { config in
-            config.dataSource = .address(item.address)
+            avatarView.image = avatarBuilder.build()
         }
     }
 }

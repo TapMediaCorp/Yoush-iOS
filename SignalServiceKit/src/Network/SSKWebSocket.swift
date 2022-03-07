@@ -1,16 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
-import SignalCoreKit
+import Starscream
 
 @objc
 public enum SSKWebSocketState: UInt {
     case open, connecting, disconnected
 }
-
-// MARK: -
 
 extension SSKWebSocketState: CustomStringConvertible {
     public var description: String {
@@ -25,31 +23,135 @@ extension SSKWebSocketState: CustomStringConvertible {
     }
 }
 
-// MARK: -
-
 @objc
-public protocol SSKWebSocket: AnyObject {
+public class SSKWebSocketError: NSObject, CustomNSError {
 
-    var delegate: SSKWebSocketDelegate? { get set }
+    init(underlyingError: Starscream.WSError) {
+        self.underlyingError = underlyingError
+    }
 
-    var id: UInt { get }
+    // MARK: - CustomNSError
 
-    var state: SSKWebSocketState { get }
+    @objc
+    public static let errorDomain = "SignalServiceKit.SSKWebSocketError"
 
-    func connect()
-    func disconnect()
+    public var errorUserInfo: [String: Any] {
+        return [
+            type(of: self).kStatusCodeKey: underlyingError.code,
+            NSUnderlyingErrorKey: (underlyingError as NSError)
+        ]
+    }
 
-    func write(data: Data)
+    // MARK: -
 
-    func writePing()
+    @objc
+    public static let kStatusCodeKey = "SSKWebSocketErrorStatusCode"
+
+    let underlyingError: Starscream.WSError
+
+    public override var description: String {
+        return "SSKWebSocketError - underlyingError: \(underlyingError)"
+    }
 }
 
-// MARK: -
+@objc
+public protocol SSKWebSocket {
 
-public extension SSKWebSocket {
-    func sendResponse(for request: WebSocketProtoWebSocketRequestMessage,
-                      status: UInt32,
-                      message: String) throws {
+    @objc
+    var delegate: SSKWebSocketDelegate? { get set }
+
+    @objc
+    var state: SSKWebSocketState { get }
+
+    @objc
+    func connect()
+
+    @objc
+    func disconnect()
+
+    @objc(writeData:)
+    func write(data: Data)
+
+    @objc
+    func writePing()
+
+    @objc(sendResponseForRequest:status:message:error:)
+    func sendResponse(for request: WebSocketProtoWebSocketRequestMessage, status: UInt32, message: String) throws
+}
+
+@objc
+public protocol SSKWebSocketDelegate: class {
+    func websocketDidConnect(socket: SSKWebSocket)
+
+    func websocketDidDisconnect(socket: SSKWebSocket, error: Error?)
+
+    func websocket(_ socket: SSKWebSocket, didReceiveMessage message: WebSocketProtoWebSocketMessage)
+}
+
+@objc
+public class SSKWebSocketManager: NSObject {
+
+    @objc
+    public class func buildSocket(request: URLRequest) -> SSKWebSocket {
+        return SSKWebSocketImpl(request: request)
+    }
+}
+
+class SSKWebSocketImpl: SSKWebSocket {
+
+    private let socket: Starscream.WebSocket
+
+    init(request: URLRequest) {
+        let socket = WebSocket(request: request)
+
+        socket.disableSSLCertValidation = true
+        socket.socketSecurityLevel = StreamSocketSecurityLevel.tlSv1_2
+        let security = SSLSecurity(certs: [TextSecureCertificate()], usePublicKeys: false)
+        security.validateEntireChain = false
+        socket.security = security
+
+        // TODO cipher suite selection
+        // socket.enabledSSLCipherSuites = [TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256]
+
+        self.socket = socket
+
+        socket.delegate = self
+    }
+
+    // MARK: - SSKWebSocket
+
+    weak var delegate: SSKWebSocketDelegate?
+
+    var hasEverConnected = false
+    var state: SSKWebSocketState {
+        if socket.isConnected {
+            return .open
+        }
+
+        if hasEverConnected {
+            return .disconnected
+        }
+
+        return .connecting
+    }
+
+    func connect() {
+        socket.connect()
+    }
+
+    func disconnect() {
+        socket.disconnect()
+    }
+
+    func write(data: Data) {
+        socket.write(data: data)
+    }
+
+    func writePing() {
+        socket.write(ping: Data())
+    }
+
+    func sendResponse(for request: WebSocketProtoWebSocketRequestMessage, status: UInt32, message: String) throws {
         let responseBuilder = WebSocketProtoWebSocketResponseMessage.builder(requestID: request.requestID,
                                                                              status: status)
         responseBuilder.setMessage(message)
@@ -61,222 +163,56 @@ public extension SSKWebSocket {
 
         let messageData = try messageBuilder.buildSerializedData()
 
-        write(data: messageData)
+        socket.write(data: messageData)
     }
 }
 
-// MARK: -
-
-@objc
-public protocol SSKWebSocketDelegate: AnyObject {
-    func websocketDidConnect(socket: SSKWebSocket)
-
-    func websocketDidDisconnectOrFail(socket: SSKWebSocket, error: Error?)
-
-    func websocket(_ socket: SSKWebSocket, didReceiveMessage message: WebSocketProtoWebSocketMessage)
-}
-
-// MARK: -
-
-@objc
-public protocol WebSocketFactory: AnyObject {
-
-    var canBuildWebSocket: Bool { get }
-
-    func buildSocket(request: URLRequest,
-                     callbackQueue: DispatchQueue) -> SSKWebSocket?
-
-    func statusCode(forError error: Error) -> Int
-}
-
-// MARK: -
-
-@objc
-public class WebSocketFactoryMock: NSObject, WebSocketFactory {
-
-    public var canBuildWebSocket: Bool { false }
-
-    public func buildSocket(request: URLRequest,
-                            callbackQueue: DispatchQueue) -> SSKWebSocket? {
-        owsFailDebug("Cannot build websocket.")
-        return nil
+extension SSKWebSocketImpl: WebSocketDelegate {
+    func websocketDidConnect(socket: WebSocketClient) {
+        hasEverConnected = true
+        delegate?.websocketDidConnect(socket: self)
     }
 
-    public func statusCode(forError error: Error) -> Int {
-        error.httpStatusCode ?? 0
+    func websocketDidDisconnect(socket: WebSocketClient, error: Error?) {
+        let websocketError: Error?
+        switch error {
+        case let wsError as WSError:
+            websocketError = SSKWebSocketError(underlyingError: wsError)
+        case let nsError as NSError:
+            // Assert that error is either a Starscream.WSError or an OS level networking error
+            assert(nsError.domain == NSPOSIXErrorDomain as String
+                || nsError.domain == kCFErrorDomainCFNetwork as String
+                || nsError.domain == NSOSStatusErrorDomain as String)
+            websocketError = error
+        default:
+            assert(error == nil, "unexpected error type: \(String(describing: error))")
+            websocketError = error
+        }
+
+        delegate?.websocketDidDisconnect(socket: self, error: websocketError)
+    }
+
+    func websocketDidReceiveMessage(socket: WebSocketClient, text: String) {
+        owsFailDebug("We only expect binary frames.")
+    }
+
+    func websocketDidReceiveData(socket: WebSocketClient, data: Data) {
+        do {
+            let message = try WebSocketProtoWebSocketMessage.parseData(data)
+            delegate?.websocket(self, didReceiveMessage: message)
+        } catch {
+            owsFailDebug("error: \(error)")
+        }
     }
 }
 
-// MARK: -
-
-@objc
-public class WebSocketFactoryNative: NSObject, WebSocketFactory {
-
-    public var canBuildWebSocket: Bool {
-        if FeatureFlags.canUseNativeWebsocket,
-           #available(iOS 13, *) {
-            return true
-        } else {
-            return false
-        }
-    }
-
-    public func buildSocket(request: URLRequest,
-                            callbackQueue: DispatchQueue) -> SSKWebSocket? {
-        guard FeatureFlags.canUseNativeWebsocket,
-              #available(iOS 13, *) else {
-                  return nil
-              }
-        return SSKWebSocketNative(request: request, callbackQueue: callbackQueue)
-    }
-
-    public func statusCode(forError error: Error) -> Int {
-        error.httpStatusCode ?? 0
-    }
+private func TextSecureCertificate() -> SSLCert {
+    let data = SSKTextSecureServiceCertificateData()
+    return SSLCert(data: data)
 }
 
-// MARK: -
-
-@available(iOS 13, *)
-public class SSKWebSocketNative: SSKWebSocket {
-
-    private static let idCounter = AtomicUInt()
-    public let id = SSKWebSocketNative.idCounter.increment()
-    private var webSocketTask = AtomicOptional<URLSessionWebSocketTask>(nil)
-    private let request: URLRequest
-    private let session = OWSURLSession(
-        securityPolicy: OWSURLSession.signalServiceSecurityPolicy,
-        configuration: OWSURLSession.defaultConfigurationWithoutCaching
-    )
-    private let callbackQueue: DispatchQueue
-
-    public init(request: URLRequest,
-                callbackQueue: DispatchQueue? = nil) {
-
-        self.request = request
-        self.callbackQueue = callbackQueue ?? .main
-    }
-
-    // MARK: - SSKWebSocket
-
-    public weak var delegate: SSKWebSocketDelegate?
-
-    private let hasEverConnected = AtomicBool(false)
-    private let isConnected = AtomicBool(false)
-    private let isDisconnecting = AtomicBool(false)
-
-    // This method is thread-safe.
-    public var state: SSKWebSocketState {
-        if isConnected.get() {
-            return .open
-        }
-
-        if hasEverConnected.get() {
-            return .disconnected
-        }
-
-        return .connecting
-    }
-
-    public func connect() {
-        guard webSocketTask.get() == nil else { return }
-
-        let task = session.webSocketTask(request: request, didOpenBlock: { [weak self] _ in
-            guard let self = self else { return }
-            self.isConnected.set(true)
-            self.hasEverConnected.set(true)
-
-            self.listenForNextMessage()
-
-            self.callbackQueue.async {
-                self.delegate?.websocketDidConnect(socket: self)
-            }
-        }, didCloseBlock: { [weak self] closeCode, _ in
-            guard let self = self else { return }
-            self.isConnected.set(false)
-            self.webSocketTask.set(nil)
-
-            self.reportError(OWSGenericError("WebSocket did close with code \(closeCode), [\(self.id)]"))
-        })
-        webSocketTask.set(task)
-        task.resume()
-    }
-
-    func listenForNextMessage() {
-        DispatchQueue.global().async { [weak self] in
-            self?.webSocketTask.get()?.receive { result in
-                switch result {
-                case .success(let message):
-                    switch message {
-                    case .data(let data):
-                        do {
-                            let message = try WebSocketProtoWebSocketMessage(serializedData: data)
-                            guard let self = self else { return }
-                            self.callbackQueue.async {
-                                self.delegate?.websocket(self, didReceiveMessage: message)
-                            }
-                        } catch {
-                            owsFailDebug("error: \(error)")
-                        }
-                    case .string:
-                        owsFailDebug("We only expect binary frames.")
-                    @unknown default:
-                        owsFailDebug("We only expect binary frames.")
-                    }
-                case .failure(let error):
-                    Logger.warn("Error receiving websocket message \(error)")
-                    self?.reportError(error)
-                    // Don't try to listen again.
-                    return
-                }
-
-                self?.listenForNextMessage()
-            }
-        }
-    }
-
-    public func disconnect() {
-        isDisconnecting.set(true)
-        webSocketTask.swap(nil)?.cancel()
-    }
-
-    public func write(data: Data) {
-        owsAssertDebug(hasEverConnected.get())
-        guard let webSocketTask = webSocketTask.get() else {
-            reportError(OWSGenericError("Missing webSocketTask."))
-            return
-        }
-        webSocketTask.send(.data(data)) { [weak self] error in
-            guard let self = self, let error = error else { return }
-            Logger.warn("Error sending websocket data \(error), [\(self.id)]")
-            self.reportError(error)
-        }
-    }
-
-    public func writePing() {
-        owsAssertDebug(hasEverConnected.get())
-        guard let webSocketTask = webSocketTask.get() else {
-            reportError(OWSGenericError("Missing webSocketTask."))
-            return
-        }
-        webSocketTask.sendPing { [weak self] error in
-            guard let self = self, let error = error else { return }
-            Logger.warn("Error sending websocket ping \(error), [\(self.id)]")
-            self.reportError(error)
-        }
-    }
-
-    private func reportError(_ error: Error) {
-        guard !isDisconnecting.get() else {
-            // This is expected.
-            Logger.verbose("Error after disconnecting: \(error), [\(self.id)]")
-            return
-        }
-        callbackQueue.async { [weak self] in
-            if let self = self,
-               let delegate = self.delegate {
-                delegate.websocketDidDisconnectOrFail(socket: self, error: error)
-            }
-        }
+private extension StreamSocketSecurityLevel {
+    static var tlSv1_2: StreamSocketSecurityLevel {
+        return StreamSocketSecurityLevel(rawValue: "kCFStreamSocketSecurityLevelTLSv1_2")
     }
 }

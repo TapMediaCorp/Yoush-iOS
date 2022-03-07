@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -8,30 +8,28 @@ NS_ASSUME_NONNULL_BEGIN
 
 extern NSString *const OWSSignalServiceKitErrorDomain;
 
-// TODO: These error codes are somtimes persisted, so we should
-//       explicitly assign a value to every case in this enum.
 typedef NS_ENUM(NSInteger, OWSErrorCode) {
     OWSErrorCodeInvalidMethodParameters = 11,
-    OWSErrorCodeObsolete12 = 12,
+    OWSErrorCodeUnableToProcessServerResponse = 12,
     OWSErrorCodeFailedToDecodeJson = 13,
     OWSErrorCodeFailedToEncodeJson = 14,
     OWSErrorCodeFailedToDecodeQR = 15,
     OWSErrorCodePrivacyVerificationFailure = 20,
     OWSErrorCodeUntrustedIdentity = 777427,
-    OWSErrorCodeObsolete30 = 30,
+    OWSErrorCodeFailedToSendOutgoingMessage = 30,
     OWSErrorCodeAssertionFailure = 31,
-    OWSErrorCodeGenericFailure = 32,
     OWSErrorCodeFailedToDecryptMessage = 100,
     OWSErrorCodeFailedToDecryptUDMessage = 101,
     OWSErrorCodeFailedToEncryptMessage = 110,
     OWSErrorCodeFailedToEncryptUDMessage = 111,
-    OWSErrorCodeMessageSendUnauthorized = 1001,
+    OWSErrorCodeSignalServiceFailure = 1001,
     OWSErrorCodeSignalServiceRateLimited = 1010,
     OWSErrorCodeUserError = 2001,
     OWSErrorCodeNoSuchSignalRecipient = 777404,
     OWSErrorCodeMessageSendDisabledDueToPreKeyUpdateFailures = 777405,
     OWSErrorCodeMessageSendFailedToBlockList = 777406,
     OWSErrorCodeMessageSendNoValidRecipients = 777407,
+    OWSErrorCodeContactsUpdaterRateLimit = 777408,
     OWSErrorCodeCouldNotWriteAttachmentData = 777409,
     OWSErrorCodeMessageDeletedBeforeSent = 777410,
     OWSErrorCodeDatabaseConversionFatalError = 777411,
@@ -49,8 +47,8 @@ typedef NS_ENUM(NSInteger, OWSErrorCode) {
     // A non-recoverable while importing or exporting a backup.
     OWSErrorCodeBackupFailure = 777419,
     OWSErrorCodeLocalAuthenticationError = 777420,
-    OWSErrorCodeObsolete777421 = 777421,
-    OWSErrorCodeObsolete777422 = 777422,
+    OWSErrorCodeMessageRequestFailed = 777421,
+    OWSErrorCodeMessageResponseFailed = 777422,
     OWSErrorCodeInvalidMessage = 777423,
     OWSErrorCodeProfileUpdateFailed = 777424,
     OWSErrorCodeAvatarWriteFailed = 777425,
@@ -64,14 +62,19 @@ typedef NS_ENUM(NSInteger, OWSErrorCode) {
     OWSErrorCodeContactSyncFailed,
     OWSErrorCodeAppDeregistered,
     OWSErrorCodeRegistrationTransferAvailable,
-    OWSErrorCodeFailedToDecryptDuplicateMessage,
-    OWSErrorCodeServerRejectedSuspectedSpam,
-    OWSErrorCodeSenderKeyEphemeralFailure,
-    OWSErrorCodeSenderKeyUnavailable,
-    OWSErrorCodeMessageSendEncryptionFailure
+    OWSErrorCodeFailedToDecryptDuplicateMessage
 };
 
+extern NSString *const OWSErrorRecipientAddressKey;
+
+extern NSError *OWSErrorWithCodeDescription(OWSErrorCode code, NSString *description);
+extern NSError *OWSErrorWithUserInfo(OWSErrorCode code, NSDictionary *userInfo);
+extern NSError *OWSErrorMakeUntrustedIdentityError(NSString *description, SignalServiceAddress *address);
+extern NSError *OWSErrorMakeUnableToProcessServerResponseError(void);
+extern NSError *OWSErrorMakeFailedToSendOutgoingMessageError(void);
+extern NSError *OWSErrorMakeNoSuchSignalRecipientError(void);
 extern NSError *OWSErrorMakeAssertionError(NSString *descriptionFormat, ...);
-extern NSError *OWSErrorMakeGenericError(NSString *descriptionFormat, ...);
+extern NSError *OWSErrorMakeMessageSendDisabledDueToPreKeyUpdateFailuresError(void);
+extern NSError *OWSErrorMakeMessageSendFailedDueToBlockListError(void);
 
 NS_ASSUME_NONNULL_END

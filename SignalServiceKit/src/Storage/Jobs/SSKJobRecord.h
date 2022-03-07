@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/BaseModel.h>
+#import "BaseModel.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -46,12 +46,11 @@ typedef NS_CLOSED_ENUM(NSUInteger, SSKJobRecordStatus){
 
 - (instancetype)initWithGrdbId:(int64_t)grdbId
                       uniqueId:(NSString *)uniqueId
-      exclusiveProcessIdentifier:(nullable NSString *)exclusiveProcessIdentifier
                     failureCount:(NSUInteger)failureCount
                            label:(NSString *)label
                           sortId:(unsigned long long)sortId
                           status:(SSKJobRecordStatus)status
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:exclusiveProcessIdentifier:failureCount:label:sortId:status:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:failureCount:label:sortId:status:));
 
 // clang-format on
 
@@ -61,13 +60,6 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:exclusiveProcessIde
 
 // GRDB TODO: Replace sortId column with autoincremented id column
 @property (nonatomic, readonly) UInt64 sortId;
-@property (nonatomic, readonly, nullable) NSString *exclusiveProcessIdentifier;
-@property (nonatomic, readonly, class) NSString *currentProcessIdentifier;
-
-- (void)flagAsExclusiveForCurrentProcessIdentifier;
-
-- (void)updateWithExclusiveForCurrentProcessIdentifierWithTransaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(flagAsOnlyValidForCurrentProcessIdentifier(transaction:));
 
 - (BOOL)saveAsStartedWithTransaction:(SDSAnyWriteTransaction *)transaction
                                error:(NSError **)outError NS_SWIFT_NAME(saveAsStarted(transaction:));

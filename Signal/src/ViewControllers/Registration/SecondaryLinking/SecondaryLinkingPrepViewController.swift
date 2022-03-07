@@ -1,14 +1,15 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import Lottie
 
 @objc
 public class SecondaryLinkingPrepViewController: OnboardingBaseViewController {
 
-    lazy var animationView = AnimationView(name: isTransferring ? "launchApp-iPad" : "launchApp-iPhone")
+    lazy var animationView = UIImageView()
     let isTransferring: Bool
 
     public init(onboardingController: OnboardingController, isTransferring: Bool) {
@@ -22,12 +23,15 @@ public class SecondaryLinkingPrepViewController: OnboardingBaseViewController {
         primaryView.autoPinEdgesToSuperviewEdges()
 
         view.backgroundColor = Theme.backgroundColor
-
-        animationView.loopMode = .playOnce
-        animationView.backgroundBehavior = .pauseAndRestore
+        
         animationView.contentMode = .scaleAspectFit
         animationView.setContentHuggingHigh()
-
+//        if isTransferring {
+//            animationView.image = UIImage(named: "yoush-ipad")
+//        }else {
+//            animationView.image = UIImage(named: "yoush-iphone")
+//        }
+        animationView.image = UIImage(named: "yoush-ipad")
         let titleText: String
         if isTransferring {
             titleText = NSLocalizedString("SECONDARY_TRANSFER_GET_STARTED_BY_OPENING_IPAD",
@@ -38,7 +42,7 @@ public class SecondaryLinkingPrepViewController: OnboardingBaseViewController {
                                           comment: "header text before the user can link this device")
         }
 
-        let titleLabel = self.createTitleLabel(text: titleText)
+        let titleLabel = self.titleLabel(text: titleText)
         primaryView.addSubview(titleLabel)
         titleLabel.accessibilityIdentifier = "onboarding.prelink.titleLabel"
 
@@ -74,11 +78,6 @@ public class SecondaryLinkingPrepViewController: OnboardingBaseViewController {
         primaryView.addSubview(stackView)
 
         stackView.autoPinEdgesToSuperviewMargins()
-    }
-
-    override public func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        animationView.play()
     }
 
     // MARK: - Events

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct BackupFragmentRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        OWSBackupFragmentSerializer.table
+        return OWSBackupFragmentSerializer.table
     }
 
-    public static var databaseTableName: String {
-        OWSBackupFragmentSerializer.table.tableName
-    }
+    public static let databaseTableName: String = OWSBackupFragmentSerializer.table.tableName
 
     public var id: Int64?
 
@@ -50,7 +48,7 @@ public struct BackupFragmentRecord: SDSRecord {
     }
 
     public static func columnName(_ column: BackupFragmentRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -66,7 +64,7 @@ public struct BackupFragmentRecord: SDSRecord {
 
 public extension BackupFragmentRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -147,15 +145,15 @@ extension OWSBackupFragment: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        BackupFragmentRecord.databaseTableName
+        return BackupFragmentRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        OWSBackupFragmentSerializer.table
+        return OWSBackupFragmentSerializer.table
     }
 }
 
@@ -201,23 +199,22 @@ extension OWSBackupFragmentSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var attachmentIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "attachmentId", columnType: .unicodeString, isOptional: true) }
-    static var downloadFilePathColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "downloadFilePath", columnType: .unicodeString, isOptional: true) }
-    static var encryptionKeyColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "encryptionKey", columnType: .blob) }
-    static var recordNameColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordName", columnType: .unicodeString) }
-    static var relativeFilePathColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "relativeFilePath", columnType: .unicodeString, isOptional: true) }
-    static var uncompressedDataLengthColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uncompressedDataLength", columnType: .int64, isOptional: true) }
+    static let attachmentIdColumn = SDSColumnMetadata(columnName: "attachmentId", columnType: .unicodeString, isOptional: true)
+    static let downloadFilePathColumn = SDSColumnMetadata(columnName: "downloadFilePath", columnType: .unicodeString, isOptional: true)
+    static let encryptionKeyColumn = SDSColumnMetadata(columnName: "encryptionKey", columnType: .blob)
+    static let recordNameColumn = SDSColumnMetadata(columnName: "recordName", columnType: .unicodeString)
+    static let relativeFilePathColumn = SDSColumnMetadata(columnName: "relativeFilePath", columnType: .unicodeString, isOptional: true)
+    static let uncompressedDataLengthColumn = SDSColumnMetadata(columnName: "uncompressedDataLength", columnType: .int64, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: OWSBackupFragment.collection(),
-                         tableName: "model_OWSBackupFragment",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: OWSBackupFragment.collection(),
+                                               tableName: "model_OWSBackupFragment",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
@@ -226,9 +223,8 @@ extension OWSBackupFragmentSerializer {
         encryptionKeyColumn,
         recordNameColumn,
         relativeFilePathColumn,
-        uncompressedDataLengthColumn
+        uncompressedDataLengthColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -396,6 +392,8 @@ public extension OWSBackupFragment {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return OWSBackupFragment.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(BackupFragmentRecord.databaseTableName) WHERE \(backupFragmentColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -426,20 +424,28 @@ public extension OWSBackupFragment {
                             batchSize: UInt,
                             block: @escaping (OWSBackupFragment, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            OWSBackupFragment.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? OWSBackupFragment else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = OWSBackupFragment.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = OWSBackupFragment.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -467,6 +473,10 @@ public extension OWSBackupFragment {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: OWSBackupFragment.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -498,6 +508,8 @@ public extension OWSBackupFragment {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: OWSBackupFragment.collection())
         case .grdbRead(let grdbTransaction):
             return BackupFragmentRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -507,6 +519,8 @@ public extension OWSBackupFragment {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: OWSBackupFragment.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try BackupFragmentRecord.deleteAll(grdbTransaction.database)
@@ -526,20 +540,24 @@ public extension OWSBackupFragment {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -551,6 +569,8 @@ public extension OWSBackupFragment {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: OWSBackupFragment.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(BackupFragmentRecord.databaseTableName) WHERE \(backupFragmentColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -570,7 +590,7 @@ public extension OWSBackupFragment {
             let cursor = try BackupFragmentRecord.fetchCursor(transaction.database, sqlRequest)
             return OWSBackupFragmentCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return OWSBackupFragmentCursor(transaction: transaction, cursor: nil)
         }
@@ -642,3 +662,4 @@ public extension OWSBackupFragment {
     }
 }
 #endif
+                                                

@@ -1,2 +1,0 @@
-• Retocamos um pouco a lista de conversas para facilitar o reconhecimento das conversas que ainda não foram lidas
-• Corrigimos alguns problemas envolvendo a caixa de procura e o gesto de zoom em fotografias

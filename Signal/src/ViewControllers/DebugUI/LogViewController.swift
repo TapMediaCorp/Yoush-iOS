@@ -1,11 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 @objc
-public class LogPickerViewController: OWSTableViewController2 {
+public class LogPickerViewController: OWSTableViewController {
     let logDirUrl: URL
 
     @objc

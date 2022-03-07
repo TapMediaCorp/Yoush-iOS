@@ -1,11 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Photos
+import PromiseKit
 
-protocol PhotoCollectionPickerDelegate: AnyObject {
+protocol PhotoCollectionPickerDelegate: class {
     func photoCollectionPicker(_ photoCollectionPicker: PhotoCollectionPickerController, didPickCollection collection: PhotoCollection)
 }
 
@@ -50,6 +51,7 @@ class PhotoCollectionPickerController: OWSTableViewController, PhotoLibraryDeleg
                 }
                 return self.buildTableCell(collection: collection)
                 },
+                                customRowHeight: UITableView.automaticDimension,
                                 actionBlock: { [weak self] in
                                     guard let strongSelf = self else { return }
                                     strongSelf.didSelectCollection(collection: collection)

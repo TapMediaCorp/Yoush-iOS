@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-// *
+//*
 // Copyright (C) 2014-2016 Open Whisper Systems
 //
 // Licensed according to the LICENSE file in this repository.
@@ -52,7 +52,7 @@ struct ProvisioningProtos_ProvisionEnvelope {
 
   /// @required
   var publicKey: Data {
-    get {return _publicKey ?? Data()}
+    get {return _publicKey ?? SwiftProtobuf.Internal.emptyData}
     set {_publicKey = newValue}
   }
   /// Returns true if `publicKey` has been explicitly set.
@@ -62,7 +62,7 @@ struct ProvisioningProtos_ProvisionEnvelope {
 
   /// @required
   var body: Data {
-    get {return _body ?? Data()}
+    get {return _body ?? SwiftProtobuf.Internal.emptyData}
     set {_body = newValue}
   }
   /// Returns true if `body` has been explicitly set.
@@ -85,7 +85,7 @@ struct ProvisioningProtos_ProvisionMessage {
 
   /// @required
   var identityKeyPublic: Data {
-    get {return _identityKeyPublic ?? Data()}
+    get {return _identityKeyPublic ?? SwiftProtobuf.Internal.emptyData}
     set {_identityKeyPublic = newValue}
   }
   /// Returns true if `identityKeyPublic` has been explicitly set.
@@ -95,7 +95,7 @@ struct ProvisioningProtos_ProvisionMessage {
 
   /// @required
   var identityKeyPrivate: Data {
-    get {return _identityKeyPrivate ?? Data()}
+    get {return _identityKeyPrivate ?? SwiftProtobuf.Internal.emptyData}
     set {_identityKeyPrivate = newValue}
   }
   /// Returns true if `identityKeyPrivate` has been explicitly set.
@@ -142,7 +142,7 @@ struct ProvisioningProtos_ProvisionMessage {
 
   /// @required
   var profileKey: Data {
-    get {return _profileKey ?? Data()}
+    get {return _profileKey ?? SwiftProtobuf.Internal.emptyData}
     set {_profileKey = newValue}
   }
   /// Returns true if `profileKey` has been explicitly set.
@@ -195,24 +195,17 @@ extension ProvisioningProtos_ProvisioningUuid: SwiftProtobuf.Message, SwiftProto
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._uuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._uuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._uuid {
+    if let v = self._uuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -232,28 +225,21 @@ extension ProvisioningProtos_ProvisionEnvelope: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._publicKey) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._body) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._publicKey)
+      case 2: try decoder.decodeSingularBytesField(value: &self._body)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._publicKey {
+    if let v = self._publicKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._body {
+    }
+    if let v = self._body {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -281,56 +267,49 @@ extension ProvisioningProtos_ProvisionMessage: SwiftProtobuf.Message, SwiftProto
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._identityKeyPublic) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._identityKeyPrivate) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._number) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._provisioningCode) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._userAgent) }()
-      case 6: try { try decoder.decodeSingularBytesField(value: &self._profileKey) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self._readReceipts) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._uuid) }()
-      case 9: try { try decoder.decodeSingularUInt32Field(value: &self._provisioningVersion) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._identityKeyPublic)
+      case 2: try decoder.decodeSingularBytesField(value: &self._identityKeyPrivate)
+      case 3: try decoder.decodeSingularStringField(value: &self._number)
+      case 4: try decoder.decodeSingularStringField(value: &self._provisioningCode)
+      case 5: try decoder.decodeSingularStringField(value: &self._userAgent)
+      case 6: try decoder.decodeSingularBytesField(value: &self._profileKey)
+      case 7: try decoder.decodeSingularBoolField(value: &self._readReceipts)
+      case 8: try decoder.decodeSingularStringField(value: &self._uuid)
+      case 9: try decoder.decodeSingularUInt32Field(value: &self._provisioningVersion)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._identityKeyPublic {
+    if let v = self._identityKeyPublic {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._identityKeyPrivate {
+    }
+    if let v = self._identityKeyPrivate {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._number {
+    }
+    if let v = self._number {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._provisioningCode {
+    }
+    if let v = self._provisioningCode {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._userAgent {
+    }
+    if let v = self._userAgent {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._profileKey {
+    }
+    if let v = self._profileKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._readReceipts {
+    }
+    if let v = self._readReceipts {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._uuid {
+    }
+    if let v = self._uuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._provisioningVersion {
+    }
+    if let v = self._provisioningVersion {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 

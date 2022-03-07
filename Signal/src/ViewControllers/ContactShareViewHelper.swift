@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,11 +8,9 @@ import ContactsUI
 import MessageUI
 
 @objc
-public protocol ContactShareViewHelperDelegate: AnyObject {
+public protocol ContactShareViewHelperDelegate: class {
     func didCreateOrEditContact()
 }
-
-// MARK: -
 
 @objc
 public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
@@ -20,9 +18,13 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
     @objc
     weak var delegate: ContactShareViewHelperDelegate?
 
+    let contactsManager: OWSContactsManager
+
     @objc
-    public required override init() {
+    public required init(contactsManager: OWSContactsManager) {
         AssertIsOnMainThread()
+
+        self.contactsManager = contactsManager
 
         super.init()
     }
@@ -53,7 +55,7 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
     private func presentThreadAndPeform(action: ConversationViewAction, contactShare: ContactShareViewModel, fromViewController: UIViewController) {
         // TODO: We're taking the first Signal account id. We might
         // want to let the user select if there's more than one.
-        let phoneNumbers = contactShare.systemContactsWithSignalAccountPhoneNumbers()
+        let phoneNumbers = contactShare.systemContactsWithSignalAccountPhoneNumbers(contactsManager)
         guard phoneNumbers.count > 0 else {
             owsFailDebug("missing Signal recipient id.")
             return
@@ -68,8 +70,6 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
             SignalApp.shared().presentConversation(for: SignalServiceAddress(phoneNumber: phoneNumber), action: action, animated: true)
         })
     }
-
-    private var inviteFlow: InviteFlow?
 
     @objc
     public func showInviteContact(contactShare: ContactShareViewModel, fromViewController: UIViewController) {
@@ -87,7 +87,6 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
         }
 
         let inviteFlow = InviteFlow(presentingViewController: fromViewController)
-        self.inviteFlow = inviteFlow
         inviteFlow.sendSMSTo(phoneNumbers: phoneNumbers)
     }
 
@@ -142,7 +141,7 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
     // MARK: -
 
     private func presentNewContactView(contactShare: ContactShareViewModel, fromViewController: UIViewController) {
-        guard contactsManagerImpl.supportsContactEditing else {
+        guard contactsManager.supportsContactEditing else {
             owsFailDebug("Contact editing not supported")
             return
         }
@@ -152,7 +151,7 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
             return
         }
 
-        guard contactsManagerImpl.isSystemContactsAuthorized else {
+        guard contactsManager.isSystemContactsAuthorized else {
             ContactsViewHelper.presentMissingContactAccessAlertController(from: fromViewController)
             return
         }
@@ -171,12 +170,12 @@ public class ContactShareViewHelper: NSObject, CNContactViewControllerDelegate {
     }
 
     private func presentSelectAddToExistingContactView(contactShare: ContactShareViewModel, fromViewController: UIViewController) {
-        guard contactsManagerImpl.supportsContactEditing else {
+        guard contactsManager.supportsContactEditing else {
             owsFailDebug("Contact editing not supported")
             return
         }
 
-        guard contactsManagerImpl.isSystemContactsAuthorized else {
+        guard contactsManager.isSystemContactsAuthorized else {
             ContactsViewHelper.presentMissingContactAccessAlertController(from: fromViewController)
             return
         }

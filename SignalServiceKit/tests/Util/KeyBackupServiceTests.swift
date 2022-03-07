@@ -55,7 +55,6 @@ class KeyBackupServiceTests: SSKBaseTestSwift {
                     isMasterKeyBackedUp: true,
                     pinType: .init(forPin: vector.pin),
                     encodedVerificationString: "",
-                    enclaveName: "",
                     transaction: transaction
                 )
             }
@@ -100,7 +99,6 @@ class KeyBackupServiceTests: SSKBaseTestSwift {
                 isMasterKeyBackedUp: true,
                 pinType: .init(forPin: pin),
                 encodedVerificationString: encodedVerificationString,
-                enclaveName: "",
                 transaction: transaction
             )
         }
@@ -151,7 +149,6 @@ class KeyBackupServiceTests: SSKBaseTestSwift {
                         isMasterKeyBackedUp: true,
                         pinType: .numeric,
                         encodedVerificationString: "",
-                        enclaveName: "",
                         transaction: transaction
                     )
                 case .synced:

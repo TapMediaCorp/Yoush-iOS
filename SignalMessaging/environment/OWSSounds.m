@@ -1,21 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSSounds.h"
 #import "Environment.h"
-#import <SignalCoreKit/Cryptography.h>
-#import <SignalCoreKit/SignalCoreKit-Swift.h>
+#import "OWSAudioPlayer.h"
 #import <SignalMessaging/SignalMessaging-Swift.h>
 #import <SignalServiceKit/OWSFileSystem.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 #import <SignalServiceKit/TSThread.h>
 
 NSString *const kOWSSoundsStorageGlobalNotificationKey = @"kOWSSoundsStorageGlobalNotificationKey";
-// This name is specified in the payload by the Signal Service when requesting fallback push notifications.
-NSString *const kDefaultNotificationSoundFilename = @"NewMessage.aifc";
-
-const NSUInteger OWSCustomSoundShift = 16;
 
 @interface OWSSystemSound : NSObject
 
@@ -71,6 +66,27 @@ const NSUInteger OWSCustomSoundShift = 16;
 
 @implementation OWSSounds
 
+#pragma mark - Dependencies
+
++ (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
++ (instancetype)sharedManager
+{
+    OWSAssertDebug(Environment.shared.sounds);
+
+    return Environment.shared.sounds;
+}
+
 - (instancetype)init
 {
     self = [super init];
@@ -80,91 +96,11 @@ const NSUInteger OWSCustomSoundShift = 16;
     }
 
     // Don't store too many sounds in memory. Most users will only use 1 or 2 sounds anyway.
-    _cachedSystemSounds = [[AnyLRUCache alloc] initWithMaxSize:4
-                                                    nseMaxSize:0
-                                    shouldEvacuateInBackground:NO];
+    _cachedSystemSounds = [[AnyLRUCache alloc] initWithMaxSize:4];
 
     OWSSingletonAssert();
 
-    AppReadinessRunNowOrWhenMainAppDidBecomeReadyAsync(^{
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            [OWSSounds migrateLegacySounds];
-
-            if (!CurrentAppContext().isNSE) {
-                [OWSSounds cleanupOrphanedSounds];
-            }
-        });
-    });
-
     return self;
-}
-
-+ (void)migrateLegacySounds
-{
-    OWSAssertDebug(CurrentAppContext().isMainApp);
-
-    NSString *legacySoundsDirectory =
-        [[OWSFileSystem appLibraryDirectoryPath] stringByAppendingPathComponent:@"Sounds"];
-    if (![OWSFileSystem fileOrFolderExistsAtPath:legacySoundsDirectory]) {
-        return;
-    }
-
-    NSError *error;
-    NSArray *legacySoundFiles = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:legacySoundsDirectory
-                                                                                    error:&error];
-    if (error) {
-        OWSFailDebug(@"Failed looking up legacy sound files: %@", error.userErrorDescription);
-        return;
-    }
-
-    for (NSString *soundFile in legacySoundFiles) {
-        NSError *moveError;
-        [[NSFileManager defaultManager] moveItemAtPath:[legacySoundsDirectory stringByAppendingPathComponent:soundFile]
-                                                toPath:[[self soundsDirectory] stringByAppendingPathComponent:soundFile]
-                                                 error:&moveError];
-        if (moveError) {
-            OWSFailDebug(@"Failed to migrate legacy sound file: %@", moveError.userErrorDescription);
-            continue;
-        }
-    }
-
-    if (![OWSFileSystem deleteFile:legacySoundsDirectory]) {
-        OWSFailDebug(@"Failed to delete legacy sounds directory");
-    }
-}
-
-+ (void)cleanupOrphanedSounds
-{
-    OWSAssertDebug(CurrentAppContext().isMainApp);
-
-    NSSet<NSNumber *> *allCustomSounds = [NSSet setWithArray:[self allCustomNotificationSounds]];
-    if (allCustomSounds.count == 0) {
-        return;
-    }
-
-    __block NSSet<NSNumber *> *allInUseSounds;
-    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
-        allInUseSounds = [NSSet setWithArray:[self.keyValueStore allValuesWithTransaction:transaction]];
-    }];
-
-    NSMutableSet *orphanedSounds = [allCustomSounds mutableCopy];
-    [orphanedSounds minusSet:allInUseSounds];
-
-    if (orphanedSounds.count == 0) {
-        return;
-    }
-
-    NSUInteger deletedSoundCount = 0;
-    for (NSNumber *soundNumber in orphanedSounds) {
-        OWSSound sound = soundNumber.unsignedLongValue;
-        if ([self deleteCustomSound:sound]) {
-            deletedSoundCount++;
-        } else {
-            OWSFailDebug(@"Failed to delete orphaned sound.");
-        }
-    }
-
-    OWSLogInfo(@"Cleaned up %lu orphaned custom sounds.", deletedSoundCount);
 }
 
 + (SDSKeyValueStore *)keyValueStore
@@ -175,99 +111,81 @@ const NSUInteger OWSCustomSoundShift = 16;
 
 + (NSArray<NSNumber *> *)allNotificationSounds
 {
-    return [@[
+    return @[
         // None and Note (default) should be first.
-        @(OWSStandardSound_None),
-        @(OWSStandardSound_Note),
+        @(OWSSound_None),
+        @(OWSSound_Note),
 
-        @(OWSStandardSound_Aurora),
-        @(OWSStandardSound_Bamboo),
-        @(OWSStandardSound_Chord),
-        @(OWSStandardSound_Circles),
-        @(OWSStandardSound_Complete),
-        @(OWSStandardSound_Hello),
-        @(OWSStandardSound_Input),
-        @(OWSStandardSound_Keys),
-        @(OWSStandardSound_Popcorn),
-        @(OWSStandardSound_Pulse),
-        @(OWSStandardSound_SignalClassic),
-        @(OWSStandardSound_Synth),
-    ] arrayByAddingObjectsFromArray:[OWSSounds allCustomNotificationSounds]];
+        @(OWSSound_Aurora),
+        @(OWSSound_Bamboo),
+        @(OWSSound_Chord),
+        @(OWSSound_Circles),
+        @(OWSSound_Complete),
+        @(OWSSound_Hello),
+        @(OWSSound_Input),
+        @(OWSSound_Keys),
+        @(OWSSound_Popcorn),
+        @(OWSSound_Pulse),
+        @(OWSSound_SignalClassic),
+        @(OWSSound_Synth),
+    ];
 }
 
 + (NSString *)displayNameForSound:(OWSSound)sound
 {
     // TODO: Should we localize these sound names?
     switch (sound) {
-        case OWSStandardSound_Default:
+        case OWSSound_Default:
             OWSFailDebug(@"invalid argument.");
             return @"";
 
         // Notification Sounds
-        case OWSStandardSound_Aurora:
+        case OWSSound_Aurora:
             return @"Aurora";
-        case OWSStandardSound_Bamboo:
+        case OWSSound_Bamboo:
             return @"Bamboo";
-        case OWSStandardSound_Chord:
+        case OWSSound_Chord:
             return @"Chord";
-        case OWSStandardSound_Circles:
+        case OWSSound_Circles:
             return @"Circles";
-        case OWSStandardSound_Complete:
+        case OWSSound_Complete:
             return @"Complete";
-        case OWSStandardSound_Hello:
+        case OWSSound_Hello:
             return @"Hello";
-        case OWSStandardSound_Input:
+        case OWSSound_Input:
             return @"Input";
-        case OWSStandardSound_Keys:
+        case OWSSound_Keys:
             return @"Keys";
-        case OWSStandardSound_Note:
+        case OWSSound_Note:
             return @"Note";
-        case OWSStandardSound_Popcorn:
+        case OWSSound_Popcorn:
             return @"Popcorn";
-        case OWSStandardSound_Pulse:
+        case OWSSound_Pulse:
             return @"Pulse";
-        case OWSStandardSound_Synth:
+        case OWSSound_Synth:
             return @"Synth";
-        case OWSStandardSound_SignalClassic:
+        case OWSSound_SignalClassic:
             return @"Signal Classic";
 
         // Call Audio
-        case OWSStandardSound_Reflection:
+        case OWSSound_Opening:
             return @"Opening";
-        case OWSStandardSound_CallConnecting:
+        case OWSSound_CallConnecting:
             return @"Call Connecting";
-        case OWSStandardSound_CallOutboundRinging:
+        case OWSSound_CallOutboundRinging:
             return @"Call Outboung Ringing";
-        case OWSStandardSound_CallBusy:
+        case OWSSound_CallBusy:
             return @"Call Busy";
-        case OWSStandardSound_CallEnded:
+        case OWSSound_CallEnded:
             return @"Call Ended";
-        case OWSStandardSound_MessageSent:
+        case OWSSound_MessageSent:
             return @"Message Sent";
-        case OWSStandardSound_Silence:
-            return @"Silence";
-
-        // Group Calls
-        case OWSStandardSound_GroupCallJoin:
-            return @"Group Call Join";
-        case OWSStandardSound_GroupCallLeave:
-            return @"Group Call Leave";
 
         // Other
-        case OWSStandardSound_None:
+        case OWSSound_None:
             return NSLocalizedString(@"SOUNDS_NONE",
                 @"Label for the 'no sound' option that allows users to disable sounds for notifications, "
                 @"etc.");
-
-        // Audio Playback
-        case OWSStandardSound_BeginNextTrack:
-            return @"Begin Next Track";
-        case OWSStandardSound_EndLastTrack:
-            return @"End Last Track";
-
-        // Custom Sounds
-        default:
-            return [OWSSounds displayNameForCustomSound:sound];
     }
 }
 
@@ -279,97 +197,75 @@ const NSUInteger OWSCustomSoundShift = 16;
 + (nullable NSString *)filenameForSound:(OWSSound)sound quiet:(BOOL)quiet
 {
     switch (sound) {
-        case OWSStandardSound_Default:
+        case OWSSound_Default:
             OWSFailDebug(@"invalid argument.");
             return @"";
 
             // Notification Sounds
-        case OWSStandardSound_Aurora:
+        case OWSSound_Aurora:
             return (quiet ? @"aurora-quiet.aifc" : @"aurora.aifc");
-        case OWSStandardSound_Bamboo:
+        case OWSSound_Bamboo:
             return (quiet ? @"bamboo-quiet.aifc" : @"bamboo.aifc");
-        case OWSStandardSound_Chord:
+        case OWSSound_Chord:
             return (quiet ? @"chord-quiet.aifc" : @"chord.aifc");
-        case OWSStandardSound_Circles:
+        case OWSSound_Circles:
             return (quiet ? @"circles-quiet.aifc" : @"circles.aifc");
-        case OWSStandardSound_Complete:
+        case OWSSound_Complete:
             return (quiet ? @"complete-quiet.aifc" : @"complete.aifc");
-        case OWSStandardSound_Hello:
+        case OWSSound_Hello:
             return (quiet ? @"hello-quiet.aifc" : @"hello.aifc");
-        case OWSStandardSound_Input:
+        case OWSSound_Input:
             return (quiet ? @"input-quiet.aifc" : @"input.aifc");
-        case OWSStandardSound_Keys:
+        case OWSSound_Keys:
             return (quiet ? @"keys-quiet.aifc" : @"keys.aifc");
-        case OWSStandardSound_Note:
+        case OWSSound_Note:
             return (quiet ? @"note-quiet.aifc" : @"note.aifc");
-        case OWSStandardSound_Popcorn:
+        case OWSSound_Popcorn:
             return (quiet ? @"popcorn-quiet.aifc" : @"popcorn.aifc");
-        case OWSStandardSound_Pulse:
+        case OWSSound_Pulse:
             return (quiet ? @"pulse-quiet.aifc" : @"pulse.aifc");
-        case OWSStandardSound_Synth:
+        case OWSSound_Synth:
             return (quiet ? @"synth-quiet.aifc" : @"synth.aifc");
-        case OWSStandardSound_SignalClassic:
+        case OWSSound_SignalClassic:
             return (quiet ? @"classic-quiet.aifc" : @"classic.aifc");
 
             // Ringtone Sounds
-        case OWSStandardSound_Reflection:
-            return @"Reflection.m4r";
+        case OWSSound_Opening:
+            return @"Opening.m4r";
 
             // Calls
-        case OWSStandardSound_CallConnecting:
+        case OWSSound_CallConnecting:
             return @"ringback_tone_ansi.caf";
-        case OWSStandardSound_CallOutboundRinging:
+        case OWSSound_CallOutboundRinging:
             return @"ringback_tone_ansi.caf";
-        case OWSStandardSound_CallBusy:
+        case OWSSound_CallBusy:
             return @"busy_tone_ansi.caf";
-        case OWSStandardSound_CallEnded:
+        case OWSSound_CallEnded:
             return @"end_call_tone_cept.caf";
-        case OWSStandardSound_MessageSent:
+        case OWSSound_MessageSent:
             return @"message_sent.aiff";
-        case OWSStandardSound_Silence:
-            return @"silence.aiff";
-
-        // Group Calls
-        case OWSStandardSound_GroupCallJoin:
-            return @"group_call_join.aiff";
-        case OWSStandardSound_GroupCallLeave:
-            return @"group_call_leave.aiff";
-
-        // Audio Playback
-        case OWSStandardSound_BeginNextTrack:
-            return @"state-change_confirm-down.caf";
-        case OWSStandardSound_EndLastTrack:
-            return @"state-change_confirm-up.caf";
 
             // Other
-        case OWSStandardSound_None:
+        case OWSSound_None:
             return nil;
-
-            // Custom Sounds
-        default:
-            return [OWSSounds filenameForCustomSound:sound];
     }
 }
 
 + (nullable NSURL *)soundURLForSound:(OWSSound)sound quiet:(BOOL)quiet
 {
-    if (sound < OWSStandardSound_CustomThreshold) {
-        NSString *_Nullable filename = [self filenameForSound:sound quiet:quiet];
-        if (!filename) {
-            return nil;
-        }
-        NSURL *_Nullable url = [[NSBundle mainBundle] URLForResource:filename.stringByDeletingPathExtension
-                                                       withExtension:filename.pathExtension];
-        OWSAssertDebug(url);
-        return url;
-    } else {
-        return [OWSSounds soundURLForCustomSound:sound];
+    NSString *_Nullable filename = [self filenameForSound:sound quiet:quiet];
+    if (!filename) {
+        return nil;
     }
+    NSURL *_Nullable url = [[NSBundle mainBundle] URLForResource:filename.stringByDeletingPathExtension
+                                                   withExtension:filename.pathExtension];
+    OWSAssertDebug(url);
+    return url;
 }
 
 + (SystemSoundID)systemSoundIDForSound:(OWSSound)sound quiet:(BOOL)quiet
 {
-    return [self.shared systemSoundIDForSound:(OWSSound)sound quiet:quiet];
+    return [self.sharedManager systemSoundIDForSound:(OWSSound)sound quiet:quiet];
 }
 
 - (SystemSoundID)systemSoundIDForSound:(OWSSound)sound quiet:(BOOL)quiet
@@ -389,49 +285,11 @@ const NSUInteger OWSCustomSoundShift = 16;
     return newSound.soundID;
 }
 
-+ (void)importSoundsAtURLs:(NSArray<NSURL *> *)urls
-{
-    NSFileManager *fileManager = [NSFileManager defaultManager];
-    for (NSURL *url in urls) {
-        NSError *error = NULL;
-        NSString *filename = url.lastPathComponent;
-        if (!filename)
-            continue;
-
-        NSString *destination = [NSString pathWithComponents:@[ [OWSSounds soundsDirectory], filename ]];
-
-        if (![fileManager fileExistsAtPath:destination]) {
-            [fileManager copyItemAtPath:[url path] toPath:destination error:&error];
-        }
-
-        if (error) {
-            OWSFailDebug(@"Failed to import custom sound with error %@", [error localizedDescription]);
-            error = NULL;
-        }
-    }
-}
-
-+ (BOOL)deleteCustomSound:(OWSSound)sound
-{
-    if (sound < OWSStandardSound_CustomThreshold) {
-        OWSFailDebug(@"Can't delete built-in sound");
-        return NO;
-    } else {
-        NSURL *url = [self soundURLForCustomSound:sound];
-        NSError *error;
-        [OWSFileSystem deleteFileIfExistsWithUrl:url error:&error];
-        if (error) {
-            OWSFailDebug(@"Failed to delete custom sound: %@", error);
-        }
-        return YES;
-    }
-}
-
 #pragma mark - Notifications
 
 + (OWSSound)defaultNotificationSound
 {
-    return OWSStandardSound_Note;
+    return OWSSound_Note;
 }
 
 + (OWSSound)globalNotificationSound
@@ -441,12 +299,12 @@ const NSUInteger OWSCustomSoundShift = 16;
         value = [self.keyValueStore getNSNumber:kOWSSoundsStorageGlobalNotificationKey transaction:transaction];
     }];
     // Default to the global default.
-    return (value ? (OWSSound)value.unsignedLongValue : [self defaultNotificationSound]);
+    return (value ? (OWSSound)value.intValue : [self defaultNotificationSound]);
 }
 
 + (void)setGlobalNotificationSound:(OWSSound)sound
 {
-    [self.shared setGlobalNotificationSound:sound];
+    [self.sharedManager setGlobalNotificationSound:sound];
 }
 
 - (void)setGlobalNotificationSound:(OWSSound)sound
@@ -458,7 +316,7 @@ const NSUInteger OWSCustomSoundShift = 16;
 
 + (void)setGlobalNotificationSound:(OWSSound)sound transaction:(SDSAnyWriteTransaction *)transaction
 {
-    [self.shared setGlobalNotificationSound:sound transaction:transaction];
+    [self.sharedManager setGlobalNotificationSound:sound transaction:transaction];
 }
 
 - (void)setGlobalNotificationSound:(OWSSound)sound transaction:(SDSAnyWriteTransaction *)transaction
@@ -470,8 +328,11 @@ const NSUInteger OWSCustomSoundShift = 16;
     // Fallback push notifications play a sound specified by the server, but we don't want to store this configuration
     // on the server. Instead, we create a file with the same name as the default to be played when receiving
     // a fallback notification.
-    NSString *dirPath = [OWSSounds soundsDirectory];
+    NSString *dirPath = [[OWSFileSystem appLibraryDirectoryPath] stringByAppendingPathComponent:@"Sounds"];
+    [OWSFileSystem ensureDirectoryExists:dirPath];
 
+    // This name is specified in the payload by the Signal Service when requesting fallback push notifications.
+    NSString *kDefaultNotificationSoundFilename = @"NewMessage.aifc";
     NSString *defaultSoundPath = [dirPath stringByAppendingPathComponent:kDefaultNotificationSoundFilename];
 
     OWSLogDebug(@"writing new default sound to %@", defaultSoundPath);
@@ -482,7 +343,7 @@ const NSUInteger OWSCustomSoundShift = 16;
         if (soundURL) {
             return [NSData dataWithContentsOfURL:soundURL];
         } else {
-            OWSAssertDebug(sound == OWSStandardSound_None);
+            OWSAssertDebug(sound == OWSSound_None);
             return [NSData new];
         }
     }();
@@ -510,7 +371,7 @@ const NSUInteger OWSCustomSoundShift = 16;
         value = [self.keyValueStore getNSNumber:thread.uniqueId transaction:transaction];
     }];
     // Default to the "global" notification sound, which in turn will default to the global default.
-    return (value ? (OWSSound)value.unsignedLongValue : [self globalNotificationSound]);
+    return (value ? (OWSSound)value.intValue : [self globalNotificationSound]);
 }
 
 + (void)setNotificationSound:(OWSSound)sound forThread:(TSThread *)thread
@@ -520,87 +381,25 @@ const NSUInteger OWSCustomSoundShift = 16;
     });
 }
 
-#pragma mark - Custom Sounds
+#pragma mark - AudioPlayer
 
-+ (NSString *)displayNameForCustomSound:(OWSSound)sound
++ (BOOL)shouldAudioPlayerLoopForSound:(OWSSound)sound
 {
-    NSString *filename = [OWSSounds filenameForCustomSound:sound];
-    NSString *fileNameWithoutExtension = [[filename lastPathComponent] stringByDeletingPathExtension];
-    if (!fileNameWithoutExtension) {
-        OWSFailDebug(@"Unable to retrieve custom sound display name from: %lu", sound);
-        return @"Custom Sound";
-    }
-
-    return [fileNameWithoutExtension capitalizedString];
+    return (sound == OWSSound_CallConnecting || sound == OWSSound_CallOutboundRinging
+        || sound == OWSSound_DefaultiOSIncomingRingtone);
 }
 
-+ (nullable NSString *)filenameForCustomSound:(OWSSound)sound
++ (nullable OWSAudioPlayer *)audioPlayerForSound:(OWSSound)sound audioBehavior:(OWSAudioBehavior)audioBehavior
 {
-    NSError *error = NULL;
-    NSArray *customSoundFilenames =
-        [[NSFileManager defaultManager] contentsOfDirectoryAtPath:[OWSSounds soundsDirectory] error:&error];
-    if (error) {
-        OWSFailDebug(@"Failed retrieving custom sound files: %@", error.userErrorDescription);
-        return NULL;
+    NSURL *_Nullable soundURL = [OWSSounds soundURLForSound:sound quiet:NO];
+    if (!soundURL) {
+        return nil;
     }
-
-    NSUInteger index =
-        [customSoundFilenames indexOfObjectPassingTest:^BOOL(id _Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
-            return [OWSSounds customSoundForFilename:obj] == sound;
-        }];
-    return index == NSNotFound ? NULL : [customSoundFilenames objectAtIndex:index];
-}
-
-+ (NSArray<NSNumber *> *)allCustomNotificationSounds
-{
-    NSError *error = NULL;
-    NSArray *customSoundFilenames =
-        [[NSFileManager defaultManager] contentsOfDirectoryAtPath:[OWSSounds soundsDirectory] error:&error];
-    if (error) {
-        OWSFailDebug(@"Failed retrieving custom sound files: %@", error.userErrorDescription);
-        return @[];
+    OWSAudioPlayer *player = [[OWSAudioPlayer alloc] initWithMediaUrl:soundURL audioBehavior:audioBehavior];
+    if ([self shouldAudioPlayerLoopForSound:sound]) {
+        player.isLooping = YES;
     }
-
-    NSMutableArray<NSNumber *> *sounds = [[NSMutableArray alloc] initWithCapacity:customSoundFilenames.count];
-    for (NSString *filename in customSoundFilenames) {
-        if ([filename isEqualToString:kDefaultNotificationSoundFilename]) {
-            continue;
-        }
-        [sounds addObject:[NSNumber numberWithUnsignedLong:[OWSSounds customSoundForFilename:filename]]];
-    }
-    return sounds;
-}
-
-+ (nullable NSURL *)soundURLForCustomSound:(OWSSound)sound
-{
-    NSString *path =
-        [[OWSSounds soundsDirectory] stringByAppendingPathComponent:[OWSSounds filenameForCustomSound:sound]];
-    return [NSURL fileURLWithPath:path];
-}
-
-+ (OWSSound)customSoundForFilename:(NSString *)filename
-{
-    NSUInteger hashValue = 0;
-    NSData *_Nullable filenameData = [filename dataUsingEncoding:NSUTF8StringEncoding];
-    if (!filenameData) {
-        OWSFailDebug(@"could not get data from filename.");
-        return OWSStandardSound_Default;
-    }
-    NSData *_Nullable hashData = [Cryptography computeSHA256Digest:filenameData truncatedToBytes:sizeof(hashValue)];
-    if (!hashData) {
-        OWSFailDebug(@"could not get hash from filename.");
-        return OWSStandardSound_Default;
-    }
-    [hashData getBytes:&hashValue length:sizeof(hashValue)];
-
-    return hashValue << OWSCustomSoundShift;
-}
-
-+ (NSString *)soundsDirectory
-{
-    NSString *directory = [[OWSFileSystem appSharedDataDirectoryPath] stringByAppendingPathComponent:@"Library/Sounds"];
-    [OWSFileSystem ensureDirectoryExists:directory];
-    return directory;
+    return player;
 }
 
 @end

@@ -1,10 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import SignalCoreKit
-import SwiftProtobuf
 
 // WARNING: This code is generated. Only edit within the markers.
 
@@ -15,12 +14,12 @@ public enum WebSocketProtoError: Error {
 // MARK: - WebSocketProtoWebSocketRequestMessage
 
 @objc
-public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureCoding {
+public class WebSocketProtoWebSocketRequestMessage: NSObject {
 
     // MARK: - WebSocketProtoWebSocketRequestMessageBuilder
 
     @objc
-    public static func builder(verb: String, path: String, requestID: UInt64) -> WebSocketProtoWebSocketRequestMessageBuilder {
+    public class func builder(verb: String, path: String, requestID: UInt64) -> WebSocketProtoWebSocketRequestMessageBuilder {
         return WebSocketProtoWebSocketRequestMessageBuilder(verb: verb, path: path, requestID: requestID)
     }
 
@@ -32,9 +31,6 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
             builder.setBody(_value)
         }
         builder.setHeaders(headers)
-        if let _value = unknownFields {
-            builder.setUnknownFields(_value)
-        }
         return builder
     }
 
@@ -90,7 +86,9 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
 
         @objc
         public func addHeaders(_ valueParam: String) {
-            proto.headers.append(valueParam)
+            var items = proto.headers
+            items.append(valueParam)
+            proto.headers = items
         }
 
         @objc
@@ -103,18 +101,14 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
             proto.requestID = valueParam
         }
 
-        public func setUnknownFields(_ unknownFields: SwiftProtobuf.UnknownStorage) {
-            proto.unknownFields = unknownFields
-        }
-
         @objc
         public func build() throws -> WebSocketProtoWebSocketRequestMessage {
-            return try WebSocketProtoWebSocketRequestMessage(proto)
+            return try WebSocketProtoWebSocketRequestMessage.parseProto(proto)
         }
 
         @objc
         public func buildSerializedData() throws -> Data {
-            return try WebSocketProtoWebSocketRequestMessage(proto).serializedData()
+            return try WebSocketProtoWebSocketRequestMessage.parseProto(proto).serializedData()
         }
     }
 
@@ -146,14 +140,6 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
         return proto.headers
     }
 
-    public var hasUnknownFields: Bool {
-        return !proto.unknownFields.data.isEmpty
-    }
-    public var unknownFields: SwiftProtobuf.UnknownStorage? {
-        guard hasUnknownFields else { return nil }
-        return proto.unknownFields
-    }
-
     private init(proto: WebSocketProtos_WebSocketRequestMessage,
                  verb: String,
                  path: String,
@@ -170,24 +156,24 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
     }
 
     @objc
-    public convenience init(serializedData: Data) throws {
+    public class func parseData(_ serializedData: Data) throws -> WebSocketProtoWebSocketRequestMessage {
         let proto = try WebSocketProtos_WebSocketRequestMessage(serializedData: serializedData)
-        try self.init(proto)
+        return try parseProto(proto)
     }
 
-    fileprivate convenience init(_ proto: WebSocketProtos_WebSocketRequestMessage) throws {
+    fileprivate class func parseProto(_ proto: WebSocketProtos_WebSocketRequestMessage) throws -> WebSocketProtoWebSocketRequestMessage {
         guard proto.hasVerb else {
-            throw WebSocketProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: verb")
+            throw WebSocketProtoError.invalidProtobuf(description: "\(logTag) missing required field: verb")
         }
         let verb = proto.verb
 
         guard proto.hasPath else {
-            throw WebSocketProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: path")
+            throw WebSocketProtoError.invalidProtobuf(description: "\(logTag) missing required field: path")
         }
         let path = proto.path
 
         guard proto.hasRequestID else {
-            throw WebSocketProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: requestID")
+            throw WebSocketProtoError.invalidProtobuf(description: "\(logTag) missing required field: requestID")
         }
         let requestID = proto.requestID
 
@@ -195,40 +181,11 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
 
         // MARK: - End Validation Logic for WebSocketProtoWebSocketRequestMessage -
 
-        self.init(proto: proto,
-                  verb: verb,
-                  path: path,
-                  requestID: requestID)
-    }
-
-    public required convenience init(from decoder: Swift.Decoder) throws {
-        let singleValueContainer = try decoder.singleValueContainer()
-        let serializedData = try singleValueContainer.decode(Data.self)
-        try self.init(serializedData: serializedData)
-    }
-    public func encode(to encoder: Swift.Encoder) throws {
-        var singleValueContainer = encoder.singleValueContainer()
-        try singleValueContainer.encode(try serializedData())
-    }
-
-    public static var supportsSecureCoding: Bool { true }
-
-    public required convenience init?(coder: NSCoder) {
-        guard let serializedData = coder.decodeData() else { return nil }
-        do {
-            try self.init(serializedData: serializedData)
-        } catch {
-            owsFailDebug("Failed to decode serialized data \(error)")
-            return nil
-        }
-    }
-
-    public func encode(with coder: NSCoder) {
-        do {
-            coder.encode(try serializedData())
-        } catch {
-            owsFailDebug("Failed to encode serialized data \(error)")
-        }
+        let result = WebSocketProtoWebSocketRequestMessage(proto: proto,
+                                                           verb: verb,
+                                                           path: path,
+                                                           requestID: requestID)
+        return result
     }
 
     @objc
@@ -237,7 +194,7 @@ public class WebSocketProtoWebSocketRequestMessage: NSObject, Codable, NSSecureC
     }
 }
 
-#if TESTABLE_BUILD
+#if DEBUG
 
 extension WebSocketProtoWebSocketRequestMessage {
     @objc
@@ -258,12 +215,12 @@ extension WebSocketProtoWebSocketRequestMessage.WebSocketProtoWebSocketRequestMe
 // MARK: - WebSocketProtoWebSocketResponseMessage
 
 @objc
-public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecureCoding {
+public class WebSocketProtoWebSocketResponseMessage: NSObject {
 
     // MARK: - WebSocketProtoWebSocketResponseMessageBuilder
 
     @objc
-    public static func builder(requestID: UInt64, status: UInt32) -> WebSocketProtoWebSocketResponseMessageBuilder {
+    public class func builder(requestID: UInt64, status: UInt32) -> WebSocketProtoWebSocketResponseMessageBuilder {
         return WebSocketProtoWebSocketResponseMessageBuilder(requestID: requestID, status: status)
     }
 
@@ -277,9 +234,6 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
         builder.setHeaders(headers)
         if let _value = body {
             builder.setBody(_value)
-        }
-        if let _value = unknownFields {
-            builder.setUnknownFields(_value)
         }
         return builder
     }
@@ -323,7 +277,9 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
 
         @objc
         public func addHeaders(_ valueParam: String) {
-            proto.headers.append(valueParam)
+            var items = proto.headers
+            items.append(valueParam)
+            proto.headers = items
         }
 
         @objc
@@ -342,18 +298,14 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
             proto.body = valueParam
         }
 
-        public func setUnknownFields(_ unknownFields: SwiftProtobuf.UnknownStorage) {
-            proto.unknownFields = unknownFields
-        }
-
         @objc
         public func build() throws -> WebSocketProtoWebSocketResponseMessage {
-            return try WebSocketProtoWebSocketResponseMessage(proto)
+            return try WebSocketProtoWebSocketResponseMessage.parseProto(proto)
         }
 
         @objc
         public func buildSerializedData() throws -> Data {
-            return try WebSocketProtoWebSocketResponseMessage(proto).serializedData()
+            return try WebSocketProtoWebSocketResponseMessage.parseProto(proto).serializedData()
         }
     }
 
@@ -394,14 +346,6 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
         return proto.hasBody
     }
 
-    public var hasUnknownFields: Bool {
-        return !proto.unknownFields.data.isEmpty
-    }
-    public var unknownFields: SwiftProtobuf.UnknownStorage? {
-        guard hasUnknownFields else { return nil }
-        return proto.unknownFields
-    }
-
     private init(proto: WebSocketProtos_WebSocketResponseMessage,
                  requestID: UInt64,
                  status: UInt32) {
@@ -416,19 +360,19 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
     }
 
     @objc
-    public convenience init(serializedData: Data) throws {
+    public class func parseData(_ serializedData: Data) throws -> WebSocketProtoWebSocketResponseMessage {
         let proto = try WebSocketProtos_WebSocketResponseMessage(serializedData: serializedData)
-        try self.init(proto)
+        return try parseProto(proto)
     }
 
-    fileprivate convenience init(_ proto: WebSocketProtos_WebSocketResponseMessage) throws {
+    fileprivate class func parseProto(_ proto: WebSocketProtos_WebSocketResponseMessage) throws -> WebSocketProtoWebSocketResponseMessage {
         guard proto.hasRequestID else {
-            throw WebSocketProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: requestID")
+            throw WebSocketProtoError.invalidProtobuf(description: "\(logTag) missing required field: requestID")
         }
         let requestID = proto.requestID
 
         guard proto.hasStatus else {
-            throw WebSocketProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: status")
+            throw WebSocketProtoError.invalidProtobuf(description: "\(logTag) missing required field: status")
         }
         let status = proto.status
 
@@ -436,39 +380,10 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
 
         // MARK: - End Validation Logic for WebSocketProtoWebSocketResponseMessage -
 
-        self.init(proto: proto,
-                  requestID: requestID,
-                  status: status)
-    }
-
-    public required convenience init(from decoder: Swift.Decoder) throws {
-        let singleValueContainer = try decoder.singleValueContainer()
-        let serializedData = try singleValueContainer.decode(Data.self)
-        try self.init(serializedData: serializedData)
-    }
-    public func encode(to encoder: Swift.Encoder) throws {
-        var singleValueContainer = encoder.singleValueContainer()
-        try singleValueContainer.encode(try serializedData())
-    }
-
-    public static var supportsSecureCoding: Bool { true }
-
-    public required convenience init?(coder: NSCoder) {
-        guard let serializedData = coder.decodeData() else { return nil }
-        do {
-            try self.init(serializedData: serializedData)
-        } catch {
-            owsFailDebug("Failed to decode serialized data \(error)")
-            return nil
-        }
-    }
-
-    public func encode(with coder: NSCoder) {
-        do {
-            coder.encode(try serializedData())
-        } catch {
-            owsFailDebug("Failed to encode serialized data \(error)")
-        }
+        let result = WebSocketProtoWebSocketResponseMessage(proto: proto,
+                                                            requestID: requestID,
+                                                            status: status)
+        return result
     }
 
     @objc
@@ -477,7 +392,7 @@ public class WebSocketProtoWebSocketResponseMessage: NSObject, Codable, NSSecure
     }
 }
 
-#if TESTABLE_BUILD
+#if DEBUG
 
 extension WebSocketProtoWebSocketResponseMessage {
     @objc
@@ -523,12 +438,12 @@ private func WebSocketProtoWebSocketMessageTypeUnwrap(_ value: WebSocketProtoWeb
 // MARK: - WebSocketProtoWebSocketMessage
 
 @objc
-public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
+public class WebSocketProtoWebSocketMessage: NSObject {
 
     // MARK: - WebSocketProtoWebSocketMessageBuilder
 
     @objc
-    public static func builder() -> WebSocketProtoWebSocketMessageBuilder {
+    public class func builder() -> WebSocketProtoWebSocketMessageBuilder {
         return WebSocketProtoWebSocketMessageBuilder()
     }
 
@@ -544,9 +459,6 @@ public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
         }
         if let _value = response {
             builder.setResponse(_value)
-        }
-        if let _value = unknownFields {
-            builder.setUnknownFields(_value)
         }
         return builder
     }
@@ -586,18 +498,14 @@ public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
             proto.response = valueParam.proto
         }
 
-        public func setUnknownFields(_ unknownFields: SwiftProtobuf.UnknownStorage) {
-            proto.unknownFields = unknownFields
-        }
-
         @objc
         public func build() throws -> WebSocketProtoWebSocketMessage {
-            return try WebSocketProtoWebSocketMessage(proto)
+            return try WebSocketProtoWebSocketMessage.parseProto(proto)
         }
 
         @objc
         public func buildSerializedData() throws -> Data {
-            return try WebSocketProtoWebSocketMessage(proto).serializedData()
+            return try WebSocketProtoWebSocketMessage.parseProto(proto).serializedData()
         }
     }
 
@@ -629,14 +537,6 @@ public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
         return proto.hasType
     }
 
-    public var hasUnknownFields: Bool {
-        return !proto.unknownFields.data.isEmpty
-    }
-    public var unknownFields: SwiftProtobuf.UnknownStorage? {
-        guard hasUnknownFields else { return nil }
-        return proto.unknownFields
-    }
-
     private init(proto: WebSocketProtos_WebSocketMessage,
                  request: WebSocketProtoWebSocketRequestMessage?,
                  response: WebSocketProtoWebSocketResponseMessage?) {
@@ -651,59 +551,30 @@ public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
     }
 
     @objc
-    public convenience init(serializedData: Data) throws {
+    public class func parseData(_ serializedData: Data) throws -> WebSocketProtoWebSocketMessage {
         let proto = try WebSocketProtos_WebSocketMessage(serializedData: serializedData)
-        try self.init(proto)
+        return try parseProto(proto)
     }
 
-    fileprivate convenience init(_ proto: WebSocketProtos_WebSocketMessage) throws {
-        var request: WebSocketProtoWebSocketRequestMessage?
+    fileprivate class func parseProto(_ proto: WebSocketProtos_WebSocketMessage) throws -> WebSocketProtoWebSocketMessage {
+        var request: WebSocketProtoWebSocketRequestMessage? = nil
         if proto.hasRequest {
-            request = try WebSocketProtoWebSocketRequestMessage(proto.request)
+            request = try WebSocketProtoWebSocketRequestMessage.parseProto(proto.request)
         }
 
-        var response: WebSocketProtoWebSocketResponseMessage?
+        var response: WebSocketProtoWebSocketResponseMessage? = nil
         if proto.hasResponse {
-            response = try WebSocketProtoWebSocketResponseMessage(proto.response)
+            response = try WebSocketProtoWebSocketResponseMessage.parseProto(proto.response)
         }
 
         // MARK: - Begin Validation Logic for WebSocketProtoWebSocketMessage -
 
         // MARK: - End Validation Logic for WebSocketProtoWebSocketMessage -
 
-        self.init(proto: proto,
-                  request: request,
-                  response: response)
-    }
-
-    public required convenience init(from decoder: Swift.Decoder) throws {
-        let singleValueContainer = try decoder.singleValueContainer()
-        let serializedData = try singleValueContainer.decode(Data.self)
-        try self.init(serializedData: serializedData)
-    }
-    public func encode(to encoder: Swift.Encoder) throws {
-        var singleValueContainer = encoder.singleValueContainer()
-        try singleValueContainer.encode(try serializedData())
-    }
-
-    public static var supportsSecureCoding: Bool { true }
-
-    public required convenience init?(coder: NSCoder) {
-        guard let serializedData = coder.decodeData() else { return nil }
-        do {
-            try self.init(serializedData: serializedData)
-        } catch {
-            owsFailDebug("Failed to decode serialized data \(error)")
-            return nil
-        }
-    }
-
-    public func encode(with coder: NSCoder) {
-        do {
-            coder.encode(try serializedData())
-        } catch {
-            owsFailDebug("Failed to encode serialized data \(error)")
-        }
+        let result = WebSocketProtoWebSocketMessage(proto: proto,
+                                                    request: request,
+                                                    response: response)
+        return result
     }
 
     @objc
@@ -712,7 +583,7 @@ public class WebSocketProtoWebSocketMessage: NSObject, Codable, NSSecureCoding {
     }
 }
 
-#if TESTABLE_BUILD
+#if DEBUG
 
 extension WebSocketProtoWebSocketMessage {
     @objc

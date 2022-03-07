@@ -1,13 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <Mantle/MTLModel.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class MessageBodyRanges;
-@class SDSAnyReadTransaction;
 @class SDSAnyWriteTransaction;
 @class SSKProtoDataMessage;
 @class SignalServiceAddress;
@@ -15,6 +13,42 @@ NS_ASSUME_NONNULL_BEGIN
 @class TSAttachmentStream;
 @class TSQuotedMessage;
 @class TSThread;
+
+@interface OWSAttachmentInfo : MTLModel
+
+@property (nonatomic, readonly, nullable) NSString *contentType;
+@property (nonatomic, readonly, nullable) NSString *sourceFilename;
+
+// This is only set when sending a new attachment so we have a way
+// to reference the original attachment when generating a thumbnail.
+// We don't want to do this until the message is saved, when the user sends
+// the message so as not to end up with an orphaned file.
+@property (nonatomic, readonly, nullable) NSString *attachmentId;
+
+// References a yet-to-be downloaded thumbnail file
+@property (atomic, nullable) NSString *thumbnailAttachmentPointerId;
+
+// References an already downloaded or locally generated thumbnail file
+@property (atomic, nullable) NSString *thumbnailAttachmentStreamId;
+
++ (instancetype)new NS_UNAVAILABLE;
+- (instancetype)init NS_UNAVAILABLE;
+
+- (instancetype)initWithAttachmentId:(nullable NSString *)attachmentId
+                         contentType:(NSString *)contentType
+                      sourceFilename:(NSString *)sourceFilename NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithAttachmentStream:(TSAttachmentStream *)attachmentStream;
+
+- (instancetype)initWithAttachmentId:(nullable NSString *)attachmentId
+                         contentType:(NSString *)contentType
+                      sourceFilename:(NSString *)sourceFilename
+        thumbnailAttachmentPointerId:(nullable NSString *)thumbnailAttachmentPointerId
+         thumbnailAttachmentStreamId:(nullable NSString *)thumbnailAttachmentStreamId NS_DESIGNATED_INITIALIZER;
+
+@end
+
+#pragma mark -
 
 typedef NS_ENUM(NSUInteger, TSQuotedMessageContentSource) {
     TSQuotedMessageContentSourceUnknown,
@@ -31,39 +65,48 @@ typedef NS_ENUM(NSUInteger, TSQuotedMessageContentSource) {
 // This property should be set IFF we are quoting a text message
 // or attachment with caption.
 @property (nullable, nonatomic, readonly) NSString *body;
-@property (nonatomic, readonly, nullable) MessageBodyRanges *bodyRanges;
 
 #pragma mark - Attachments
 
-@property (nonatomic, readonly) BOOL hasAttachment;
+// This is a MIME type.
+//
+// This property should be set IFF we are quoting an attachment message.
+- (nullable NSString *)contentType;
+- (nullable NSString *)sourceFilename;
 
-/// Returns YES if the thumbnail is something maintained by the quoted reply itself (as opposed to to media in some
-/// other message)
-@property (nonatomic, readonly) BOOL isThumbnailOwned;
-@property (nonatomic, readonly, nullable) NSString *thumbnailAttachmentId;
-@property (nonatomic, readonly, nullable) NSString *contentType;
-@property (nonatomic, readonly, nullable) NSString *sourceFilename;
-
-// Should only be called by TSMessage. May perform a sneaky write if necessary
-- (nullable TSAttachment *)fetchThumbnailWithTransaction:(SDSAnyReadTransaction *)transaction;
+// References a yet-to-be downloaded thumbnail file
+- (nullable NSString *)thumbnailAttachmentPointerId;
 
 // References an already downloaded or locally generated thumbnail file
+- (nullable NSString *)thumbnailAttachmentStreamId;
 - (void)setThumbnailAttachmentStream:(TSAttachment *)thumbnailAttachmentStream;
 
+// currently only used by orphan attachment cleaner
+- (NSArray<NSString *> *)thumbnailAttachmentStreamIds;
+
+@property (atomic, readonly) NSArray<OWSAttachmentInfo *> *quotedAttachments;
+
 // Before sending, persist a thumbnail attachment derived from the quoted attachment
-- (nullable TSAttachmentStream *)createThumbnailIfNecessaryWithTransaction:(SDSAnyWriteTransaction *)transaction;
+- (NSArray<TSAttachmentStream *> *)createThumbnailAttachmentsIfNecessaryWithTransaction:
+    (SDSAnyWriteTransaction *)transaction;
 
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
 
+// used when receiving quoted messages
+- (instancetype)initWithTimestamp:(uint64_t)timestamp
+                    authorAddress:(SignalServiceAddress *)authorAddress
+                             body:(NSString *_Nullable)body
+                       bodySource:(TSQuotedMessageContentSource)bodySource
+    receivedQuotedAttachmentInfos:(NSArray<OWSAttachmentInfo *> *)attachmentInfos;
+
 // used when sending quoted messages
 - (instancetype)initWithTimestamp:(uint64_t)timestamp
                     authorAddress:(SignalServiceAddress *)authorAddress
-                             body:(nullable NSString *)body
-                       bodyRanges:(nullable MessageBodyRanges *)bodyRanges
-       quotedAttachmentForSending:(nullable TSAttachment *)attachment;
+                             body:(NSString *_Nullable)body
+      quotedAttachmentsForSending:(NSArray<TSAttachment *> *)attachments;
 
-// used when receiving quoted messages
+
 + (nullable instancetype)quotedMessageForDataMessage:(SSKProtoDataMessage *)dataMessage
                                               thread:(TSThread *)thread
                                          transaction:(SDSAnyWriteTransaction *)transaction;

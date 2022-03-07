@@ -1,14 +1,21 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
 import SignalServiceKit
-import SignalUI
 
 @objc class GroupTableViewCell: UITableViewCell {
 
-    private let avatarView = ConversationAvatarView(sizeClass: .thirtySix, localUserDisplayMode: .asUser)
+    // MARK: - Dependencies
+
+    private var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
+    // MARK: -
+
+    private let avatarView = AvatarImageView()
     private let nameLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let accessoryLabel = UILabel()
@@ -20,9 +27,14 @@ import SignalUI
 
         // Font config
         nameLabel.font = .ows_dynamicTypeBody
+        nameLabel.textColor = Theme.primaryTextColor
         subtitleLabel.font = UIFont.ows_regularFont(withSize: 11.0)
+        subtitleLabel.textColor = Theme.secondaryTextAndIconColor
 
         // Layout
+
+        avatarView.autoSetDimension(.width, toSize: CGFloat(kStandardAvatarSize))
+        avatarView.autoPinToSquareAspectRatio()
 
         let textRows = UIStackView(arrangedSubviews: [nameLabel, subtitleLabel])
         textRows.axis = .vertical
@@ -31,11 +43,10 @@ import SignalUI
         let columns = UIStackView(arrangedSubviews: [avatarView, textRows, accessoryLabel])
         columns.axis = .horizontal
         columns.alignment = .center
-        columns.spacing = ContactCellView.avatarTextHSpacing
+        columns.spacing = kContactCellAvatarTextMargin
 
         self.contentView.addSubview(columns)
-        columns.autoPinWidthToSuperviewMargins()
-        columns.autoPinHeightToSuperview(withMargin: 7)
+        columns.autoPinEdgesToSuperviewMargins()
 
         // Accessory Label
         accessoryLabel.font = .ows_semiboldFont(withSize: 13)
@@ -49,7 +60,7 @@ import SignalUI
     }
 
     @objc
-    public func configure(thread: TSGroupThread, customSubtitle: String? = nil, customTextColor: UIColor? = nil) {
+    public func configure(thread: TSGroupThread) {
         OWSTableItem.configureCell(self)
 
         if let groupName = thread.groupModel.groupName, !groupName.isEmpty {
@@ -58,12 +69,10 @@ import SignalUI
             self.nameLabel.text = MessageStrings.newGroupDefaultTitle
         }
 
-        let groupMembersCount = thread.groupModel.groupMembership.fullMembers.count
-        self.subtitleLabel.text = customSubtitle ?? GroupViewUtils.formatGroupMembersLabel(memberCount: groupMembersCount)
+        let groupMembersCount = thread.groupModel.groupMembers.count
+        self.subtitleLabel.text = GroupViewUtils.formatGroupMembersLabel(memberCount: groupMembersCount)
 
-        self.avatarView.updateWithSneakyTransactionIfNecessary { config in
-            config.dataSource = .thread(thread)
-        }
+        self.avatarView.image = OWSAvatarBuilder.buildImage(thread: thread, diameter: kStandardAvatarSize)
 
         if let accessoryMessage = accessoryMessage, !accessoryMessage.isEmpty {
             accessoryLabel.text = accessoryMessage
@@ -71,8 +80,6 @@ import SignalUI
         } else {
             accessoryLabel.isHidden = true
         }
-
-        nameLabel.textColor = customTextColor ?? Theme.primaryTextColor
-        subtitleLabel.textColor = customTextColor ?? Theme.secondaryTextAndIconColor
     }
+
 }

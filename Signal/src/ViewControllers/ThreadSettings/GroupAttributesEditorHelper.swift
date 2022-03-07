@@ -1,14 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import UIKit
 
-protocol GroupAttributesEditorHelperDelegate: AnyObject {
+protocol GroupAttributesEditorHelperDelegate: class {
     func groupAttributesEditorContentsDidChange()
-    func groupAttributesEditorSelectionDidChange()
-    func presentFormSheet(_ viewControllerToPresent: UIViewController, animated: Bool, completion: (() -> Void)?)
 }
 
 // MARK: -
@@ -18,6 +17,18 @@ protocol GroupAttributesEditorHelperDelegate: AnyObject {
 // "create new group" and "edit group" views.
 class GroupAttributesEditorHelper: NSObject {
 
+    // MARK: - Dependencies
+
+    fileprivate var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    fileprivate var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    // MARK: -
+
     public enum EditAction {
         case none
         case name
@@ -26,9 +37,11 @@ class GroupAttributesEditorHelper: NSObject {
 
     weak var delegate: GroupAttributesEditorHelperDelegate?
 
-    private let groupModelOriginal: TSGroupModel?
-
     private let groupId: Data
+
+    private let conversationColorName: String
+
+    private let avatarViewHelper = AvatarViewHelper()
 
     private var avatarView: UIImageView?
 
@@ -39,78 +52,46 @@ class GroupAttributesEditorHelper: NSObject {
     private let iconViewSize: UInt
 
     private let cameraButton = GroupAttributesEditorHelper.buildCameraButtonForCenter()
-    private let cameraCornerButton = GroupAttributesEditorHelper.buildCameraButtonForCorner()
 
     let nameTextField = UITextField()
 
-    var groupNameOriginal: String?
+    private var groupNameOriginal: String?
 
     var groupNameCurrent: String? {
-        get { nameTextField.text?.nilIfEmpty?.filterStringForDisplay() }
-        set { nameTextField.text = newValue?.nilIfEmpty?.filterStringForDisplay() }
-    }
-
-    let descriptionTextView = TextViewWithPlaceholder()
-
-    var groupDescriptionOriginal: String?
-
-    var groupDescriptionCurrent: String? {
-        get { descriptionTextView.text?.nilIfEmpty?.filterStringForDisplay() }
-        set { descriptionTextView.text = newValue?.nilIfEmpty?.filterStringForDisplay() }
+        return nameTextField.text?.filterStringForDisplay()
     }
 
     private var avatarOriginal: GroupAvatar?
 
     var avatarCurrent: GroupAvatar?
 
-    private let renderDefaultAvatarWhenCleared: Bool
-
     var hasUnsavedChanges: Bool {
         return (groupNameOriginal != groupNameCurrent ||
-                    groupDescriptionOriginal != groupDescriptionCurrent ||
-                    avatarOriginal?.imageData != avatarCurrent?.imageData)
+                avatarOriginal?.imageData != avatarCurrent?.imageData)
     }
 
-    public convenience init(
-        groupModel: TSGroupModel,
-        iconViewSize: UInt = AvatarBuilder.largeAvatarSizePoints,
-        renderDefaultAvatarWhenCleared: Bool = false
-    ) {
-        self.init(
-            groupModelOriginal: groupModel,
-            groupId: groupModel.groupId,
-            groupNameOriginal: groupModel.groupName,
-            groupDescriptionOriginal: (groupModel as? TSGroupModelV2)?.descriptionText,
-            avatarOriginalData: groupModel.groupAvatarData,
-            iconViewSize: iconViewSize,
-            renderDefaultAvatarWhenCleared: renderDefaultAvatarWhenCleared
-        )
-    }
+    public required init(groupId: Data,
+                         conversationColorName: String,
+                         groupNameOriginal: String?,
+                         avatarOriginalData: Data?,
+                         iconViewSize: UInt) {
 
-    public required init(
-        groupModelOriginal: TSGroupModel? = nil,
-        groupId: Data,
-        groupNameOriginal: String?,
-        groupDescriptionOriginal: String? = nil,
-        avatarOriginalData: Data?,
-        iconViewSize: UInt,
-        renderDefaultAvatarWhenCleared: Bool = false
-    ) {
-        self.groupModelOriginal = groupModelOriginal
         self.groupId = groupId
-        self.groupNameOriginal = groupNameOriginal?.nilIfEmpty?.filterStringForDisplay()
-        self.groupDescriptionOriginal = groupDescriptionOriginal?.nilIfEmpty?.filterStringForDisplay()
+        self.conversationColorName = conversationColorName
+        self.groupNameOriginal = groupNameOriginal?.filterStringForDisplay()
         self.avatarOriginal = GroupAvatar.build(imageData: avatarOriginalData)
         self.avatarCurrent = avatarOriginal
         self.iconViewSize = iconViewSize
-        self.renderDefaultAvatarWhenCleared = renderDefaultAvatarWhenCleared
 
         super.init()
     }
 
     // MARK: -
 
-    func buildContents() {
+    func buildContents(avatarViewHelperDelegate: AvatarViewHelperDelegate) {
+
+        avatarViewHelper.delegate = avatarViewHelperDelegate
+
         // We need to specify a contentMode since the size of the image
         // might not match the aspect ratio of the view.
         avatarImageView.contentMode = .scaleAspectFill
@@ -132,10 +113,6 @@ class GroupAttributesEditorHelper: NSObject {
         avatarWrapper.addSubview(cameraButton)
         cameraButton.autoCenterInSuperview()
 
-        avatarWrapper.addSubview(cameraCornerButton)
-        cameraCornerButton.autoPinEdge(toSuperviewEdge: .trailing)
-        cameraCornerButton.autoPinEdge(toSuperviewEdge: .bottom)
-
         nameTextField.text = groupNameOriginal
         nameTextField.font = .ows_dynamicTypeBody
         nameTextField.backgroundColor = .clear
@@ -144,47 +121,29 @@ class GroupAttributesEditorHelper: NSObject {
         nameTextField.addTarget(self, action: #selector(textFieldDidChange), for: .editingChanged)
         nameTextField.placeholder = NSLocalizedString("GROUP_NAME_PLACEHOLDER",
                                                       comment: "Placeholder text for 'group name' field.")
-
-        descriptionTextView.text = groupDescriptionOriginal
-        descriptionTextView.delegate = self
-        descriptionTextView.placeholderText = NSLocalizedString("GROUP_DESCRIPTION_PLACEHOLDER",
-                                                                comment: "Placeholder text for 'group description' field.")
     }
 
     public static func buildCameraButtonForCorner() -> UIView {
-        let cameraImageContainer = UIView()
-        cameraImageContainer.autoSetDimensions(to: CGSize.square(32))
-        cameraImageContainer.backgroundColor = Theme.isDarkThemeEnabled ? .ows_gray15 : UIColor(rgbHex: 0xf8f9f9)
-        cameraImageContainer.layer.cornerRadius = 16
-
-        cameraImageContainer.layer.shadowColor = UIColor.black.cgColor
-        cameraImageContainer.layer.shadowOpacity = 0.2
-        cameraImageContainer.layer.shadowRadius = 4
-        cameraImageContainer.layer.shadowOffset = CGSize(width: 0, height: 2)
-
-        let secondaryShadowView = UIView()
-        secondaryShadowView.layer.shadowColor = UIColor.black.cgColor
-        secondaryShadowView.layer.shadowOpacity = 0.12
-        secondaryShadowView.layer.shadowRadius = 16
-        secondaryShadowView.layer.shadowOffset = CGSize(width: 0, height: 4)
-
-        cameraImageContainer.addSubview(secondaryShadowView)
-        secondaryShadowView.autoPinEdgesToSuperviewEdges()
-
-        let cameraImageView = UIImageView.withTemplateImageName("camera-outline-32", tintColor: Theme.isDarkThemeEnabled ? .ows_gray80 : .ows_black)
-        cameraImageView.autoSetDimensions(to: CGSize.square(20))
-        cameraImageView.contentMode = .scaleAspectFit
-
-        cameraImageContainer.addSubview(cameraImageView)
+        let cameraImageView = UIImageView()
+        cameraImageView.setTemplateImageName("31-icon-camera", tintColor: .ows_gray45)
+        let cameraWrapper = UIView.container()
+        cameraWrapper.backgroundColor = .ows_white
+        cameraWrapper.addSubview(cameraImageView)
         cameraImageView.autoCenterInSuperview()
-
-        return cameraImageContainer
+        let wrapperSize: CGFloat = 26
+        cameraWrapper.layer.shadowColor = UIColor.ows_black.cgColor
+        cameraWrapper.layer.shadowOpacity = 0.5
+        cameraWrapper.layer.shadowRadius = 4
+        cameraWrapper.layer.shadowOffset = CGSize(width: 0, height: 4)
+        cameraWrapper.layer.cornerRadius = wrapperSize * 0.5
+        cameraWrapper.autoSetDimensions(to: CGSize(square: wrapperSize))
+        return cameraWrapper
     }
 
     public static func buildCameraButtonForCenter() -> UIView {
         let cameraImageView = UIImageView()
-        cameraImageView.setTemplateImageName("camera-outline-24", tintColor: Theme.primaryIconColor)
-        let iconSize: CGFloat = 32
+        cameraImageView.setTemplateImageName("ic-group-blue-new", tintColor: Theme.accentBlueColor)
+        let iconSize: CGFloat = 20
         cameraImageView.autoSetDimensions(to: CGSize(square: iconSize))
         return cameraImageView
     }
@@ -192,22 +151,12 @@ class GroupAttributesEditorHelper: NSObject {
     private func updateAvatarView(groupAvatar: GroupAvatar?) {
         if let groupAvatar = groupAvatar {
             avatarImageView.image = groupAvatar.image
-            avatarImageView.layer.borderWidth = 0
-            avatarImageView.layer.borderColor = nil
+            avatarImageView.backgroundColor = nil
             cameraButton.isHidden = true
-            cameraCornerButton.isHidden = false
-        } else if renderDefaultAvatarWhenCleared {
-            avatarImageView.image = avatarBuilder.avatarImage(forGroupId: groupId, diameterPoints: iconViewSize)
-            avatarImageView.layer.borderWidth = 0
-            avatarImageView.layer.borderColor = nil
-            cameraButton.isHidden = true
-            cameraCornerButton.isHidden = false
         } else {
             avatarImageView.image = nil
-            avatarImageView.layer.borderWidth = 2
-            avatarImageView.layer.borderColor = Theme.outlineColor.cgColor
+            avatarImageView.backgroundColor = Theme.washColor
             cameraButton.isHidden = false
-            cameraCornerButton.isHidden = true
         }
     }
 
@@ -238,96 +187,13 @@ class GroupAttributesEditorHelper: NSObject {
     }
 
     @objc
-    func didTapAvatarView() {
+    func didTapAvatarView(sender: UIGestureRecognizer) {
         showAvatarUI()
     }
 
     func showAvatarUI() {
         nameTextField.resignFirstResponder()
-        descriptionTextView.resignFirstResponder()
-
-        let vc = AvatarSettingsViewController(
-            context: .groupId(groupId),
-            currentAvatarImage: avatarCurrent?.image
-        ) { [weak self] newAvatarImage in
-            self?.setAvatarImage(newAvatarImage)
-        }
-
-        delegate?.presentFormSheet(OWSNavigationController(rootViewController: vc), animated: true, completion: nil)
-    }
-
-    // MARK: - update
-
-    func updateGroupIfNecessary(fromViewController: UIViewController, completion: @escaping () -> Void) {
-        nameTextField.acceptAutocorrectSuggestion()
-        descriptionTextView.acceptAutocorrectSuggestion()
-
-        guard !groupNameCurrent.isEmptyOrNil else {
-            NewGroupConfirmViewController.showMissingGroupNameAlert()
-            return
-        }
-
-        guard hasUnsavedChanges else {
-            owsFailDebug("!hasUnsavedChanges.")
-            return completion()
-        }
-
-        guard let newGroupModel = buildNewGroupModel() else {
-            let error = OWSAssertionError("Couldn't build group model.")
-            GroupViewUtils.showUpdateErrorUI(error: error)
-            return
-        }
-        GroupViewUtils.updateGroupWithActivityIndicator(
-            fromViewController: fromViewController,
-            updatePromiseBlock: {
-                self.updateGroupThreadPromise(newGroupModel: newGroupModel)
-            },
-            completion: { _ in
-                completion()
-            }
-        )
-    }
-
-    private func buildNewGroupModel() -> TSGroupModel? {
-        guard let groupModelOriginal = groupModelOriginal else { return nil }
-
-        do {
-            return try databaseStorage.read { transaction in
-                var builder = groupModelOriginal.asBuilder
-                builder.name = self.groupNameCurrent
-                builder.descriptionText = self.groupDescriptionCurrent
-                builder.avatarData = self.avatarCurrent?.imageData
-                return try builder.build(transaction: transaction)
-            }
-        } catch {
-            owsFailDebug("Error: \(error)")
-            return nil
-        }
-    }
-
-    private func updateGroupThreadPromise(newGroupModel: TSGroupModel) -> Promise<Void> {
-        guard let localAddress = tsAccountManager.localAddress else {
-            return Promise(error: OWSAssertionError("Missing localAddress."))
-        }
-
-        guard let oldGroupModel = groupModelOriginal else {
-            return Promise(error: OWSAssertionError("Missing groupModelOriginal."))
-        }
-
-        return firstly { () -> Promise<Void> in
-            return GroupManager.messageProcessingPromise(
-                for: oldGroupModel,
-                description: self.logTag
-            )
-        }.then(on: .global()) { _ in
-            // dmConfiguration: nil means don't change disappearing messages configuration.
-            GroupManager.localUpdateExistingGroup(
-                oldGroupModel: oldGroupModel,
-                newGroupModel: newGroupModel,
-                dmConfiguration: nil,
-                groupUpdateSourceAddress: localAddress
-            )
-        }.asVoid()
+        avatarViewHelper.showChangeAvatarUI()
     }
 }
 
@@ -341,12 +207,8 @@ struct GroupAvatar {
         guard let imageData = imageData else {
             return nil
         }
-        guard imageData.ows_isValidImage else {
+        guard (imageData as NSData).ows_isValidImage() else {
             owsFailDebug("Invalid image data.")
-            return nil
-        }
-        guard TSGroupModel.isValidGroupAvatarData(imageData) else {
-            owsFailDebug("Invalid group avatar.")
             return nil
         }
         guard let image = UIImage(data: imageData) else {
@@ -364,7 +226,7 @@ struct GroupAvatar {
             owsFailDebug("Invalid image.")
             return nil
         }
-        return build(imageData: imageData)
+        return GroupAvatar(imageData: imageData, image: image)
     }
 }
 
@@ -372,37 +234,31 @@ struct GroupAvatar {
 
 extension GroupAttributesEditorHelper: UITextFieldDelegate {
     public func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString: String) -> Bool {
+        // get the current text, or use an empty string if that failed
+        let currentText = textField.text ?? ""
+        
+        // attempt to read the range they are trying to change, or exit if we can't
+        guard let stringRange = Range(range, in: currentText) else { return true }
+        
+        // add their new text to the existing text
+        let updatedText = currentText.replacingCharacters(in: stringRange, with: replacementString)
+        
+        let specialCharacterSet = CharacterSet(charactersIn: "~!@#$%^&*()_+`-=[]\\{}|:;'<>?,./")
+        
+        if updatedText.rangeOfCharacter(from: specialCharacterSet) != nil {
+            return false
+        }
+        if updatedText.containsEmoji {
+            return false
+        }
+
+        
         // Truncate the replacement to fit.
         return TextFieldHelper.textField(
             textField,
             shouldChangeCharactersInRange: range,
-            replacementString: replacementString.withoutBidiControlCharacters,
-            maxGlyphCount: GroupManager.maxGroupNameGlyphCount
-        )
-    }
-}
-
-extension GroupAttributesEditorHelper: TextViewWithPlaceholderDelegate {
-    func textViewDidUpdateText(_ textView: TextViewWithPlaceholder) {
-        delegate?.groupAttributesEditorContentsDidChange()
-    }
-
-    func textViewDidUpdateSelection(_ textView: TextViewWithPlaceholder) {
-        delegate?.groupAttributesEditorSelectionDidChange()
-    }
-
-    func textView(
-        _ textView: TextViewWithPlaceholder,
-        uiTextView: UITextView,
-        shouldChangeTextIn range: NSRange,
-        replacementText text: String
-    ) -> Bool {
-        // Truncate the replacement to fit.
-        return TextViewHelper.textView(
-            uiTextView,
-            shouldChangeTextIn: range,
-            replacementText: text,
-            maxGlyphCount: GroupManager.maxGroupDescriptionGlyphCount
+            replacementString: replacementString,
+            byteLimit: UInt(GroupManager.maxGroupNameLength)
         )
     }
 }

@@ -1,13 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalUI/OWSBubbleView.h>
+#import "OWSBubbleView.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class ConversationStyle;
 @class DisplayableText;
+@class OWSBubbleShapeView;
 @class OWSQuotedReplyModel;
 @class TSAttachmentPointer;
 @class TSQuotedMessage;
@@ -21,7 +22,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-// TODO: Remove this view.
 @interface OWSQuotedMessageView : UIView
 
 @property (nonatomic, nullable, weak) id<OWSQuotedMessageViewDelegate> delegate;

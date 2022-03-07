@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
@@ -65,9 +65,9 @@ class DisplayableTextTest: SignalBaseTest {
 
         // Excessive diacritics
 
-        XCTAssertEqual("H҉̸̧͘͠A͢͞V̛̛I̴̸N͏̕͏G҉̵͜͏͢ ̧̧́T̶̛͘͡R̸̵̨̢̀O̷̡U͡҉B̶̛͢͞L̸̸͘͢͟É̸ ̸̛͘͏R͟È͠͞A̸͝Ḑ̕͘͜I̵͘҉͜͞N̷̡̢͠G̴͘͠ ͟͞T͏̢́͡È̀X̕҉̢̀T̢͠?̕͏̢͘͢".glyphCount, 28)
+        XCTAssertEqual("H҉̸̧͘͠A͢͞V̛̛I̴̸N͏̕͏G҉̵͜͏͢ ̧̧́T̶̛͘͡R̸̵̨̢̀O̷̡U͡҉B̶̛͢͞L̸̸͘͢͟É̸ ̸̛͘͏R͟È͠͞A̸͝Ḑ̕͘͜I̵͘҉͜͞N̷̡̢͠G̴͘͠ ͟͞T͏̢́͡È̀X̕҉̢̀T̢͠?̕͏̢͘͢".glyphCount, 115)
 
-        XCTAssertEqual("L̷̳͔̲͝Ģ̵̮̯̤̩̙͍̬̟͉̹̘̹͍͈̮̦̰̣͟͝O̶̴̮̻̮̗͘͡!̴̷̟͓͓".glyphCount, 4)
+        XCTAssertEqual("L̷̳͔̲͝Ģ̵̮̯̤̩̙͍̬̟͉̹̘̹͍͈̮̦̰̣͟͝O̶̴̮̻̮̗͘͡!̴̷̟͓͓".glyphCount, 43)
     }
 
     func testContainsOnlyEmoji() {
@@ -104,12 +104,12 @@ class DisplayableTextTest: SignalBaseTest {
 
     func test_shouldAllowLinkification() {
         func assertLinkifies(_ text: String, file: StaticString = #file, line: UInt = #line) {
-            let displayableText = DisplayableText.displayableTextForTests(text)
+            let displayableText = DisplayableText.displayableText(text)
             XCTAssert(displayableText.shouldAllowLinkification, "was not linkifiable text: \(text)", file: file, line: line)
         }
 
         func assertNotLinkifies(_ text: String, file: StaticString = #file, line: UInt = #line) {
-            let displayableText = DisplayableText.displayableTextForTests(text)
+            let displayableText = DisplayableText.displayableText(text)
             XCTAssertFalse(displayableText.shouldAllowLinkification, "was linkifiable text: \(text)", file: file, line: line)
         }
 
@@ -124,9 +124,6 @@ class DisplayableTextTest: SignalBaseTest {
         assertNotLinkifies("foo http://asĸ.com")
         assertNotLinkifies("http://asĸ.com")
         assertNotLinkifies("asĸ.com")
-        assertLinkifies("Https://ask.com")
-        assertLinkifies("HTTP://ask.com")
-        assertLinkifies("HttPs://ask.com")
 
         // Mixed latin and cyrillic text, but it's not a link
         // (nothing to linkify, but there's nothing illegal here)
@@ -154,7 +151,6 @@ class DisplayableTextTest: SignalBaseTest {
         assertNotLinkifies("asĸ.com")
         assertNotLinkifies("https://кц.cфm")
         assertNotLinkifies("https://google.cфm")
-        assertNotLinkifies("Https://google.cфm")
 
         assertLinkifies("кц.рф")
         assertLinkifies("кц.рф/some/path")

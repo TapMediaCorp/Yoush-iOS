@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
+import PromiseKit
 import SignalServiceKit
 @testable import Signal
 
@@ -10,10 +11,10 @@ struct VerificationFailedError: Error { }
 struct FailedToGetRPRegistrationTokenError: Error { }
 
 enum PushNotificationRequestResult: String {
-    case failTSOnly = "FailTSOnly"
-    case failRPOnly = "FailRPOnly"
-    case failBoth = "FailBoth"
-    case succeed = "Succeed"
+    case FailTSOnly = "FailTSOnly",
+    FailRPOnly = "FailRPOnly",
+    FailBoth = "FailBoth",
+    Succeed = "Succeed"
 }
 
 class FailingTSAccountManager: TSAccountManager {
@@ -25,18 +26,13 @@ class FailingTSAccountManager: TSAccountManager {
         self.phoneNumberAwaitingVerification = "+13235555555"
     }
 
-    override func verifyAccount(request: TSRequest,
-                                success successBlock: @escaping (Any?) -> Void,
-                                failure failureBlock: @escaping (Error) -> Void) {
+    override func verifyAccount(with request: TSRequest, success successBlock: @escaping (Any?) -> Void, failure failureBlock: @escaping (Error) -> Void) {
         failureBlock(VerificationFailedError())
     }
 
-    override func registerForPushNotifications(pushToken: String,
-                                               voipToken: String?,
-                                               success successHandler: @escaping () -> Void,
-                                               failure failureHandler: @escaping (Error) -> Void) {
-        if pushToken == PushNotificationRequestResult.failTSOnly.rawValue || pushToken == PushNotificationRequestResult.failBoth.rawValue {
-            failureHandler(OWSGenericError("Missing or invalid push token."))
+    override func registerForPushNotifications(pushToken: String, voipToken: String, success successHandler: @escaping () -> Void, failure failureHandler: @escaping (Error) -> Void) {
+        if pushToken == PushNotificationRequestResult.FailTSOnly.rawValue || pushToken == PushNotificationRequestResult.FailBoth.rawValue {
+            failureHandler(OWSErrorMakeUnableToProcessServerResponseError())
         } else {
             successHandler()
         }
@@ -44,18 +40,17 @@ class FailingTSAccountManager: TSAccountManager {
 }
 
 class VerifyingTSAccountManager: FailingTSAccountManager {
-    override func verifyAccount(request: TSRequest,
-                                success successBlock: @escaping (Any?) -> Void,
-                                failure failureBlock: @escaping (Error) -> Void) {
+    override func verifyAccount(with request: TSRequest, success successBlock: @escaping (Any?) -> Void, failure failureBlock: @escaping (Error) -> Void) {
         successBlock(["uuid": UUID().uuidString])
     }
+
 }
 
 class TokenObtainingTSAccountManager: VerifyingTSAccountManager {
 }
 
 class VerifyingPushRegistrationManager: PushRegistrationManager {
-    public override func requestPushTokens() -> Promise<(pushToken: String, voipToken: String?)> {
+    public override func requestPushTokens() -> Promise<(pushToken: String, voipToken: String)> {
         return Promise.value(("a", "b"))
     }
 }
@@ -67,7 +62,7 @@ class AccountManagerTest: SignalBaseTest {
 
         let tsAccountManager = FailingTSAccountManager()
         let sskEnvironment = SSKEnvironment.shared as! MockSSKEnvironment
-        sskEnvironment.tsAccountManagerRef = tsAccountManager
+        sskEnvironment.tsAccountManager = tsAccountManager
     }
 
     override func tearDown() {
@@ -118,9 +113,9 @@ class AccountManagerTest: SignalBaseTest {
     func testSuccessfulRegistration() {
         let tsAccountManager = TokenObtainingTSAccountManager()
         let sskEnvironment = SSKEnvironment.shared as! MockSSKEnvironment
-        sskEnvironment.tsAccountManagerRef = tsAccountManager
+        sskEnvironment.tsAccountManager = tsAccountManager
 
-        AppEnvironment.shared.pushRegistrationManagerRef = VerifyingPushRegistrationManager()
+        AppEnvironment.shared.pushRegistrationManager = VerifyingPushRegistrationManager()
 
         let accountManager = AccountManager()
 
@@ -134,7 +129,7 @@ class AccountManagerTest: SignalBaseTest {
             XCTFail("Unexpected error: \(error)")
         }
 
-        self.waitForExpectations(timeout: 5.0, handler: nil)
+        self.waitForExpectations(timeout: 1.0, handler: nil)
     }
 
     func testUpdatePushTokens() {
@@ -143,7 +138,7 @@ class AccountManagerTest: SignalBaseTest {
         let expectation = self.expectation(description: "should fail")
 
         firstly {
-            accountManager.updatePushTokens(pushToken: PushNotificationRequestResult.failTSOnly.rawValue, voipToken: "whatever")
+            accountManager.updatePushTokens(pushToken: PushNotificationRequestResult.FailTSOnly.rawValue, voipToken: "whatever")
         }.done {
             XCTFail("Expected to fail.")
         }.catch { _ in

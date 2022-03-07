@@ -1,25 +1,20 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "ConversationScrollButton.h"
+#import "UIFont+OWS.h"
+#import "UIView+OWS.h"
 #import <SignalMessaging/SignalMessaging-Swift.h>
-#import <SignalUI/SignalUI-Swift.h>
-#import <SignalUI/Theme.h>
-#import <SignalUI/UIFont+OWS.h>
-#import <SignalUI/UIView+SignalUI.h>
+#import <SignalMessaging/Theme.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface ConversationScrollButton ()
 
-@property (nonatomic) NSString *iconName;
-@property (nonatomic) UIImageView *iconView;
+@property (nonatomic) NSString *iconText;
+@property (nonatomic) UILabel *iconLabel;
 @property (nonatomic) UIView *circleView;
-@property (nonatomic) UIView *shadowView;
-
-@property (nonatomic) UIView *unreadBadge;
-@property (nonatomic) UILabel *unreadLabel;
 
 @end
 
@@ -27,21 +22,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation ConversationScrollButton
 
-- (instancetype)initWithIconName:(NSString *)iconName
+- (nullable instancetype)initWithIconText:(NSString *)iconText
 {
     self = [super initWithFrame:CGRectZero];
     if (!self) {
         return self;
     }
 
-    self.iconName = iconName;
+    self.iconText = iconText;
 
     [self createContents];
-
-    [NSNotificationCenter.defaultCenter addObserver:self
-                                           selector:@selector(themeDidChange:)
-                                               name:ThemeDidChangeNotification
-                                             object:nil];
 
     return self;
 }
@@ -56,95 +46,57 @@ NS_ASSUME_NONNULL_BEGIN
     return self.circleSize + 2 * 15.f;
 }
 
-- (void)themeDidChange:(NSNotification *)notification
-{
-    [self updateColors];
-}
-
 - (void)createContents
 {
-    UIImageView *iconView = [UIImageView new];
-    self.iconView = iconView;
-    iconView.userInteractionEnabled = NO;
+    UILabel *iconLabel = [UILabel new];
+    self.iconLabel = iconLabel;
+    iconLabel.userInteractionEnabled = NO;
 
     const CGFloat circleSize = self.class.circleSize;
-    CGRect shadowRect = CGRectMake(0, 0, circleSize, circleSize);
-
-    UIView *shadowView = [[OWSCircleView alloc] initWithDiameter:circleSize];
-    self.shadowView = shadowView;
-    shadowView.userInteractionEnabled = NO;
-    shadowView.layer.shadowOffset = CGSizeMake(0, 0);
-    shadowView.layer.shadowRadius = 4;
-    shadowView.layer.shadowOpacity = 0.05f;
-    shadowView.layer.shadowColor = UIColor.blackColor.CGColor;
-    shadowView.layer.shadowPath = [UIBezierPath bezierPathWithOvalInRect:shadowRect].CGPath;
-
     UIView *circleView = [[OWSCircleView alloc] initWithDiameter:circleSize];
     self.circleView = circleView;
     circleView.userInteractionEnabled = NO;
-    circleView.layer.shadowOffset = CGSizeMake(0, 4.f);
-    circleView.layer.shadowRadius = 12.f;
-    circleView.layer.shadowOpacity = 0.3f;
-    circleView.layer.shadowColor = UIColor.blackColor.CGColor;
-    circleView.layer.shadowPath = [UIBezierPath bezierPathWithOvalInRect:shadowRect].CGPath;
-
-    UIView *unreadBadge = [UIView new];
-    self.unreadBadge = unreadBadge;
-    unreadBadge.userInteractionEnabled = NO;
-    unreadBadge.layer.cornerRadius = 8;
-    unreadBadge.clipsToBounds = YES;
-
-    UILabel *unreadCountLabel = [UILabel new];
-    self.unreadLabel = unreadCountLabel;
-    unreadCountLabel.font = [UIFont systemFontOfSize:12];
-    unreadCountLabel.textColor = UIColor.ows_whiteColor;
-    unreadCountLabel.textAlignment = NSTextAlignmentCenter;
-
-    [unreadBadge addSubview:unreadCountLabel];
-    [unreadCountLabel autoPinHeightToSuperview];
-    [unreadCountLabel autoPinWidthToSuperviewWithMargin:3];
-
-    [self addSubview:shadowView];
+    circleView.layer.shadowColor = Theme.middleGrayColor.CGColor;
+    circleView.layer.shadowOffset = CGSizeMake(+1.f, +2.f);
+    circleView.layer.shadowRadius = 1.5f;
+    circleView.layer.shadowOpacity = 0.35f;
 
     [self addSubview:circleView];
-    [circleView autoHCenterInSuperview];
-    [circleView autoPinEdgeToSuperviewEdge:ALEdgeBottom];
-
-    [shadowView autoPinEdgesToEdgesOfView:circleView];
-
-    [circleView addSubview:iconView];
-    [iconView autoCenterInSuperview];
-
-    [self addSubview:unreadBadge];
-
-    [unreadBadge autoPinEdge:ALEdgeBottom toEdge:ALEdgeTop ofView:circleView withOffset:8];
-    [unreadBadge autoHCenterInSuperview];
-    [unreadBadge autoSetDimension:ALDimensionHeight toSize:16];
-    [unreadBadge autoSetDimension:ALDimensionWidth toSize:16 relation:NSLayoutRelationGreaterThanOrEqual];
-    [unreadBadge autoMatchDimension:ALDimensionWidth
-                        toDimension:ALDimensionWidth
-                             ofView:self
-                         withOffset:0
-                           relation:NSLayoutRelationLessThanOrEqual];
-    [unreadBadge autoPinEdgeToSuperviewEdge:ALEdgeTop];
+    [self addSubview:iconLabel];
+    [circleView autoCenterInSuperview];
+    [iconLabel autoCenterInSuperview];
 
     [self updateColors];
 }
 
-- (void)setUnreadCount:(NSUInteger)unreadCount
+- (void)setHasUnreadMessages:(BOOL)hasUnreadMessages
 {
-    _unreadCount = unreadCount;
+    _hasUnreadMessages = hasUnreadMessages;
 
-    self.unreadLabel.text = [NSString stringWithFormat:@"%lu", unreadCount];
-    self.unreadBadge.hidden = unreadCount < 1;
+    [self updateColors];
 }
 
 - (void)updateColors
 {
-    self.unreadBadge.backgroundColor = UIColor.ows_accentBlueColor;
-    self.circleView.backgroundColor = Theme.isDarkThemeEnabled ? UIColor.ows_gray65Color : UIColor.ows_gray02Color;
-    [self.iconView setTemplateImageName:self.iconName
-                              tintColor:Theme.isDarkThemeEnabled ? UIColor.ows_gray15Color : UIColor.ows_gray75Color];
+    UIColor *foregroundColor;
+    UIColor *backgroundColor;
+    if (self.hasUnreadMessages) {
+        foregroundColor = UIColor.whiteColor;
+        backgroundColor = UIColor.ows_accentBlueColor;
+    } else {
+        foregroundColor = Theme.accentBlueColor;
+        backgroundColor = Theme.scrollButtonBackgroundColor;
+    }
+
+    const CGFloat circleSize = self.class.circleSize;
+    self.circleView.backgroundColor = backgroundColor;
+    self.iconLabel.attributedText =
+        [[NSAttributedString alloc] initWithString:self.iconText
+                                        attributes:@{
+                                            NSFontAttributeName : [UIFont ows_fontAwesomeFont:circleSize * 0.8f],
+                                            NSForegroundColorAttributeName : foregroundColor,
+                                            NSBaselineOffsetAttributeName : @(-0.5f),
+                                        }];
 }
 
 @end

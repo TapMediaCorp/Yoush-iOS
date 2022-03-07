@@ -1,14 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern NSNotificationName const NSNotificationNameIsCensorshipCircumventionActiveDidChange;
+extern NSString *const kNSNotificationName_IsCensorshipCircumventionActiveDidChange;
 
 @class AFHTTPSessionManager;
-@class OWSCensorshipConfiguration;
-@class OWSURLSession;
 @class SDSKeyValueStore;
 @class TSAccountManager;
 
@@ -16,10 +14,16 @@ extern NSNotificationName const NSNotificationNameIsCensorshipCircumventionActiv
 
 - (SDSKeyValueStore *)keyValueStore;
 
-+ (instancetype)shared;
+/// For backing up and restoring signal account information
+@property (nonatomic, readonly) AFHTTPSessionManager *storageServiceSessionManager;
+
++ (instancetype)sharedInstance;
 
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
+
+/// For uploading and downloading blobs on the specified CDN.
+- (AFHTTPSessionManager *)cdnSessionManagerForCdnNumber:(UInt32)cdnNumber;
 
 #pragma mark - Censorship Circumvention
 
@@ -32,7 +36,8 @@ extern NSNotificationName const NSNotificationNameIsCensorshipCircumventionActiv
 /// should only be accessed if censorship circumvention is active.
 @property (nonatomic, readonly) NSURL *domainFrontBaseURL;
 
-- (OWSCensorshipConfiguration *)buildCensorshipConfiguration;
+/// For interacting with the Signal Service
+- (AFHTTPSessionManager *)buildSignalServiceSessionManager;
 
 @end
 

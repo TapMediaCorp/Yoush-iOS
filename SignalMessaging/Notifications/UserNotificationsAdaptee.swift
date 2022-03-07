@@ -1,11 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import UserNotifications
-import Intents
-import SignalServiceKit
+import PromiseKit
 
 public class UserNotificationConfig {
 
@@ -15,7 +14,7 @@ public class UserNotificationConfig {
     }
 
     class func notificationActions(for category: AppNotificationCategory) -> [UNNotificationAction] {
-        return category.actions.compactMap { notificationAction($0) }
+        return category.actions.map { notificationAction($0) }
     }
 
     class func notificationCategory(_ category: AppNotificationCategory) -> UNNotificationCategory {
@@ -25,118 +24,67 @@ public class UserNotificationConfig {
                                       options: [])
     }
 
-    class func notificationAction(_ action: AppNotificationAction) -> UNNotificationAction? {
+    class func notificationAction(_ action: AppNotificationAction) -> UNNotificationAction {
         switch action {
         case .answerCall:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: CallStrings.answerCallButtonTitle,
-                                                    options: [.foreground],
-                                                    systemImage: "phone")
+            return UNNotificationAction(identifier: action.identifier,
+                                        title: CallStrings.answerCallButtonTitle,
+                                        options: [.foreground])
         case .callBack:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: CallStrings.callBackButtonTitle,
-                                                    options: [.foreground],
-                                                    systemImage: "phone")
+            return UNNotificationAction(identifier: action.identifier,
+                                        title: CallStrings.callBackButtonTitle,
+                                        options: [.foreground])
         case .declineCall:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: CallStrings.declineCallButtonTitle,
-                                                    options: [],
-                                                    systemImage: "phone.down")
+            return UNNotificationAction(identifier: action.identifier,
+                                        title: CallStrings.declineCallButtonTitle,
+                                        options: [])
         case .markAsRead:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: MessageStrings.markAsReadNotificationAction,
-                                                    options: [],
-                                                    systemImage: "message")
+            return UNNotificationAction(identifier: action.identifier,
+                                        title: MessageStrings.markAsReadNotificationAction,
+                                        options: [])
         case .reply:
-            return textInputNotificationActionWithIdentifier(action.identifier,
-                                                             title: MessageStrings.replyNotificationAction,
-                                                             options: [],
-                                                             textInputButtonTitle: MessageStrings.sendButton,
-                                                             textInputPlaceholder: "",
-                                                             systemImage: "arrowshape.turn.up.left")
+            return UNTextInputNotificationAction(identifier: action.identifier,
+                                                 title: MessageStrings.replyNotificationAction,
+                                                 options: [],
+                                                 textInputButtonTitle: MessageStrings.sendButton,
+                                                 textInputPlaceholder: "")
         case .showThread:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: CallStrings.showThreadButtonTitle,
-                                                    options: [],
-                                                    systemImage: "bubble.left.and.bubble.right")
-        case .reactWithThumbsUp:
-            return notificationActionWithIdentifier(action.identifier,
-                                                    title: MessageStrings.reactWithThumbsUpNotificationAction,
-                                                    options: [],
-                                                    systemImage: "hand.thumbsup")
-        case .showCallLobby:
-            // Currently, .showCallLobby is only used as a default action.
-            owsFailDebug("Show call lobby not supported as a UNNotificationAction")
-            return nil
-        case .submitDebugLogs:
-            // Currently, .submitDebugLogs is only used as a default action.
-            owsFailDebug("Show submit debug logs not supported as a UNNotificationAction")
-            return nil
-        }
-    }
-
-    private class func notificationActionWithIdentifier(
-        _ identifier: String,
-        title: String,
-        options: UNNotificationActionOptions,
-        systemImage: String?) -> UNNotificationAction {
-        if #available(iOS 15, *), let systemImage = systemImage {
-            let actionIcon = UNNotificationActionIcon(systemImageName: systemImage)
-            return UNNotificationAction(identifier: identifier,
-                                        title: title,
-                                        options: options,
-                                        icon: actionIcon)
-        } else {
-            return UNNotificationAction(identifier: identifier,
-                                        title: title,
-                                        options: options)
-        }
-    }
-
-    private class func textInputNotificationActionWithIdentifier(
-        _ identifier: String,
-        title: String,
-        options: UNNotificationActionOptions,
-        textInputButtonTitle: String,
-        textInputPlaceholder: String,
-        systemImage: String?) -> UNNotificationAction {
-        if #available(iOS 15, *), let systemImage = systemImage {
-            let actionIcon = UNNotificationActionIcon(systemImageName: systemImage)
-            return UNTextInputNotificationAction(identifier: identifier,
-                                                 title: title,
-                                                 options: options,
-                                                 icon: actionIcon,
-                                                 textInputButtonTitle: textInputButtonTitle,
-                                                 textInputPlaceholder: textInputPlaceholder)
-        } else {
-            return UNTextInputNotificationAction(identifier: identifier,
-                                                 title: title,
-                                                 options: options,
-                                                 textInputButtonTitle: textInputButtonTitle,
-                                                 textInputPlaceholder: textInputPlaceholder)
+            return UNNotificationAction(identifier: action.identifier,
+                                        title: CallStrings.showThreadButtonTitle,
+                                        options: [.foreground])
         }
     }
 
     public class func action(identifier: String) -> AppNotificationAction? {
-        return AppNotificationAction.allCases.first { notificationAction($0)?.identifier == identifier }
+        return AppNotificationAction.allCases.first { notificationAction($0).identifier == identifier }
     }
 
 }
 
-// MARK: -
-
-class UserNotificationPresenterAdaptee: NSObject, NotificationPresenterAdaptee {
+class UserNotificationPresenterAdaptee: NSObject {
 
     private let notificationCenter: UNUserNotificationCenter
+    private var notifications: [String: UNNotificationRequest] = [:]
 
     override init() {
         self.notificationCenter = UNUserNotificationCenter.current()
         super.init()
         SwiftSingletons.register(self)
     }
+}
+
+extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
+
+    // MARK: - Dependencies
+
+    var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    // MARK: -
 
     func registerNotificationSettings() -> Promise<Void> {
-        return Promise { future in
+        return Promise { resolver in
             notificationCenter.requestAuthorization(options: [.badge, .sound, .alert]) { (granted, error) in
                 self.notificationCenter.setNotificationCategories(UserNotificationConfig.allNotificationCategories)
 
@@ -151,25 +99,21 @@ class UserNotificationPresenterAdaptee: NSObject, NotificationPresenterAdaptee {
                 // Note that the promise is fulfilled regardless of if notification permssions were
                 // granted. This promise only indicates that the user has responded, so we can
                 // proceed with requesting push tokens and complete registration.
-                future.resolve()
+                resolver.fulfill(())
             }
         }
     }
 
-    func notify(category: AppNotificationCategory, title: String?, body: String, threadIdentifier: String?, userInfo: [AnyHashable: Any], interaction: INInteraction?, sound: OWSSound?,
-                completion: NotificationCompletion?) {
-        assertOnQueue(NotificationPresenter.notificationQueue)
-
-        notify(category: category, title: title, body: body, threadIdentifier: threadIdentifier, userInfo: userInfo, interaction: interaction, sound: sound, replacingIdentifier: nil, completion: completion)
+    func notify(category: AppNotificationCategory, title: String?, body: String, threadIdentifier: String?, userInfo: [AnyHashable: Any], sound: OWSSound?) {
+        AssertIsOnMainThread()
+        notify(category: category, title: title, body: body, threadIdentifier: threadIdentifier, userInfo: userInfo, sound: sound, replacingIdentifier: nil)
     }
 
-    func notify(category: AppNotificationCategory, title: String?, body: String, threadIdentifier: String?, userInfo: [AnyHashable: Any], interaction: INInteraction?, sound: OWSSound?, replacingIdentifier: String?,
-                completion: NotificationCompletion?) {
-        assertOnQueue(NotificationPresenter.notificationQueue)
+    func notify(category: AppNotificationCategory, title: String?, body: String, threadIdentifier: String?, userInfo: [AnyHashable: Any], sound: OWSSound?, replacingIdentifier: String?) {
+        AssertIsOnMainThread()
 
         guard tsAccountManager.isOnboarded() else {
             Logger.info("suppressing notification since user hasn't yet completed onboarding.")
-            completion?()
             return
         }
 
@@ -177,7 +121,7 @@ class UserNotificationPresenterAdaptee: NSObject, NotificationPresenterAdaptee {
         content.categoryIdentifier = category.identifier
         content.userInfo = userInfo
         let isAppActive = CurrentAppContext().isMainAppAndActive
-        if let sound = sound, sound != OWSStandardSound.none.rawValue {
+        if let sound = sound, sound != OWSSound.none {
             content.sound = sound.notificationSound(isQuiet: isAppActive)
         }
 
@@ -185,15 +129,12 @@ class UserNotificationPresenterAdaptee: NSObject, NotificationPresenterAdaptee {
         if let replacingIdentifier = replacingIdentifier {
             notificationIdentifier = replacingIdentifier
             Logger.debug("replacing notification with identifier: \(notificationIdentifier)")
-            cancelNotificationSync(identifier: notificationIdentifier)
+            cancelNotification(identifier: notificationIdentifier)
         }
 
         let trigger: UNNotificationTrigger?
-        let checkForCancel = (category == .incomingMessageWithActions_CanReply ||
-                                category == .incomingMessageWithActions_CannotReply ||
-                                category == .incomingMessageWithoutActions ||
-                                category == .incomingReactionWithActions_CanReply ||
-                                category == .incomingReactionWithActions_CannotReply)
+        let checkForCancel = (category == .incomingMessageWithActions ||
+                              category == .incomingMessageWithoutActions)
         if checkForCancel && hasReceivedSyncMessageRecently {
             assert(userInfo[AppNotificationUserInfoKey.threadId] != nil)
             trigger = UNTimeIntervalNotificationTrigger(timeInterval: kNotificationDelayForRemoteRead, repeats: false)
@@ -217,255 +158,149 @@ class UserNotificationPresenterAdaptee: NSObject, NotificationPresenterAdaptee {
             content.threadIdentifier = threadIdentifier
         }
 
-        var contentToUse: UNNotificationContent = content
-        if #available(iOS 15, *), let interaction = interaction {
-            if DebugFlags.internalLogging {
-                Logger.info("Will donate interaction")
-            }
+        let request = UNNotificationRequest(identifier: notificationIdentifier, content: content, trigger: trigger)
 
-            interaction.donate(completion: { error in
-                if DebugFlags.internalLogging { Logger.info("Did donate interaction") }
-
-                if let error = error {
-                    owsFailDebug("Failed to donate incoming message intent \(error)")
-                    return
-                }
-            })
-
-            if DebugFlags.internalLogging {
-                Logger.info("Will update notification content with intent")
-            }
-
-            if let intent = interaction.intent as? UNNotificationContentProviding {
-                do {
-                    try contentToUse = content.updating(from: intent)
-                    if DebugFlags.internalLogging {
-                        Logger.info("Did update notification content with intent")
-                    }
-                } catch {
-                    owsFailDebug("Failed to update UNNotificationContent for comm style notification")
-                }
-            }
-        }
-
-        let request = UNNotificationRequest(identifier: notificationIdentifier, content: contentToUse, trigger: trigger)
-
-        if DebugFlags.internalLogging {
-            Logger.info("presenting notification with identifier: \(notificationIdentifier)")
-        }
+        Logger.debug("presenting notification with identifier: \(notificationIdentifier)")
         notificationCenter.add(request) { (error: Error?) in
             if let error = error {
                 owsFailDebug("Error: \(error)")
+                return
             }
-            completion?()
+            guard notificationIdentifier != UserNotificationPresenterAdaptee.kMigrationNotificationId else {
+                return
+            }
+            DispatchQueue.main.async {
+                // If we show any other notification, we can clear the "GRDB migration" notification.
+                self.clearNotificationForGRDBMigration()
+            }
         }
+        notifications[notificationIdentifier] = request
     }
 
-    // This method is thread-safe.
-    func postGenericIncomingMessageNotification() -> Promise<Void> {
-        let content = UNMutableNotificationContent()
-        content.categoryIdentifier = AppNotificationCategory.incomingMessageGeneric.identifier
-        content.userInfo = [:]
-        // We use a fixed identifier so that if we post multiple "generic"
-        // notifications, they replace each other.
-        let notificationIdentifier = "org.signal.genericIncomingMessageNotification"
-        content.body = NotificationStrings.genericIncomingMessageNotification
-        let request = UNNotificationRequest(identifier: notificationIdentifier, content: content, trigger: nil)
-        if DebugFlags.internalLogging {
-            Logger.info("Presenting notification with identifier: \(notificationIdentifier)")
-        }
-        let (promise, future) = Promise<Void>.pending()
-        notificationCenter.add(request) { (error: Error?) in
-            if let error = error {
-                owsFailDebug("Error: \(error)")
-            }
-            future.resolve(())
-        }
-        return promise
-    }
-
-    // MARK: - Cancellation
-
-    public static let cancelQueue = DispatchQueue(label: "org.signal.notifications.cancelQueue")
-
-    private enum PendingCancelation: Equatable, Hashable {
-        case threadId(String)
-        case messageId(String)
-        case reactionId(String)
-    }
-
-    private let pendingCancelations = AtomicSet<PendingCancelation>()
-    private let isDrainCancelationInFlight = AtomicBool(false)
-
-    // This method is thread-safe.
-    private func enqueue(pendingCancelation: PendingCancelation) {
-        pendingCancelations.insert(pendingCancelation)
-        Self.cancelQueue.async {
-            self.drainCancelations()
-        }
-    }
-
-    private func drainCancelations() {
-        assertOnQueue(Self.cancelQueue)
-
-        guard !pendingCancelations.isEmpty else {
-            return
-        }
-        guard isDrainCancelationInFlight.tryToSetFlag() else {
-            return
-        }
-
-        firstly {
-            self.getNotificationRequests()
-        }.map(on: Self.cancelQueue) { notificationRequests in
-            self.drainCancelations(notificationRequests: notificationRequests)
-        }.ensure(on: Self.cancelQueue) {
-            self.isDrainCancelationInFlight.set(false)
-            self.drainCancelations()
-        }.catch(on: .global()) { error in
-            owsFailDebug("Error: \(error)")
-        }
-    }
-
-    private func getNotificationRequests() -> Promise<[UNNotificationRequest]> {
-        assertOnQueue(Self.cancelQueue)
-
-        return firstly {
-            Guarantee { resolve in
-                self.notificationCenter.getDeliveredNotifications { resolve($0) }
-            }
-        }.then(on: Self.cancelQueue) { delivered in
-            firstly {
-                Guarantee { resolve in
-                    self.notificationCenter.getPendingNotificationRequests { resolve($0) }
-                }
-            }.map(on: Self.cancelQueue) { pending in
-                pending + delivered.map { $0.request }
-            }
-        }
-    }
-
-    private func drainCancelations(notificationRequests: [UNNotificationRequest]) {
-        assertOnQueue(Self.cancelQueue)
-
-        let cancellations = pendingCancelations.removeAllValues()
-        guard !cancellations.isEmpty else {
-            return
-        }
-
-        var cancelledThreadIds = Set<String>()
-        var cancelledMessageIds = Set<String>()
-        var cancelledReactionIds = Set<String>()
-        for cancelation in cancellations {
-            switch cancelation {
-            case .threadId(let threadId):
-                cancelledThreadIds.insert(threadId)
-            case .messageId(let messageId):
-                cancelledMessageIds.insert(messageId)
-            case .reactionId(let reactionId):
-                cancelledReactionIds.insert(reactionId)
-            }
-        }
-
-        var identifiersToCancel = [String]()
-        for request in notificationRequests {
-            if let requestThreadId = request.content.userInfo[AppNotificationUserInfoKey.threadId] as? String,
-               cancelledThreadIds.contains(requestThreadId) {
-                identifiersToCancel.append(request.identifier)
-            }
-            if let requestMessageId = request.content.userInfo[AppNotificationUserInfoKey.messageId] as? String,
-               cancelledMessageIds.contains(requestMessageId) {
-                identifiersToCancel.append(request.identifier)
-            }
-            if let requestReactionId = request.content.userInfo[AppNotificationUserInfoKey.reactionId] as? String,
-               cancelledReactionIds.contains(requestReactionId) {
-                identifiersToCancel.append(request.identifier)
-            }
-        }
-
-        // De-duplicate.
-        identifiersToCancel = Array(Set(identifiersToCancel))
-
-        guard !identifiersToCancel.isEmpty else {
-            return
-        }
-
-        notificationCenter.removeDeliveredNotifications(withIdentifiers: identifiersToCancel)
-        notificationCenter.removePendingNotificationRequests(withIdentifiers: identifiersToCancel)
-    }
-
-    // This method is thread-safe.
-    private func cancelNotificationSync(identifier: String) {
+    func cancelNotification(identifier: String) {
+        AssertIsOnMainThread()
+        notifications.removeValue(forKey: identifier)
         notificationCenter.removeDeliveredNotifications(withIdentifiers: [identifier])
         notificationCenter.removePendingNotificationRequests(withIdentifiers: [identifier])
     }
 
-    // This method is thread-safe.
-    private func cancelNotification(_ notification: UNNotificationRequest) {
-        cancelNotificationSync(identifier: notification.identifier)
+    func cancelNotification(_ notification: UNNotificationRequest) {
+        AssertIsOnMainThread()
+
+        cancelNotification(identifier: notification.identifier)
     }
 
-    // This method is thread-safe.
     func cancelNotifications(threadId: String) {
-        enqueue(pendingCancelation: .threadId(threadId))
+        AssertIsOnMainThread()
+        for notification in notifications.values {
+            guard let notificationThreadId = notification.content.userInfo[AppNotificationUserInfoKey.threadId] as? String else {
+                continue
+            }
+
+            guard notificationThreadId == threadId else {
+                continue
+            }
+
+            cancelNotification(notification)
+        }
     }
 
     func cancelNotifications(messageId: String) {
-        enqueue(pendingCancelation: .messageId(messageId))
+        AssertIsOnMainThread()
+        for notification in notifications.values {
+            guard let notificationMessageId = notification.content.userInfo[AppNotificationUserInfoKey.messageId] as? String else {
+                continue
+            }
+
+            guard notificationMessageId == messageId else {
+                continue
+            }
+
+            cancelNotification(notification)
+        }
     }
 
-    // This method is thread-safe.
     func cancelNotifications(reactionId: String) {
-        enqueue(pendingCancelation: .reactionId(reactionId))
+        AssertIsOnMainThread()
+        for notification in notifications.values {
+            guard let notificationReactionId = notification.content.userInfo[AppNotificationUserInfoKey.reactionId] as? String else {
+                continue
+            }
+
+            guard notificationReactionId == reactionId else {
+                continue
+            }
+
+            cancelNotification(notification)
+        }
     }
 
-    // This method is thread-safe.
     func clearAllNotifications() {
-        pendingCancelations.removeAllValues()
+        AssertIsOnMainThread()
+
         notificationCenter.removeAllPendingNotificationRequests()
         notificationCenter.removeAllDeliveredNotifications()
     }
 
-    private func shouldPresentNotification(category: AppNotificationCategory, userInfo: [AnyHashable: Any]) -> Bool {
-        assertOnQueue(NotificationPresenter.notificationQueue)
+    private static let kMigrationNotificationId = "kMigrationNotificationId"
+
+    func notifyUserForGRDBMigration() {
+        AssertIsOnMainThread()
+
+        let title = NSLocalizedString("GRDB_MIGRATION_NOTIFICATION_TITLE",
+                                      comment: "Title of notification shown during GRDB migration indicating that user may need to open app to view their content.")
+        let body = NSLocalizedString("GRDB_MIGRATION_NOTIFICATION_BODY",
+                                      comment: "Body message of notification shown during GRDB migration indicating that user may need to open app to view their content.")
+        // By re-using the same identifier, we ensure that we never
+        // show this notification more than once at a time.
+        let identifier = UserNotificationPresenterAdaptee.kMigrationNotificationId
+        notify(category: .grdbMigration, title: title, body: body, threadIdentifier: nil, userInfo: [:], sound: nil, replacingIdentifier: identifier)
+    }
+
+    private func clearNotificationForGRDBMigration() {
+        AssertIsOnMainThread()
+
+        let identifier = UserNotificationPresenterAdaptee.kMigrationNotificationId
+        cancelNotification(identifier: identifier)
+    }
+
+    func shouldPresentNotification(category: AppNotificationCategory, userInfo: [AnyHashable: Any]) -> Bool {
+        AssertIsOnMainThread()
+        guard CurrentAppContext().isMainAppAndActive else {
+            return true
+        }
 
         switch category {
+        case .incomingMessageWithActions,
+             .incomingMessageWithoutActions,
+             .infoOrErrorMessage:
+            // If the app is in the foreground, show these notifications
+            // unless the corresponding conversation is already open.
+            break
         case .incomingMessageFromNoLongerVerifiedIdentity,
              .threadlessErrorMessage,
              .incomingCall,
              .missedCallWithActions,
              .missedCallWithoutActions,
              .missedCallFromNoLongerVerifiedIdentity:
-            // Always show these notifications
+            // Always show these notifications whenever the app is in the foreground.
             return true
-        case .internalError:
-            // Only show errors alerts on builds run by a test population (beta, internal, etc.)
-            return DebugFlags.testPopulationErrorAlerts
-        case .incomingMessageWithActions_CanReply,
-             .incomingMessageWithActions_CannotReply,
-             .incomingMessageWithoutActions,
-             .incomingReactionWithActions_CanReply,
-             .incomingReactionWithActions_CannotReply,
-             .infoOrErrorMessage:
-            // Only show these notification if:
-            // - The app is not foreground
-            // - The app is foreground, but the corresponding conversation is not open
-            guard CurrentAppContext().isMainAppAndActive else { return true }
-            guard let notificationThreadId = userInfo[AppNotificationUserInfoKey.threadId] as? String else {
-                owsFailDebug("threadId was unexpectedly nil")
-                return true
-            }
+        case .grdbMigration:
+            // Never show these notifications if the app is in the foreground.
+            return false
+        }
 
-            guard let conversationSplitVC = CurrentAppContext().frontmostViewController() as? ConversationSplit else {
-                return true
-            }
-
-            // Show notifications for any *other* thread than the currently selected thread
-            return conversationSplitVC.visibleThread?.uniqueId != notificationThreadId
-        case .incomingMessageGeneric:
-            owsFailDebug(".incomingMessageGeneric should never check shouldPresentNotification().")
+        guard let notificationThreadId = userInfo[AppNotificationUserInfoKey.threadId] as? String else {
+            owsFailDebug("threadId was unexpectedly nil")
             return true
         }
+        
+        guard let conversationSplitVC = CurrentAppContext().frontmostViewController() as? ConversationSplit else {
+            return true
+        }
+
+        // Show notifications for any *other* thread than the currently selected thread
+        return conversationSplitVC.visibleThread?.uniqueId != notificationThreadId
     }
 }
 
@@ -475,25 +310,10 @@ public protocol ConversationSplit {
 
 extension OWSSound {
     func notificationSound(isQuiet: Bool) -> UNNotificationSound {
-        guard let filename = OWSSounds.filename(forSound: self, quiet: isQuiet) else {
+        guard let filename = OWSSounds.filename(for: self, quiet: isQuiet) else {
             owsFailDebug("filename was unexpectedly nil")
             return UNNotificationSound.default
         }
         return UNNotificationSound(named: UNNotificationSoundName(rawValue: filename))
-    }
-}
-
-extension UNAuthorizationStatus: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .notDetermined: return "Not Determined"
-        case .denied: return "Denied"
-        case .authorized: return "Authorized"
-        case .provisional: return "Provisional"
-        case .ephemeral: return "Ephemeral"
-        @unknown default:
-            owsFailDebug("New case! Please update the method")
-            return "Raw value: \(rawValue)"
-        }
     }
 }

@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugContactsUtils.h"
-#import "Signal-Swift.h"
+#import "Yoush-Swift.h"
 #import <Contacts/Contacts.h>
 #import <SignalCoreKit/Randomness.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
@@ -47,7 +47,7 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertDebug(count > 0);
 
     NSUInteger remainder = count;
-    const NSUInteger kMaxBatchSize = 10;
+    const NSUInteger kMaxBatchSize = 20;
     NSUInteger batch = MIN(kMaxBatchSize, remainder);
     remainder -= batch;
     [self createRandomContactsBatch:batch
@@ -105,28 +105,18 @@ NS_ASSUME_NONNULL_BEGIN
 
                                 // 50% chance of fake contact having an avatar
                                 const NSUInteger kPercentWithAvatar = 50;
-                                const NSUInteger kPercentWithLargeAvatar = 25;
                                 const NSUInteger kMinimumAvatarDiameter = 200;
                                 const NSUInteger kMaximumAvatarDiameter = 800;
                                 OWSAssertDebug(kMaximumAvatarDiameter >= kMinimumAvatarDiameter);
-                                uint32_t avatarSeed = arc4random_uniform(100);
-                                if (avatarSeed < kPercentWithAvatar) {
-                                    BOOL shouldUseLargeAvatar = avatarSeed < kPercentWithLargeAvatar;
-                                    NSUInteger avatarDiameter;
-                                    if (shouldUseLargeAvatar) {
-                                        avatarDiameter = kMaximumAvatarDiameter;
-                                    } else {
-                                        avatarDiameter
-                                            = arc4random_uniform(kMaximumAvatarDiameter - kMinimumAvatarDiameter)
-                                            + kMinimumAvatarDiameter;
-                                    }
+                                if (arc4random_uniform(100) < kPercentWithAvatar) {
+                                    NSUInteger avatarDiameter
+                                        = arc4random_uniform(kMaximumAvatarDiameter - kMinimumAvatarDiameter)
+                                        + kMinimumAvatarDiameter;
                                     // Note this doesn't work on iOS9, since iOS9 doesn't generate the
                                     // imageThumbnailData from programmatically assigned imageData. We could make our
                                     // own thumbnail in Contact.m, but it's not worth it for the sake of debug UI.
-                                    UIImage *avatarImage = (shouldUseLargeAvatar
-                                            ? [AvatarBuilder buildNoiseAvatarWithDiameterPoints:avatarDiameter]
-                                            : [AvatarBuilder buildRandomAvatarWithDiameterPoints:avatarDiameter]);
-                                    contact.imageData = UIImageJPEGRepresentation(avatarImage, (CGFloat)0.9);
+                                    contact.imageData = UIImageJPEGRepresentation(
+                                        [OWSAvatarBuilder buildRandomAvatarWithDiameter:avatarDiameter], (CGFloat)0.9);
                                     OWSLogDebug(@"avatar size: %lu bytes", (unsigned long)contact.imageData.length);
                                 }
 
@@ -139,10 +129,10 @@ NS_ASSUME_NONNULL_BEGIN
 
                         NSError *saveError = nil;
                         if (![store executeSaveRequest:request error:&saveError]) {
-                            OWSFailDebug(@"Error saving fake contacts: %@", saveError);
+                            OWSLogError(@"Error saving fake contacts: %@", saveError);
                             dispatch_async(dispatch_get_main_queue(), ^{
                                 [OWSActionSheets showActionSheetWithTitle:@"Error"
-                                                                  message:saveError.userErrorDescription];
+                                                                  message:saveError.localizedDescription];
                             });
                             return;
                         } else {
@@ -196,10 +186,10 @@ NS_ASSUME_NONNULL_BEGIN
                         NSError *saveError = nil;
                         if (!result || fetchError) {
                             OWSLogError(@"error = %@", fetchError);
-                            [OWSActionSheets showActionSheetWithTitle:@"Error" message:fetchError.userErrorDescription];
+                            [OWSActionSheets showActionSheetWithTitle:@"Error" message:fetchError.localizedDescription];
                         } else if (![store executeSaveRequest:request error:&saveError]) {
                             OWSLogError(@"error = %@", saveError);
-                            [OWSActionSheets showActionSheetWithTitle:@"Error" message:saveError.userErrorDescription];
+                            [OWSActionSheets showActionSheetWithTitle:@"Error" message:saveError.localizedDescription];
                         }
                     }];
 }

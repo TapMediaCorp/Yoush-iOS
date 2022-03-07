@@ -1,11 +1,20 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
 public class ProvisioningController: NSObject {
+
+    // MARK: - Dependencies
+
+    var accountManager: AccountManager {
+        return AppEnvironment.shared.accountManager
+    }
+
+    // MARK: -
 
     let onboardingController: OnboardingController
     let provisioningCipher: ProvisioningCipher
@@ -13,17 +22,17 @@ public class ProvisioningController: NSObject {
     let provisioningSocket: ProvisioningSocket
 
     var deviceIdPromise: Promise<String>
-    var deviceIdFuture: Future<String>
+    var deviceIdResolver: Resolver<String>
 
     var provisionEnvelopePromise: Promise<ProvisioningProtoProvisionEnvelope>
-    var provisionEnvelopeFuture: Future<ProvisioningProtoProvisionEnvelope>
+    var provisionEnvelopeResolver: Resolver<ProvisioningProtoProvisionEnvelope>
 
     public init(onboardingController: OnboardingController) {
         self.onboardingController = onboardingController
         provisioningCipher = ProvisioningCipher.generate()
 
-        (self.deviceIdPromise, self.deviceIdFuture) = Promise.pending()
-        (self.provisionEnvelopePromise, self.provisionEnvelopeFuture) = Promise.pending()
+        (self.deviceIdPromise, self.deviceIdResolver) = Promise.pending()
+        (self.provisionEnvelopePromise, self.provisionEnvelopeResolver) = Promise.pending()
 
         provisioningSocket = ProvisioningSocket()
 
@@ -34,8 +43,8 @@ public class ProvisioningController: NSObject {
 
     public func resetPromises() {
         _awaitProvisionMessage = nil
-        (self.deviceIdPromise, self.deviceIdFuture) = Promise.pending()
-        (self.provisionEnvelopePromise, self.provisionEnvelopeFuture) = Promise.pending()
+        (self.deviceIdPromise, self.deviceIdResolver) = Promise.pending()
+        (self.provisionEnvelopePromise, self.provisionEnvelopeResolver) = Promise.pending()
     }
 
     @objc
@@ -47,7 +56,7 @@ public class ProvisioningController: NSObject {
         let vc = SecondaryLinkingQRCodeViewController(provisioningController: provisioningController)
         navController.setViewControllers([vc], animated: false)
 
-        provisioningController.awaitProvisioning(from: vc, navigationController: navController)
+        provisioningController.awaitProvisioning(from: vc)
         navController.isNavigationBarHidden = true
         CurrentAppContext().mainWindow?.rootViewController = navController
     }
@@ -63,15 +72,18 @@ public class ProvisioningController: NSObject {
         let qrCodeViewController = SecondaryLinkingQRCodeViewController(provisioningController: self)
         navigationController.pushViewController(qrCodeViewController, animated: true)
 
-        awaitProvisioning(from: qrCodeViewController, navigationController: navigationController)
+        awaitProvisioning(from: qrCodeViewController)
     }
 
-    func awaitProvisioning(from viewController: SecondaryLinkingQRCodeViewController,
-                           navigationController: UINavigationController) {
+    func awaitProvisioning(from viewController: SecondaryLinkingQRCodeViewController) {
+        guard let navigationController = viewController.navigationController else {
+            owsFailDebug("navigationController was unexpectedly nil")
+            return
+        }
 
         awaitProvisionMessage.done { [weak self, weak navigationController] message in
-            guard let self = self else { throw PromiseError.cancelled }
-            guard let navigationController = navigationController else { throw PromiseError.cancelled }
+            guard let self = self else { throw PMKError.cancelled }
+            guard let navigationController = navigationController else { throw PMKError.cancelled }
 
             // Verify the primary device is new enough to link us. Right now this is a simple check
             // of >= the latest version, but when we bump the version we may need to be more specific
@@ -95,12 +107,12 @@ public class ProvisioningController: NSObject {
             navigationController.pushViewController(confirmVC, animated: true)
         }.catch { error in
             switch error {
-            case PromiseError.cancelled:
+            case PMKError.cancelled:
                 Logger.info("cancelled")
             default:
                 Logger.warn("error: \(error)")
                 let alert = ActionSheetController(title: NSLocalizedString("SECONDARY_LINKING_ERROR_WAITING_FOR_SCAN", comment: "alert title"),
-                                                  message: error.userErrorDescription)
+                                                  message: error.localizedDescription)
                 alert.addAction(ActionSheetAction(title: CommonStrings.retryButton,
                                                   accessibilityIdentifier: "alert.retry",
                                                   style: .default,
@@ -124,19 +136,6 @@ public class ProvisioningController: NSObject {
 
                 let alert: ActionSheetController
                 switch error {
-                case AccountManagerError.reregistrationDifferentAccount:
-                    let title = NSLocalizedString("SECONDARY_LINKING_ERROR_DIFFERENT_ACCOUNT_TITLE",
-                                                  comment: "Title for error alert indicating that re-linking failed because the account did not match.")
-                    let message = NSLocalizedString("SECONDARY_LINKING_ERROR_DIFFERENT_ACCOUNT_MESSAGE",
-                                                    comment: "Message for error alert indicating that re-linking failed because the account did not match.")
-                    alert = ActionSheetController(title: title, message: message)
-                    alert.addAction(ActionSheetAction(title: NSLocalizedString("SECONDARY_LINKING_ERROR_DIFFERENT_ACCOUNT_RESET_DEVICE",
-                                                                               comment: "Label for the 'reset device' action in the 're-linking failed because the account did not match' alert."),
-                                                      accessibilityIdentifier: "alert.reset_device",
-                                                      style: .default,
-                                                      handler: { _ in
-                                                        Self.resetDeviceState()
-                                                      }))
                 case SignalServiceError.obsoleteLinkedDevice:
                     let title = NSLocalizedString("SECONDARY_LINKING_ERROR_OBSOLETE_LINKED_DEVICE_TITLE",
                                                   comment: "Title for error alert indicating that a linked device must be upgraded before it can be linked.")
@@ -154,7 +153,7 @@ public class ProvisioningController: NSObject {
                     alert.addAction(updateAction)
                 default:
                     let title = NSLocalizedString("SECONDARY_LINKING_ERROR_WAITING_FOR_SCAN", comment: "alert title")
-                    let message = error.userErrorDescription
+                    let message = error.localizedDescription
                     alert = ActionSheetController(title: title, message: message)
                     alert.addAction(ActionSheetAction(title: CommonStrings.retryButton,
                                                       accessibilityIdentifier: "alert.retry",
@@ -174,15 +173,9 @@ public class ProvisioningController: NSObject {
                                                      backgroundBlock: backgroundBlock)
     }
 
-    private static func resetDeviceState() {
-        Logger.warn("")
-
-        SignalApp.resetAppDataWithUI()
-    }
-
     public func getProvisioningURL() -> Promise<URL> {
         return getDeviceId().map { [weak self] deviceId in
-            guard let self = self else { throw PromiseError.cancelled }
+            guard let self = self else { throw PMKError.cancelled }
 
             return try self.buildProvisioningUrl(deviceId: deviceId)
         }
@@ -192,7 +185,7 @@ public class ProvisioningController: NSObject {
     public var awaitProvisionMessage: Promise<ProvisionMessage> {
         if _awaitProvisionMessage == nil {
             _awaitProvisionMessage = provisionEnvelopePromise.map { [weak self] envelope in
-                guard let self = self else { throw PromiseError.cancelled }
+                guard let self = self else { throw PMKError.cancelled }
                 return try self.provisioningCipher.decrypt(envelope: envelope)
             }
         }
@@ -201,7 +194,7 @@ public class ProvisioningController: NSObject {
 
     public func completeLinking(deviceName: String) -> Promise<Void> {
         return awaitProvisionMessage.then { [weak self] provisionMessage -> Promise<Void> in
-            guard let self = self else { throw PromiseError.cancelled }
+            guard let self = self else { throw PMKError.cancelled }
 
             return self.accountManager.completeSecondaryLinking(provisionMessage: provisionMessage,
                                                                 deviceName: deviceName)
@@ -221,12 +214,7 @@ public class ProvisioningController: NSObject {
 
         // We don't use URLComponents to generate this URL as it encodes '+' and '/'
         // in the base64 pub_key in a way the Android doesn't tolerate.
-        let urlString: String
-        if FeatureFlags.newLinkDeviceScheme {
-            urlString = "\(kURLSchemeSGNLKey)://\(kURLHostLinkDevicePrefix)?uuid=\(deviceId)&pub_key=\(encodedPubKey)"
-        } else {
-            urlString = "tsdevice:/?uuid=\(deviceId)&pub_key=\(encodedPubKey)"
-        }
+        let urlString = "tsdevice:/?uuid=\(deviceId)&pub_key=\(encodedPubKey)"
         guard let url = URL(string: urlString) else {
             throw OWSAssertionError("invalid url: \(urlString)")
         }
@@ -248,20 +236,20 @@ public class ProvisioningController: NSObject {
 
 extension ProvisioningController: ProvisioningSocketDelegate {
     public func provisioningSocket(_ provisioningSocket: ProvisioningSocket, didReceiveDeviceId deviceId: String) {
-        owsAssertDebug(!deviceIdPromise.isSealed)
-        deviceIdFuture.resolve(deviceId)
+        assert(deviceIdPromise.isPending)
+        deviceIdResolver.fulfill(deviceId)
     }
 
     public func provisioningSocket(_ provisioningSocket: ProvisioningSocket, didReceiveEnvelope envelope: ProvisioningProtoProvisionEnvelope) {
         // After receiving the provisioning message, there's nothing else to retreive from the provisioning socket
         provisioningSocket.disconnect()
 
-        owsAssertDebug(!provisionEnvelopePromise.isSealed)
-        return provisionEnvelopeFuture.resolve(envelope)
+        assert(provisionEnvelopePromise.isPending)
+        return provisionEnvelopeResolver.fulfill(envelope)
     }
 
     public func provisioningSocket(_ provisioningSocket: ProvisioningSocket, didError error: Error) {
-        deviceIdFuture.reject(error)
-        provisionEnvelopeFuture.reject(error)
+        deviceIdResolver.reject(error)
+        provisionEnvelopeResolver.reject(error)
     }
 }

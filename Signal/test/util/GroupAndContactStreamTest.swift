@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,6 +8,12 @@ import Contacts
 
 class GroupAndContactStreamTest: SignalBaseTest {
 
+    // MARK: - Dependencies
+
+    private var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
     // MARK: - Test Life Cycle
 
     override func setUp() {
@@ -15,13 +21,13 @@ class GroupAndContactStreamTest: SignalBaseTest {
 
         // ensure local client has necessary "registered" state
         let localE164Identifier = "+13235551234"
-        let localUUID = UUID(uuidString: "83DF967A-5CBD-43EB-AE9A-571A930F78D6")!
+        let localUUID = UUID()
         tsAccountManager.registerForTests(withLocalNumber: localE164Identifier, uuid: localUUID)
     }
 
     // MARK: -
 
-    let outputContactSyncData = "GwoMKzEzMjMxMTExMTExEgdBbGljZS0xQABYADMSB0FsaWNlLTJAAEokMzFDRTE0MTItOUEyOC00RTZGLUI0RUUtMjIyMjIyMjIyMjIyWABBCgwrMTMyMTMzMzMzMzMSB0FsaWNlLTNAAEokMUQ0QUIwNDUtODhGQi00QzRFLTlGNkEtMzMzMzMzMzMzMzMzWAA="
+    let outputContactSyncData = "IQoMKzEzMjMxMTExMTExEgdBbGljZS0xIgRibHVlQABYADkSB0FsaWNlLTIiBGJsdWVAAEokMzFDRTE0MTItOUEyOC00RTZGLUI0RUUtMjIyMjIyMjIyMjIyWABHCgwrMTMyMTMzMzMzMzMSB0FsaWNlLTMiBGJsdWVAAEokMUQ0QUIwNDUtODhGQi00QzRFLTlGNkEtMzMzMzMzMzMzMzMzWAA="
 
     func test_writeContactSync() throws {
         let signalAccounts = [
@@ -60,10 +66,12 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertEqual("+13231111111", contact.address.phoneNumber)
             XCTAssertNil(contact.address.uuid)
             XCTAssertEqual("Alice-1", contact.name)
+            XCTAssertEqual("blue", contact.conversationColorName)
             XCTAssertNil(contact.verifiedProto)
             XCTAssertNil(contact.profileKey)
             XCTAssertEqual(false, contact.isBlocked)
             XCTAssertEqual(0, contact.expireTimer)
+            XCTAssertNil(contact.avatarData)
             XCTAssertEqual(false, contact.isArchived)
             XCTAssertNil(contact.inboxSortOrder)
         }
@@ -73,10 +81,12 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertNil(contact.address.phoneNumber)
             XCTAssertEqual("31CE1412-9A28-4E6F-B4EE-222222222222", contact.address.uuid?.uuidString)
             XCTAssertEqual("Alice-2", contact.name)
+            XCTAssertEqual("blue", contact.conversationColorName)
             XCTAssertNil(contact.verifiedProto)
             XCTAssertNil(contact.profileKey)
             XCTAssertEqual(false, contact.isBlocked)
             XCTAssertEqual(0, contact.expireTimer)
+            XCTAssertNil(contact.avatarData)
             XCTAssertEqual(false, contact.isArchived)
             XCTAssertNil(contact.inboxSortOrder)
         }
@@ -86,16 +96,18 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertEqual("+13213333333", contact.address.phoneNumber)
             XCTAssertEqual("1D4AB045-88FB-4C4E-9F6A-333333333333", contact.address.uuid?.uuidString)
             XCTAssertEqual("Alice-3", contact.name)
+            XCTAssertEqual("blue", contact.conversationColorName)
             XCTAssertNil(contact.verifiedProto)
             XCTAssertNil(contact.profileKey)
             XCTAssertEqual(false, contact.isBlocked)
             XCTAssertEqual(0, contact.expireTimer)
+            XCTAssertNil(contact.avatarData)
             XCTAssertEqual(false, contact.isArchived)
             XCTAssertNil(contact.inboxSortOrder)
         }
     }
 
-    let outputGroupSyncData = "ZAoQc111Fz2xlVb3YbtcfwN0SBoMKzEzMjEzMjE0MzIxGgwrMTMyMTMyMTQzMjMiDgoJaW1hZ2UvcG5nEKMBMABKDhIMKzEzMjEzMjE0MzIxSg4SDCsxMzIxMzIxNDMyM1ABWACJUE5HDQoaCgAAAA1JSERSAAAAAQAAAAEIBgAAAB8VxIkAAAABc1JHQgCuzhzpAAAARGVYSWZNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAADoAEAAwAAAAEAAQAAoAIABAAAAAEAAAABoAMABAAAAAEAAAABAAAAAPkinf4AAAANSURBVAgdY/jPwPAfAAUAAf/ID2IWAAAAAElFTkSuQmCCbwoQc222Fz2xlVb3YbtcfwN0SBIJQm9vayBDbHViGgwrMTMyMTMyMTQzMjEaDCsxNTU1MzIxNDMyMyIOCglpbWFnZS9wbmcQowEwAEoOEgwrMTMyMTMyMTQzMjFKDhIMKzE1NTUzMjE0MzIzUAJYAYlQTkcNChoKAAAADUlIRFIAAAABAAAAAQgGAAAAHxXEiQAAAAFzUkdCAK7OHOkAAABEZVhJZk1NACoAAAAIAAGHaQAEAAAAAQAAABoAAAAAAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAAGgAwAEAAAAAQAAAAEAAAAA+SKd/gAAAA1JREFUCB1jYGD4/x8AAwIB/6fhVKUAAAAASUVORK5CYIKNAQoQc333Fz2xlVb3YbtcfwN0SBIJQ29vayBCbHViGgwrMTMyMTMyMTMzMzMaDCsxMzIzNTU1MTIzNBoMKzE1NTUzMjEyMjIyIg4KCWltYWdlL3BuZxCjATAASg4SDCsxMzIxMzIxMzMzM0oOEgwrMTMyMzU1NTEyMzRKDhIMKzE1NTUzMjEyMjIyUABYAYlQTkcNChoKAAAADUlIRFIAAAABAAAAAQgGAAAAHxXEiQAAAAFzUkdCAK7OHOkAAABEZVhJZk1NACoAAAAIAAGHaQAEAAAAAQAAABoAAAAAAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAAGgAwAEAAAAAQAAAAEAAAAA+SKd/gAAAA1JREFUCB1jYPjP8B8ABAEB/zB9GO4AAAAASUVORK5CYII="
+    let outputGroupSyncData = "uQEKEHNddRc9sZVW92G7XH8DdEgaDCsxMzIxMzIxNDMyMRoMKzEzMjEzMjE0MzIzIg4KCWltYWdlL3BuZxCjATAAOgVicm93bkoOEgwrMTMyMTMyMTQzMjFKNAokMUQ0QUIwNDUtODhGQi00QzRFLTlGNkEtRjkyMTEyNEJENTI5EgwrMTMyMTMyMTQzMjNKJgokMzFDRTE0MTItOUEyOC00RTZGLUI0RUUtQTI1QzMxNzlEMDg1UAJYAIlQTkcNChoKAAAADUlIRFIAAAABAAAAAQgGAAAAHxXEiQAAAAFzUkdCAK7OHOkAAABEZVhJZk1NACoAAAAIAAGHaQAEAAAAAQAAABoAAAAAAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAAGgAwAEAAAAAQAAAAEAAAAA+SKd/gAAAA1JREFUCB1j+M/A8B8ABQAB/8gPYhYAAAAASUVORK5CYIKgAQoQc222Fz2xlVb3YbtcfwN0SBIJQm9vayBDbHViGgwrMTMyMTMyMTQzMjEaDCsxNTU1MzIxNDMyMyIOCglpbWFnZS9wbmcQowEwADoJYmx1ZV9ncmV5Sg4SDCsxMzIxMzIxNDMyMUo0CiQ1NTU1NTU1NS04OEZCLTRDNEUtOUY2QS1GOTIxMTI0QkQ1MjkSDCsxNTU1MzIxNDMyM1ABWAGJUE5HDQoaCgAAAA1JSERSAAAAAQAAAAEIBgAAAB8VxIkAAAABc1JHQgCuzhzpAAAARGVYSWZNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAADoAEAAwAAAAEAAQAAoAIABAAAAAEAAAABoAMABAAAAAEAAAABAAAAAPkinf4AAAANSURBVAgdY2Bg+P8fAAMCAf+n4VSlAAAAAElFTkSuQmCCmwEKEHN99xc9sZVW92G7XH8DdEgSCUNvb2sgQmx1YhoMKzEzMjEzMjEzMzMzGgwrMTU1NTMyMTIyMjIiDgoJaW1hZ2UvcG5nEKMBMAA6BGJsdWVKDhIMKzEzMjEzMjEzMzMzSjQKJDU1NTU1NTU1LTg4RkItNEM0RS05RjZBLTIyMjIyMjIyMjIyMhIMKzE1NTUzMjEyMjIyUABYAYlQTkcNChoKAAAADUlIRFIAAAABAAAAAQgGAAAAHxXEiQAAAAFzUkdCAK7OHOkAAABEZVhJZk1NACoAAAAIAAGHaQAEAAAAAQAAABoAAAAAAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAAGgAwAEAAAAAQAAAAEAAAAA+SKd/gAAAA1JREFUCB1jYPjP8B8ABAEB/zB9GO4AAAAASUVORK5CYII="
 
     let groupImageData1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAAD5Ip3+AAAADUlEQVQIHWP4z8DwHwAFAAH/yA9iFgAAAABJRU5ErkJggg=="
     let groupImageData2 =  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAaADAAQAAAABAAAAAQAAAAD5Ip3+AAAADUlEQVQIHWNgYPj/HwADAgH/p+FUpQAAAABJRU5ErkJggg=="
@@ -110,6 +122,7 @@ class GroupAndContactStreamTest: SignalBaseTest {
             let groupId = Data(base64Encoded: "c111Fz2xlVb3YbtcfwN0SA==")!
             let groupMembers: [SignalServiceAddress] = [
                 .init(phoneNumber: "+13213214321"),
+                .init(uuidString: "31ce1412-9a28-4e6f-b4ee-a25c3179d085"),
                 .init(uuidString: "1d4ab045-88fb-4c4e-9f6a-f921124bd529", phoneNumber: "+13213214323")
             ]
 
@@ -119,6 +132,7 @@ class GroupAndContactStreamTest: SignalBaseTest {
                                                                avatarData: groupAvatarData1,
                                                                groupId: groupId,
                                                                transaction: transaction)
+                thread.updateConversationColorName(.burlap, transaction: transaction)
             }
             return thread
         }()
@@ -139,15 +153,8 @@ class GroupAndContactStreamTest: SignalBaseTest {
                                                                transaction: $0)
                 thread.shouldThreadBeVisible = true
                 thread.anyOverwritingUpdate(transaction: $0)
-
-                ThreadAssociatedData.fetchOrDefault(
-                    for: thread,
-                    transaction: $0
-                ).updateWith(
-                    isArchived: true,
-                    updateStorageService: false,
-                    transaction: $0
-                )
+                thread.updateConversationColorName(.taupe, transaction: $0)
+                thread.archiveThread(updateStorageService: false, transaction: $0)
             }
             return thread
         }()
@@ -156,7 +163,6 @@ class GroupAndContactStreamTest: SignalBaseTest {
             let groupId = Data(base64Encoded: "c333Fz2xlVb3YbtcfwN0SA==")!
             let groupMembers: [SignalServiceAddress] = [
                 .init(phoneNumber: "+13213213333"),
-                tsAccountManager.localAddress!,
                 .init(uuidString: "55555555-88fb-4c4e-9f6a-222222222222", phoneNumber: "+15553212222")
             ]
 
@@ -169,19 +175,13 @@ class GroupAndContactStreamTest: SignalBaseTest {
                                                                transaction: transaction)
                 thread.shouldThreadBeVisible = true
                 thread.anyOverwritingUpdate(transaction: transaction)
+                thread.updateConversationColorName(.blue, transaction: transaction)
 
                 let messageFactory = OutgoingMessageFactory()
-                messageFactory.threadCreator = { _ in thread }
+                messageFactory.threadCreator = { _ in return thread }
                 _ = messageFactory.create(transaction: transaction)
 
-                ThreadAssociatedData.fetchOrDefault(
-                    for: thread,
-                    transaction: transaction
-                ).updateWith(
-                    isArchived: true,
-                    updateStorageService: false,
-                    transaction: transaction
-                )
+                thread.archiveThread(updateStorageService: false, transaction: transaction)
             }
             return thread
         }()
@@ -221,14 +221,16 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertEqual(group.name, nil)
             XCTAssertEqual(group.memberAddresses, [
                 SignalServiceAddress(phoneNumber: "+13213214321"),
-                SignalServiceAddress(uuidString: "1d4ab045-88fb-4c4e-9f6a-f921124bd529", phoneNumber: "+13213214323")
-            ])
+                SignalServiceAddress(uuidString: "1d4ab045-88fb-4c4e-9f6a-f921124bd529", phoneNumber: "+13213214323"),
+                SignalServiceAddress(uuidString: "31ce1412-9a28-4e6f-b4ee-a25c3179d085")
+                ])
 
+            XCTAssertEqual(group.conversationColorName, ConversationColorName.burlap.rawValue)
             XCTAssertEqual(group.isBlocked, false)
             XCTAssertEqual(group.expireTimer, 0)
             XCTAssertEqual(group.avatarData, groupAvatarData1)
             XCTAssertEqual(false, group.isArchived)
-            XCTAssertEqual(1, group.inboxSortOrder)
+            XCTAssertEqual(2, group.inboxSortOrder)
         }
 
         do {
@@ -238,12 +240,13 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertEqual(group.memberAddresses, [
                 SignalServiceAddress(phoneNumber: "+13213214321"),
                 SignalServiceAddress(uuidString: "55555555-88fb-4c4e-9f6a-f921124bd529", phoneNumber: "+15553214323")
-            ])
+                ])
+            XCTAssertEqual(group.conversationColorName, ConversationColorName.taupe.rawValue)
             XCTAssertEqual(group.isBlocked, false)
             XCTAssertEqual(group.expireTimer, 0)
             XCTAssertEqual(group.avatarData, groupAvatarData2)
             XCTAssertEqual(true, group.isArchived)
-            XCTAssertEqual(2, group.inboxSortOrder)
+            XCTAssertEqual(1, group.inboxSortOrder)
         }
 
         do {
@@ -252,9 +255,9 @@ class GroupAndContactStreamTest: SignalBaseTest {
             XCTAssertEqual(group.name, "Cook Blub")
             XCTAssertEqual(group.memberAddresses, [
                 SignalServiceAddress(phoneNumber: "+13213213333"),
-                tsAccountManager.localAddress!,
                 SignalServiceAddress(uuidString: "55555555-88FB-4C4E-9F6A-222222222222", phoneNumber: "+15553212222")
-            ])
+                ])
+            XCTAssertEqual(group.conversationColorName, ConversationColorName.blue.rawValue)
             XCTAssertEqual(group.isBlocked, false)
             XCTAssertEqual(group.expireTimer, 0)
             XCTAssertEqual(group.avatarData, groupAvatarData3)
@@ -283,6 +286,7 @@ class GroupAndContactStreamTest: SignalBaseTest {
                                        recipientIdentity: nil,
                                        profileKeyData: nil,
                                        contactsManager: contactsManager,
+                                       conversationColorName: ConversationColorName.blue.rawValue,
                                        disappearingMessagesConfiguration: nil,
                                        isArchived: false,
                                        inboxPosition: nil)
@@ -317,101 +321,82 @@ class GroupAndContactStreamTest: SignalBaseTest {
 }
 
 class TestContactsManager: NSObject, ContactsManagerProtocol {
-    func isSystemContactWithSignalAccount(_ address: SignalServiceAddress) -> Bool {
-        false
-    }
-
-    func isSystemContactWithSignalAccount(_ address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> Bool {
-        false
-    }
-
-    func hasNameInSystemContacts(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> Bool {
-        false
-    }
-
-    func comparableName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
-        self.displayName(for: address)
-    }
 
     func comparableName(for signalAccount: SignalAccount, transaction: SDSAnyReadTransaction) -> String {
-        signalAccount.recipientAddress.stringForDisplay
+        return signalAccount.recipientAddress.stringForDisplay
     }
 
     func displayName(for address: SignalServiceAddress) -> String {
-        address.stringForDisplay
+        return address.stringForDisplay
     }
 
     func displayName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
-        address.stringForDisplay
+        return address.stringForDisplay
     }
 
     func displayName(for signalAccount: SignalAccount) -> String {
-        signalAccount.recipientAddress.stringForDisplay
+        return signalAccount.recipientAddress.stringForDisplay
     }
 
     func displayName(for thread: TSThread, transaction: SDSAnyReadTransaction) -> String {
-        "Fake Name"
+        return "Fake Name"
     }
 
     func displayNameWithSneakyTransaction(thread: TSThread) -> String {
-        "Fake Name"
+        return "Fake Name"
     }
 
     func shortDisplayName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
-        address.stringForDisplay
+        return address.stringForDisplay
+    }
+
+    func conversationColorName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
+        return ConversationColorName.taupe.rawValue
+    }
+
+    func nameComponents(for address: SignalServiceAddress) -> PersonNameComponents? {
+        return PersonNameComponents()
     }
 
     func nameComponents(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> PersonNameComponents? {
-        PersonNameComponents()
+        return PersonNameComponents()
     }
 
     func signalAccounts() -> [SignalAccount] {
-        []
+        return []
     }
 
-    func isSystemContactWithSneakyTransaction(phoneNumber: String) -> Bool {
+    func isSystemContact(phoneNumber: String) -> Bool {
         return true
     }
 
-    func isSystemContact(phoneNumber: String, transaction: SDSAnyReadTransaction) -> Bool {
-        return true
-    }
-
-    func isSystemContactWithSneakyTransaction(address: SignalServiceAddress) -> Bool {
-        return true
-    }
-
-    func isSystemContact(address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> Bool {
+    func isSystemContact(address: SignalServiceAddress) -> Bool {
         return true
     }
 
     func isSystemContact(withSignalAccount phoneNumber: String) -> Bool {
-        true
-    }
-
-    func isSystemContact(withSignalAccount phoneNumber: String, transaction: SDSAnyReadTransaction) -> Bool {
-        true
+        return true
     }
 
     func compare(signalAccount left: SignalAccount, with right: SignalAccount) -> ComparisonResult {
-        .orderedSame
+        return .orderedSame
     }
 
     public func sortSignalServiceAddresses(_ addresses: [SignalServiceAddress],
                                            transaction: SDSAnyReadTransaction) -> [SignalServiceAddress] {
-        addresses
+        return addresses
     }
 
     func cnContact(withId contactId: String?) -> CNContact? {
-        nil
+        return nil
     }
 
     func avatarData(forCNContactId contactId: String?) -> Data? {
-        nil
+        return nil
     }
 
     func avatarImage(forCNContactId contactId: String?) -> UIImage? {
-        nil
+        return nil
     }
 
     var unknownUserLabel: String = "unknown"

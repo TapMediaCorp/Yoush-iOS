@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -10,7 +10,7 @@ public class Platform: NSObject {
     @objc
     public static let isSimulator: Bool = {
         let isSim: Bool
-        #if targetEnvironment(simulator)
+        #if arch(i386) || arch(x86_64)
             isSim = true
         #else
             isSim = false

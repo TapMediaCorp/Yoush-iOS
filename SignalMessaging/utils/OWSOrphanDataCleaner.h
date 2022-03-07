@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -13,7 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (SDSKeyValueStore *)keyValueStore;
 
-- (instancetype)init NS_DESIGNATED_INITIALIZER;
++ (instancetype)new NS_UNAVAILABLE;
+- (instancetype)init NS_UNAVAILABLE;
 
 // This is exposed for the debug UI.
 + (void)auditAndCleanup:(BOOL)shouldCleanup;

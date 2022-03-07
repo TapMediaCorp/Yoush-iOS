@@ -1,11 +1,19 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 @objc
 public class LaunchJobs: NSObject {
+
+    // MARK: Singletons
+
+    private var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
+    // MARK: 
 
     private enum LaunchJobsState: String {
         case notYetStarted
@@ -39,7 +47,6 @@ public class LaunchJobs: NSObject {
     // completion will be invoked async on the main thread.
     private func startLaunchJobs(completion: @escaping () -> Void) {
         AssertIsOnMainThread()
-        owsAssertDebug(!CurrentAppContext().isNSE)
 
         state = .inFlight
 
@@ -64,10 +71,6 @@ public class LaunchJobs: NSObject {
             // Mark all "downloading" attachments as "failed", i.e. any incoming attachments that were not
             // successfully downloaded before the app exited should be marked as failures.
             OWSFailedAttachmentDownloadsJob().runSync()
-
-            // Kick off a low priority trim of the MSL
-            // This will reschedule itself on a background queue ~24h or so
-            MessageSendLog.schedulePeriodicCleanup()
 
             DispatchQueue.main.async {
                 Logger.verbose("Completing.")

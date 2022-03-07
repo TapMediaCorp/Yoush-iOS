@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -57,6 +57,10 @@ class IntroducingPinsMegaphone: MegaphoneView {
 class IntroducingPinsSplash: SplashViewController {
     override var isReadyToComplete: Bool { KeyBackupService.hasMasterKey }
 
+    var ows2FAManager: OWS2FAManager {
+        return .shared()
+    }
+
     override var canDismissWithGesture: Bool { return false }
 
     // MARK: - View lifecycle
@@ -102,7 +106,7 @@ class IntroducingPinsSplash: SplashViewController {
         attributedBody.append("  ")
         attributedBody.append(CommonStrings.learnMore,
                                 attributes: [
-                                    .link: URL(string: "https://support.signal.org/hc/articles/360007059792")!,
+                                    .link: URL(string: "https://support.tapofthink.com/hc/articles/360007059792")!,
                                     .font: UIFont.ows_dynamicTypeBody
             ]
         )
@@ -113,7 +117,7 @@ class IntroducingPinsSplash: SplashViewController {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.textAlignment = .center
-        titleLabel.font = UIFont.ows_dynamicTypeTitle1.ows_semibold
+        titleLabel.font = UIFont.ows_dynamicTypeTitle1.ows_semibold()
         titleLabel.textColor = Theme.primaryTextColor
         titleLabel.minimumScaleFactor = 0.5
         titleLabel.adjustsFontSizeToFitWidth = true
@@ -137,7 +141,7 @@ class IntroducingPinsSplash: SplashViewController {
 
         // Primary button
         let primaryButton = OWSFlatButton.button(title: primaryButtonTitle(),
-                                                 font: UIFont.ows_dynamicTypeBody.ows_semibold,
+                                                 font: UIFont.ows_dynamicTypeBody.ows_semibold(),
                                                  titleColor: .white,
                                                  backgroundColor: .ows_accentBlue,
                                                  target: self,
@@ -181,7 +185,7 @@ class IntroducingPinsSplash: SplashViewController {
             )
         ) { [weak self] _ in
             guard let self = self else { return }
-            let vc = SFSafariViewController(url: URL(string: "https://support.signal.org/hc/articles/360007059792")!)
+            let vc = SFSafariViewController(url: URL(string: "https://support.tapofthink.com/hc/articles/360007059792")!)
             self.present(vc, animated: true, completion: nil)
         }
         actionSheet.addAction(learnMoreAction)
@@ -230,13 +234,15 @@ class IntroducingPinsSplash: SplashViewController {
 
     override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
         guard let fromViewController = presentingViewController else {
-            return // owsFailDebug("Trying to dismiss while not presented.")
+            return //owsFailDebug("Trying to dismiss while not presented.")
         }
 
-        let toastText = self.toastText
         super.dismiss(animated: flag) { [weak self] in
             if let self = self, !self.isDismissWithoutCompleting {
-                fromViewController.presentToast(text: toastText)
+                self.presentToast(
+                    text: self.toastText,
+                    fromViewController: fromViewController
+                )
             }
             completion?()
         }

@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-// *
+//*
 // Copyright (C) 2014-2016 Open Whisper Systems
 //
 // Licensed according to the LICENSE file in this repository.
@@ -76,7 +76,7 @@ struct SignalServiceProtos_Envelope {
 
   /// Contains an encrypted DataMessage
   var legacyMessage: Data {
-    get {return _legacyMessage ?? Data()}
+    get {return _legacyMessage ?? SwiftProtobuf.Internal.emptyData}
     set {_legacyMessage = newValue}
   }
   /// Returns true if `legacyMessage` has been explicitly set.
@@ -86,7 +86,7 @@ struct SignalServiceProtos_Envelope {
 
   /// Contains an encrypted Content
   var content: Data {
-    get {return _content ?? Data()}
+    get {return _content ?? SwiftProtobuf.Internal.emptyData}
     set {_content = newValue}
   }
   /// Returns true if `content` has been explicitly set.
@@ -114,7 +114,6 @@ struct SignalServiceProtos_Envelope {
   /// Clears the value of `serverTimestamp`. Subsequent reads from it will return its default value.
   mutating func clearServerTimestamp() {self._serverTimestamp = nil}
 
-  /// @trustedMapping
   var sourceUuid: String {
     get {return _sourceUuid ?? String()}
     set {_sourceUuid = newValue}
@@ -134,8 +133,6 @@ struct SignalServiceProtos_Envelope {
     case prekeyBundle // = 3
     case receipt // = 5
     case unidentifiedSender // = 6
-    case senderkeyMessage // = 7
-    case plaintextContent // = 8
 
     init() {
       self = .unknown
@@ -149,8 +146,6 @@ struct SignalServiceProtos_Envelope {
       case 3: self = .prekeyBundle
       case 5: self = .receipt
       case 6: self = .unidentifiedSender
-      case 7: self = .senderkeyMessage
-      case 8: self = .plaintextContent
       default: return nil
       }
     }
@@ -163,8 +158,6 @@ struct SignalServiceProtos_Envelope {
       case .prekeyBundle: return 3
       case .receipt: return 5
       case .unidentifiedSender: return 6
-      case .senderkeyMessage: return 7
-      case .plaintextContent: return 8
       }
     }
 
@@ -217,7 +210,7 @@ struct SignalServiceProtos_TypingMessage {
   mutating func clearAction() {self._action = nil}
 
   var groupID: Data {
-    get {return _groupID ?? Data()}
+    get {return _groupID ?? SwiftProtobuf.Internal.emptyData}
     set {_groupID = newValue}
   }
   /// Returns true if `groupID` has been explicitly set.
@@ -327,26 +320,6 @@ struct SignalServiceProtos_Content {
   /// Clears the value of `typingMessage`. Subsequent reads from it will return its default value.
   mutating func clearTypingMessage() {self._typingMessage = nil}
 
-  /// Serialized SKDM
-  var senderKeyDistributionMessage: Data {
-    get {return _senderKeyDistributionMessage ?? Data()}
-    set {_senderKeyDistributionMessage = newValue}
-  }
-  /// Returns true if `senderKeyDistributionMessage` has been explicitly set.
-  var hasSenderKeyDistributionMessage: Bool {return self._senderKeyDistributionMessage != nil}
-  /// Clears the value of `senderKeyDistributionMessage`. Subsequent reads from it will return its default value.
-  mutating func clearSenderKeyDistributionMessage() {self._senderKeyDistributionMessage = nil}
-
-  /// Serialized decryption error
-  var decryptionErrorMessage: Data {
-    get {return _decryptionErrorMessage ?? Data()}
-    set {_decryptionErrorMessage = newValue}
-  }
-  /// Returns true if `decryptionErrorMessage` has been explicitly set.
-  var hasDecryptionErrorMessage: Bool {return self._decryptionErrorMessage != nil}
-  /// Clears the value of `decryptionErrorMessage`. Subsequent reads from it will return its default value.
-  mutating func clearDecryptionErrorMessage() {self._decryptionErrorMessage = nil}
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -357,8 +330,6 @@ struct SignalServiceProtos_Content {
   fileprivate var _nullMessage: SignalServiceProtos_NullMessage?
   fileprivate var _receiptMessage: SignalServiceProtos_ReceiptMessage?
   fileprivate var _typingMessage: SignalServiceProtos_TypingMessage?
-  fileprivate var _senderKeyDistributionMessage: Data?
-  fileprivate var _decryptionErrorMessage: Data?
 }
 
 struct SignalServiceProtos_CallMessage {
@@ -367,92 +338,80 @@ struct SignalServiceProtos_CallMessage {
   // methods supported on all messages.
 
   var offer: SignalServiceProtos_CallMessage.Offer {
-    get {return _storage._offer ?? SignalServiceProtos_CallMessage.Offer()}
-    set {_uniqueStorage()._offer = newValue}
+    get {return _offer ?? SignalServiceProtos_CallMessage.Offer()}
+    set {_offer = newValue}
   }
   /// Returns true if `offer` has been explicitly set.
-  var hasOffer: Bool {return _storage._offer != nil}
+  var hasOffer: Bool {return self._offer != nil}
   /// Clears the value of `offer`. Subsequent reads from it will return its default value.
-  mutating func clearOffer() {_uniqueStorage()._offer = nil}
+  mutating func clearOffer() {self._offer = nil}
 
   var answer: SignalServiceProtos_CallMessage.Answer {
-    get {return _storage._answer ?? SignalServiceProtos_CallMessage.Answer()}
-    set {_uniqueStorage()._answer = newValue}
+    get {return _answer ?? SignalServiceProtos_CallMessage.Answer()}
+    set {_answer = newValue}
   }
   /// Returns true if `answer` has been explicitly set.
-  var hasAnswer: Bool {return _storage._answer != nil}
+  var hasAnswer: Bool {return self._answer != nil}
   /// Clears the value of `answer`. Subsequent reads from it will return its default value.
-  mutating func clearAnswer() {_uniqueStorage()._answer = nil}
+  mutating func clearAnswer() {self._answer = nil}
 
-  var iceUpdate: [SignalServiceProtos_CallMessage.IceUpdate] {
-    get {return _storage._iceUpdate}
-    set {_uniqueStorage()._iceUpdate = newValue}
-  }
+  var iceUpdate: [SignalServiceProtos_CallMessage.IceUpdate] = []
 
   var legacyHangup: SignalServiceProtos_CallMessage.Hangup {
-    get {return _storage._legacyHangup ?? SignalServiceProtos_CallMessage.Hangup()}
-    set {_uniqueStorage()._legacyHangup = newValue}
+    get {return _legacyHangup ?? SignalServiceProtos_CallMessage.Hangup()}
+    set {_legacyHangup = newValue}
   }
   /// Returns true if `legacyHangup` has been explicitly set.
-  var hasLegacyHangup: Bool {return _storage._legacyHangup != nil}
+  var hasLegacyHangup: Bool {return self._legacyHangup != nil}
   /// Clears the value of `legacyHangup`. Subsequent reads from it will return its default value.
-  mutating func clearLegacyHangup() {_uniqueStorage()._legacyHangup = nil}
+  mutating func clearLegacyHangup() {self._legacyHangup = nil}
 
   var busy: SignalServiceProtos_CallMessage.Busy {
-    get {return _storage._busy ?? SignalServiceProtos_CallMessage.Busy()}
-    set {_uniqueStorage()._busy = newValue}
+    get {return _busy ?? SignalServiceProtos_CallMessage.Busy()}
+    set {_busy = newValue}
   }
   /// Returns true if `busy` has been explicitly set.
-  var hasBusy: Bool {return _storage._busy != nil}
+  var hasBusy: Bool {return self._busy != nil}
   /// Clears the value of `busy`. Subsequent reads from it will return its default value.
-  mutating func clearBusy() {_uniqueStorage()._busy = nil}
+  mutating func clearBusy() {self._busy = nil}
 
   /// Signal-iOS sends profile key with call messages
   /// for earlier discovery.
   var profileKey: Data {
-    get {return _storage._profileKey ?? Data()}
-    set {_uniqueStorage()._profileKey = newValue}
+    get {return _profileKey ?? SwiftProtobuf.Internal.emptyData}
+    set {_profileKey = newValue}
   }
   /// Returns true if `profileKey` has been explicitly set.
-  var hasProfileKey: Bool {return _storage._profileKey != nil}
+  var hasProfileKey: Bool {return self._profileKey != nil}
   /// Clears the value of `profileKey`. Subsequent reads from it will return its default value.
-  mutating func clearProfileKey() {_uniqueStorage()._profileKey = nil}
+  mutating func clearProfileKey() {self._profileKey = nil}
 
   var hangup: SignalServiceProtos_CallMessage.Hangup {
-    get {return _storage._hangup ?? SignalServiceProtos_CallMessage.Hangup()}
-    set {_uniqueStorage()._hangup = newValue}
+    get {return _hangup ?? SignalServiceProtos_CallMessage.Hangup()}
+    set {_hangup = newValue}
   }
   /// Returns true if `hangup` has been explicitly set.
-  var hasHangup: Bool {return _storage._hangup != nil}
+  var hasHangup: Bool {return self._hangup != nil}
   /// Clears the value of `hangup`. Subsequent reads from it will return its default value.
-  mutating func clearHangup() {_uniqueStorage()._hangup = nil}
+  mutating func clearHangup() {self._hangup = nil}
 
   var supportsMultiRing: Bool {
-    get {return _storage._supportsMultiRing ?? false}
-    set {_uniqueStorage()._supportsMultiRing = newValue}
+    get {return _supportsMultiRing ?? false}
+    set {_supportsMultiRing = newValue}
   }
   /// Returns true if `supportsMultiRing` has been explicitly set.
-  var hasSupportsMultiRing: Bool {return _storage._supportsMultiRing != nil}
+  var hasSupportsMultiRing: Bool {return self._supportsMultiRing != nil}
   /// Clears the value of `supportsMultiRing`. Subsequent reads from it will return its default value.
-  mutating func clearSupportsMultiRing() {_uniqueStorage()._supportsMultiRing = nil}
+  mutating func clearSupportsMultiRing() {self._supportsMultiRing = nil}
 
   var destinationDeviceID: UInt32 {
-    get {return _storage._destinationDeviceID ?? 0}
-    set {_uniqueStorage()._destinationDeviceID = newValue}
+    get {return _destinationDeviceID ?? 0}
+    set {_destinationDeviceID = newValue}
   }
   /// Returns true if `destinationDeviceID` has been explicitly set.
-  var hasDestinationDeviceID: Bool {return _storage._destinationDeviceID != nil}
+  var hasDestinationDeviceID: Bool {return self._destinationDeviceID != nil}
   /// Clears the value of `destinationDeviceID`. Subsequent reads from it will return its default value.
-  mutating func clearDestinationDeviceID() {_uniqueStorage()._destinationDeviceID = nil}
-
-  var opaque: SignalServiceProtos_CallMessage.Opaque {
-    get {return _storage._opaque ?? SignalServiceProtos_CallMessage.Opaque()}
-    set {_uniqueStorage()._opaque = newValue}
-  }
-  /// Returns true if `opaque` has been explicitly set.
-  var hasOpaque: Bool {return _storage._opaque != nil}
-  /// Clears the value of `opaque`. Subsequent reads from it will return its default value.
-  mutating func clearOpaque() {_uniqueStorage()._opaque = nil}
+  mutating func clearDestinationDeviceID() {self._destinationDeviceID = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -471,7 +430,7 @@ struct SignalServiceProtos_CallMessage {
     /// Clears the value of `id`. Subsequent reads from it will return its default value.
     mutating func clearID() {self._id = nil}
 
-    /// Legacy/deprecated; replaced by 'opaque'
+    /// @required
     var sdp: String {
       get {return _sdp ?? String()}
       set {_sdp = newValue}
@@ -489,15 +448,6 @@ struct SignalServiceProtos_CallMessage {
     var hasType: Bool {return self._type != nil}
     /// Clears the value of `type`. Subsequent reads from it will return its default value.
     mutating func clearType() {self._type = nil}
-
-    var opaque: Data {
-      get {return _opaque ?? Data()}
-      set {_opaque = newValue}
-    }
-    /// Returns true if `opaque` has been explicitly set.
-    var hasOpaque: Bool {return self._opaque != nil}
-    /// Clears the value of `opaque`. Subsequent reads from it will return its default value.
-    mutating func clearOpaque() {self._opaque = nil}
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -534,7 +484,6 @@ struct SignalServiceProtos_CallMessage {
     fileprivate var _id: UInt64?
     fileprivate var _sdp: String?
     fileprivate var _type: SignalServiceProtos_CallMessage.Offer.TypeEnum?
-    fileprivate var _opaque: Data?
   }
 
   struct Answer {
@@ -552,7 +501,7 @@ struct SignalServiceProtos_CallMessage {
     /// Clears the value of `id`. Subsequent reads from it will return its default value.
     mutating func clearID() {self._id = nil}
 
-    /// Legacy/deprecated; replaced by 'opaque'
+    /// @required
     var sdp: String {
       get {return _sdp ?? String()}
       set {_sdp = newValue}
@@ -562,22 +511,12 @@ struct SignalServiceProtos_CallMessage {
     /// Clears the value of `sdp`. Subsequent reads from it will return its default value.
     mutating func clearSdp() {self._sdp = nil}
 
-    var opaque: Data {
-      get {return _opaque ?? Data()}
-      set {_opaque = newValue}
-    }
-    /// Returns true if `opaque` has been explicitly set.
-    var hasOpaque: Bool {return self._opaque != nil}
-    /// Clears the value of `opaque`. Subsequent reads from it will return its default value.
-    mutating func clearOpaque() {self._opaque = nil}
-
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
 
     fileprivate var _id: UInt64?
     fileprivate var _sdp: String?
-    fileprivate var _opaque: Data?
   }
 
   struct IceUpdate {
@@ -595,27 +534,27 @@ struct SignalServiceProtos_CallMessage {
     /// Clears the value of `id`. Subsequent reads from it will return its default value.
     mutating func clearID() {self._id = nil}
 
-    /// Legacy/deprecated; remove when old clients are gone.
-    var mid: String {
-      get {return _mid ?? String()}
-      set {_mid = newValue}
+    /// @required
+    var sdpMid: String {
+      get {return _sdpMid ?? String()}
+      set {_sdpMid = newValue}
     }
-    /// Returns true if `mid` has been explicitly set.
-    var hasMid: Bool {return self._mid != nil}
-    /// Clears the value of `mid`. Subsequent reads from it will return its default value.
-    mutating func clearMid() {self._mid = nil}
+    /// Returns true if `sdpMid` has been explicitly set.
+    var hasSdpMid: Bool {return self._sdpMid != nil}
+    /// Clears the value of `sdpMid`. Subsequent reads from it will return its default value.
+    mutating func clearSdpMid() {self._sdpMid = nil}
 
-    /// Legacy/deprecated; remove when old clients are gone.
-    var line: UInt32 {
-      get {return _line ?? 0}
-      set {_line = newValue}
+    /// @required
+    var sdpMlineIndex: UInt32 {
+      get {return _sdpMlineIndex ?? 0}
+      set {_sdpMlineIndex = newValue}
     }
-    /// Returns true if `line` has been explicitly set.
-    var hasLine: Bool {return self._line != nil}
-    /// Clears the value of `line`. Subsequent reads from it will return its default value.
-    mutating func clearLine() {self._line = nil}
+    /// Returns true if `sdpMlineIndex` has been explicitly set.
+    var hasSdpMlineIndex: Bool {return self._sdpMlineIndex != nil}
+    /// Clears the value of `sdpMlineIndex`. Subsequent reads from it will return its default value.
+    mutating func clearSdpMlineIndex() {self._sdpMlineIndex = nil}
 
-    /// Legacy/deprecated; replaced by 'opaque'
+    /// @required
     var sdp: String {
       get {return _sdp ?? String()}
       set {_sdp = newValue}
@@ -625,24 +564,14 @@ struct SignalServiceProtos_CallMessage {
     /// Clears the value of `sdp`. Subsequent reads from it will return its default value.
     mutating func clearSdp() {self._sdp = nil}
 
-    var opaque: Data {
-      get {return _opaque ?? Data()}
-      set {_opaque = newValue}
-    }
-    /// Returns true if `opaque` has been explicitly set.
-    var hasOpaque: Bool {return self._opaque != nil}
-    /// Clears the value of `opaque`. Subsequent reads from it will return its default value.
-    mutating func clearOpaque() {self._opaque = nil}
-
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
 
     fileprivate var _id: UInt64?
-    fileprivate var _mid: String?
-    fileprivate var _line: UInt32?
+    fileprivate var _sdpMid: String?
+    fileprivate var _sdpMlineIndex: UInt32?
     fileprivate var _sdp: String?
-    fileprivate var _opaque: Data?
   }
 
   struct Busy {
@@ -744,66 +673,16 @@ struct SignalServiceProtos_CallMessage {
     fileprivate var _deviceID: UInt32?
   }
 
-  struct Opaque {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var data: Data {
-      get {return _data ?? Data()}
-      set {_data = newValue}
-    }
-    /// Returns true if `data` has been explicitly set.
-    var hasData: Bool {return self._data != nil}
-    /// Clears the value of `data`. Subsequent reads from it will return its default value.
-    mutating func clearData() {self._data = nil}
-
-    var urgency: SignalServiceProtos_CallMessage.Opaque.Urgency {
-      get {return _urgency ?? .droppable}
-      set {_urgency = newValue}
-    }
-    /// Returns true if `urgency` has been explicitly set.
-    var hasUrgency: Bool {return self._urgency != nil}
-    /// Clears the value of `urgency`. Subsequent reads from it will return its default value.
-    mutating func clearUrgency() {self._urgency = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    enum Urgency: SwiftProtobuf.Enum {
-      typealias RawValue = Int
-      case droppable // = 0
-      case handleImmediately // = 1
-
-      init() {
-        self = .droppable
-      }
-
-      init?(rawValue: Int) {
-        switch rawValue {
-        case 0: self = .droppable
-        case 1: self = .handleImmediately
-        default: return nil
-        }
-      }
-
-      var rawValue: Int {
-        switch self {
-        case .droppable: return 0
-        case .handleImmediately: return 1
-        }
-      }
-
-    }
-
-    init() {}
-
-    fileprivate var _data: Data?
-    fileprivate var _urgency: SignalServiceProtos_CallMessage.Opaque.Urgency?
-  }
-
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _offer: SignalServiceProtos_CallMessage.Offer?
+  fileprivate var _answer: SignalServiceProtos_CallMessage.Answer?
+  fileprivate var _legacyHangup: SignalServiceProtos_CallMessage.Hangup?
+  fileprivate var _busy: SignalServiceProtos_CallMessage.Busy?
+  fileprivate var _profileKey: Data?
+  fileprivate var _hangup: SignalServiceProtos_CallMessage.Hangup?
+  fileprivate var _supportsMultiRing: Bool?
+  fileprivate var _destinationDeviceID: UInt32?
 }
 
 #if swift(>=4.2)
@@ -816,10 +695,6 @@ extension SignalServiceProtos_CallMessage.Hangup.TypeEnum: CaseIterable {
   // Support synthesized by the compiler.
 }
 
-extension SignalServiceProtos_CallMessage.Opaque.Urgency: CaseIterable {
-  // Support synthesized by the compiler.
-}
-
 #endif  // swift(>=4.2)
 
 struct SignalServiceProtos_DataMessage {
@@ -828,159 +703,127 @@ struct SignalServiceProtos_DataMessage {
   // methods supported on all messages.
 
   var body: String {
-    get {return _storage._body ?? String()}
-    set {_uniqueStorage()._body = newValue}
+    get {return _body ?? String()}
+    set {_body = newValue}
   }
   /// Returns true if `body` has been explicitly set.
-  var hasBody: Bool {return _storage._body != nil}
+  var hasBody: Bool {return self._body != nil}
   /// Clears the value of `body`. Subsequent reads from it will return its default value.
-  mutating func clearBody() {_uniqueStorage()._body = nil}
+  mutating func clearBody() {self._body = nil}
 
-  var attachments: [SignalServiceProtos_AttachmentPointer] {
-    get {return _storage._attachments}
-    set {_uniqueStorage()._attachments = newValue}
-  }
+  var attachments: [SignalServiceProtos_AttachmentPointer] = []
 
   var group: SignalServiceProtos_GroupContext {
-    get {return _storage._group ?? SignalServiceProtos_GroupContext()}
-    set {_uniqueStorage()._group = newValue}
+    get {return _group ?? SignalServiceProtos_GroupContext()}
+    set {_group = newValue}
   }
   /// Returns true if `group` has been explicitly set.
-  var hasGroup: Bool {return _storage._group != nil}
+  var hasGroup: Bool {return self._group != nil}
   /// Clears the value of `group`. Subsequent reads from it will return its default value.
-  mutating func clearGroup() {_uniqueStorage()._group = nil}
+  mutating func clearGroup() {self._group = nil}
 
   var groupV2: SignalServiceProtos_GroupContextV2 {
-    get {return _storage._groupV2 ?? SignalServiceProtos_GroupContextV2()}
-    set {_uniqueStorage()._groupV2 = newValue}
+    get {return _groupV2 ?? SignalServiceProtos_GroupContextV2()}
+    set {_groupV2 = newValue}
   }
   /// Returns true if `groupV2` has been explicitly set.
-  var hasGroupV2: Bool {return _storage._groupV2 != nil}
+  var hasGroupV2: Bool {return self._groupV2 != nil}
   /// Clears the value of `groupV2`. Subsequent reads from it will return its default value.
-  mutating func clearGroupV2() {_uniqueStorage()._groupV2 = nil}
+  mutating func clearGroupV2() {self._groupV2 = nil}
 
   var flags: UInt32 {
-    get {return _storage._flags ?? 0}
-    set {_uniqueStorage()._flags = newValue}
+    get {return _flags ?? 0}
+    set {_flags = newValue}
   }
   /// Returns true if `flags` has been explicitly set.
-  var hasFlags: Bool {return _storage._flags != nil}
+  var hasFlags: Bool {return self._flags != nil}
   /// Clears the value of `flags`. Subsequent reads from it will return its default value.
-  mutating func clearFlags() {_uniqueStorage()._flags = nil}
+  mutating func clearFlags() {self._flags = nil}
 
   var expireTimer: UInt32 {
-    get {return _storage._expireTimer ?? 0}
-    set {_uniqueStorage()._expireTimer = newValue}
+    get {return _expireTimer ?? 0}
+    set {_expireTimer = newValue}
   }
   /// Returns true if `expireTimer` has been explicitly set.
-  var hasExpireTimer: Bool {return _storage._expireTimer != nil}
+  var hasExpireTimer: Bool {return self._expireTimer != nil}
   /// Clears the value of `expireTimer`. Subsequent reads from it will return its default value.
-  mutating func clearExpireTimer() {_uniqueStorage()._expireTimer = nil}
+  mutating func clearExpireTimer() {self._expireTimer = nil}
 
   var profileKey: Data {
-    get {return _storage._profileKey ?? Data()}
-    set {_uniqueStorage()._profileKey = newValue}
+    get {return _profileKey ?? SwiftProtobuf.Internal.emptyData}
+    set {_profileKey = newValue}
   }
   /// Returns true if `profileKey` has been explicitly set.
-  var hasProfileKey: Bool {return _storage._profileKey != nil}
+  var hasProfileKey: Bool {return self._profileKey != nil}
   /// Clears the value of `profileKey`. Subsequent reads from it will return its default value.
-  mutating func clearProfileKey() {_uniqueStorage()._profileKey = nil}
+  mutating func clearProfileKey() {self._profileKey = nil}
 
   var timestamp: UInt64 {
-    get {return _storage._timestamp ?? 0}
-    set {_uniqueStorage()._timestamp = newValue}
+    get {return _timestamp ?? 0}
+    set {_timestamp = newValue}
   }
   /// Returns true if `timestamp` has been explicitly set.
-  var hasTimestamp: Bool {return _storage._timestamp != nil}
+  var hasTimestamp: Bool {return self._timestamp != nil}
   /// Clears the value of `timestamp`. Subsequent reads from it will return its default value.
-  mutating func clearTimestamp() {_uniqueStorage()._timestamp = nil}
+  mutating func clearTimestamp() {self._timestamp = nil}
 
   var quote: SignalServiceProtos_DataMessage.Quote {
-    get {return _storage._quote ?? SignalServiceProtos_DataMessage.Quote()}
-    set {_uniqueStorage()._quote = newValue}
+    get {return _quote ?? SignalServiceProtos_DataMessage.Quote()}
+    set {_quote = newValue}
   }
   /// Returns true if `quote` has been explicitly set.
-  var hasQuote: Bool {return _storage._quote != nil}
+  var hasQuote: Bool {return self._quote != nil}
   /// Clears the value of `quote`. Subsequent reads from it will return its default value.
-  mutating func clearQuote() {_uniqueStorage()._quote = nil}
+  mutating func clearQuote() {self._quote = nil}
 
-  var contact: [SignalServiceProtos_DataMessage.Contact] {
-    get {return _storage._contact}
-    set {_uniqueStorage()._contact = newValue}
-  }
+  var contact: [SignalServiceProtos_DataMessage.Contact] = []
 
-  var preview: [SignalServiceProtos_DataMessage.Preview] {
-    get {return _storage._preview}
-    set {_uniqueStorage()._preview = newValue}
-  }
+  var preview: [SignalServiceProtos_DataMessage.Preview] = []
 
   var sticker: SignalServiceProtos_DataMessage.Sticker {
-    get {return _storage._sticker ?? SignalServiceProtos_DataMessage.Sticker()}
-    set {_uniqueStorage()._sticker = newValue}
+    get {return _sticker ?? SignalServiceProtos_DataMessage.Sticker()}
+    set {_sticker = newValue}
   }
   /// Returns true if `sticker` has been explicitly set.
-  var hasSticker: Bool {return _storage._sticker != nil}
+  var hasSticker: Bool {return self._sticker != nil}
   /// Clears the value of `sticker`. Subsequent reads from it will return its default value.
-  mutating func clearSticker() {_uniqueStorage()._sticker = nil}
+  mutating func clearSticker() {self._sticker = nil}
 
   var requiredProtocolVersion: UInt32 {
-    get {return _storage._requiredProtocolVersion ?? 0}
-    set {_uniqueStorage()._requiredProtocolVersion = newValue}
+    get {return _requiredProtocolVersion ?? 0}
+    set {_requiredProtocolVersion = newValue}
   }
   /// Returns true if `requiredProtocolVersion` has been explicitly set.
-  var hasRequiredProtocolVersion: Bool {return _storage._requiredProtocolVersion != nil}
+  var hasRequiredProtocolVersion: Bool {return self._requiredProtocolVersion != nil}
   /// Clears the value of `requiredProtocolVersion`. Subsequent reads from it will return its default value.
-  mutating func clearRequiredProtocolVersion() {_uniqueStorage()._requiredProtocolVersion = nil}
+  mutating func clearRequiredProtocolVersion() {self._requiredProtocolVersion = nil}
 
   var isViewOnce: Bool {
-    get {return _storage._isViewOnce ?? false}
-    set {_uniqueStorage()._isViewOnce = newValue}
+    get {return _isViewOnce ?? false}
+    set {_isViewOnce = newValue}
   }
   /// Returns true if `isViewOnce` has been explicitly set.
-  var hasIsViewOnce: Bool {return _storage._isViewOnce != nil}
+  var hasIsViewOnce: Bool {return self._isViewOnce != nil}
   /// Clears the value of `isViewOnce`. Subsequent reads from it will return its default value.
-  mutating func clearIsViewOnce() {_uniqueStorage()._isViewOnce = nil}
+  mutating func clearIsViewOnce() {self._isViewOnce = nil}
 
   var reaction: SignalServiceProtos_DataMessage.Reaction {
-    get {return _storage._reaction ?? SignalServiceProtos_DataMessage.Reaction()}
-    set {_uniqueStorage()._reaction = newValue}
+    get {return _reaction ?? SignalServiceProtos_DataMessage.Reaction()}
+    set {_reaction = newValue}
   }
   /// Returns true if `reaction` has been explicitly set.
-  var hasReaction: Bool {return _storage._reaction != nil}
+  var hasReaction: Bool {return self._reaction != nil}
   /// Clears the value of `reaction`. Subsequent reads from it will return its default value.
-  mutating func clearReaction() {_uniqueStorage()._reaction = nil}
+  mutating func clearReaction() {self._reaction = nil}
 
   var delete: SignalServiceProtos_DataMessage.Delete {
-    get {return _storage._delete ?? SignalServiceProtos_DataMessage.Delete()}
-    set {_uniqueStorage()._delete = newValue}
+    get {return _delete ?? SignalServiceProtos_DataMessage.Delete()}
+    set {_delete = newValue}
   }
   /// Returns true if `delete` has been explicitly set.
-  var hasDelete: Bool {return _storage._delete != nil}
+  var hasDelete: Bool {return self._delete != nil}
   /// Clears the value of `delete`. Subsequent reads from it will return its default value.
-  mutating func clearDelete() {_uniqueStorage()._delete = nil}
-
-  var bodyRanges: [SignalServiceProtos_DataMessage.BodyRange] {
-    get {return _storage._bodyRanges}
-    set {_uniqueStorage()._bodyRanges = newValue}
-  }
-
-  var groupCallUpdate: SignalServiceProtos_DataMessage.GroupCallUpdate {
-    get {return _storage._groupCallUpdate ?? SignalServiceProtos_DataMessage.GroupCallUpdate()}
-    set {_uniqueStorage()._groupCallUpdate = newValue}
-  }
-  /// Returns true if `groupCallUpdate` has been explicitly set.
-  var hasGroupCallUpdate: Bool {return _storage._groupCallUpdate != nil}
-  /// Clears the value of `groupCallUpdate`. Subsequent reads from it will return its default value.
-  mutating func clearGroupCallUpdate() {_uniqueStorage()._groupCallUpdate = nil}
-
-  var payment: SignalServiceProtos_DataMessage.Payment {
-    get {return _storage._payment ?? SignalServiceProtos_DataMessage.Payment()}
-    set {_uniqueStorage()._payment = newValue}
-  }
-  /// Returns true if `payment` has been explicitly set.
-  var hasPayment: Bool {return _storage._payment != nil}
-  /// Clears the value of `payment`. Subsequent reads from it will return its default value.
-  mutating func clearPayment() {_uniqueStorage()._payment = nil}
+  mutating func clearDelete() {self._delete = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1021,9 +864,7 @@ struct SignalServiceProtos_DataMessage {
     case viewOnceVideo // = 3
     case reactions // = 4
     case cdnSelectorAttachments // = 5
-    case mentions // = 6
-    case payments // = 7
-    static let current = payments
+    static let current = cdnSelectorAttachments
 
     init() {
       self = .initial
@@ -1037,8 +878,6 @@ struct SignalServiceProtos_DataMessage {
       case 3: self = .viewOnceVideo
       case 4: self = .reactions
       case 5: self = .cdnSelectorAttachments
-      case 6: self = .mentions
-      case 7: self = .payments
       default: return nil
       }
     }
@@ -1051,8 +890,6 @@ struct SignalServiceProtos_DataMessage {
       case .viewOnceVideo: return 3
       case .reactions: return 4
       case .cdnSelectorAttachments: return 5
-      case .mentions: return 6
-      case .payments: return 7
       }
     }
 
@@ -1102,8 +939,6 @@ struct SignalServiceProtos_DataMessage {
 
     var attachments: [SignalServiceProtos_DataMessage.Quote.QuotedAttachment] = []
 
-    var bodyRanges: [SignalServiceProtos_DataMessage.BodyRange] = []
-
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     struct QuotedAttachment {
@@ -1112,40 +947,40 @@ struct SignalServiceProtos_DataMessage {
       // methods supported on all messages.
 
       var contentType: String {
-        get {return _storage._contentType ?? String()}
-        set {_uniqueStorage()._contentType = newValue}
+        get {return _contentType ?? String()}
+        set {_contentType = newValue}
       }
       /// Returns true if `contentType` has been explicitly set.
-      var hasContentType: Bool {return _storage._contentType != nil}
+      var hasContentType: Bool {return self._contentType != nil}
       /// Clears the value of `contentType`. Subsequent reads from it will return its default value.
-      mutating func clearContentType() {_uniqueStorage()._contentType = nil}
+      mutating func clearContentType() {self._contentType = nil}
 
       var fileName: String {
-        get {return _storage._fileName ?? String()}
-        set {_uniqueStorage()._fileName = newValue}
+        get {return _fileName ?? String()}
+        set {_fileName = newValue}
       }
       /// Returns true if `fileName` has been explicitly set.
-      var hasFileName: Bool {return _storage._fileName != nil}
+      var hasFileName: Bool {return self._fileName != nil}
       /// Clears the value of `fileName`. Subsequent reads from it will return its default value.
-      mutating func clearFileName() {_uniqueStorage()._fileName = nil}
+      mutating func clearFileName() {self._fileName = nil}
 
       var thumbnail: SignalServiceProtos_AttachmentPointer {
-        get {return _storage._thumbnail ?? SignalServiceProtos_AttachmentPointer()}
-        set {_uniqueStorage()._thumbnail = newValue}
+        get {return _thumbnail ?? SignalServiceProtos_AttachmentPointer()}
+        set {_thumbnail = newValue}
       }
       /// Returns true if `thumbnail` has been explicitly set.
-      var hasThumbnail: Bool {return _storage._thumbnail != nil}
+      var hasThumbnail: Bool {return self._thumbnail != nil}
       /// Clears the value of `thumbnail`. Subsequent reads from it will return its default value.
-      mutating func clearThumbnail() {_uniqueStorage()._thumbnail = nil}
+      mutating func clearThumbnail() {self._thumbnail = nil}
 
       var flags: UInt32 {
-        get {return _storage._flags ?? 0}
-        set {_uniqueStorage()._flags = newValue}
+        get {return _flags ?? 0}
+        set {_flags = newValue}
       }
       /// Returns true if `flags` has been explicitly set.
-      var hasFlags: Bool {return _storage._flags != nil}
+      var hasFlags: Bool {return self._flags != nil}
       /// Clears the value of `flags`. Subsequent reads from it will return its default value.
-      mutating func clearFlags() {_uniqueStorage()._flags = nil}
+      mutating func clearFlags() {self._flags = nil}
 
       var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1174,7 +1009,10 @@ struct SignalServiceProtos_DataMessage {
 
       init() {}
 
-      fileprivate var _storage = _StorageClass.defaultInstance
+      fileprivate var _contentType: String?
+      fileprivate var _fileName: String?
+      fileprivate var _thumbnail: SignalServiceProtos_AttachmentPointer?
+      fileprivate var _flags: UInt32?
     }
 
     init() {}
@@ -1191,46 +1029,37 @@ struct SignalServiceProtos_DataMessage {
     // methods supported on all messages.
 
     var name: SignalServiceProtos_DataMessage.Contact.Name {
-      get {return _storage._name ?? SignalServiceProtos_DataMessage.Contact.Name()}
-      set {_uniqueStorage()._name = newValue}
+      get {return _name ?? SignalServiceProtos_DataMessage.Contact.Name()}
+      set {_name = newValue}
     }
     /// Returns true if `name` has been explicitly set.
-    var hasName: Bool {return _storage._name != nil}
+    var hasName: Bool {return self._name != nil}
     /// Clears the value of `name`. Subsequent reads from it will return its default value.
-    mutating func clearName() {_uniqueStorage()._name = nil}
+    mutating func clearName() {self._name = nil}
 
-    var number: [SignalServiceProtos_DataMessage.Contact.Phone] {
-      get {return _storage._number}
-      set {_uniqueStorage()._number = newValue}
-    }
+    var number: [SignalServiceProtos_DataMessage.Contact.Phone] = []
 
-    var email: [SignalServiceProtos_DataMessage.Contact.Email] {
-      get {return _storage._email}
-      set {_uniqueStorage()._email = newValue}
-    }
+    var email: [SignalServiceProtos_DataMessage.Contact.Email] = []
 
-    var address: [SignalServiceProtos_DataMessage.Contact.PostalAddress] {
-      get {return _storage._address}
-      set {_uniqueStorage()._address = newValue}
-    }
+    var address: [SignalServiceProtos_DataMessage.Contact.PostalAddress] = []
 
     var avatar: SignalServiceProtos_DataMessage.Contact.Avatar {
-      get {return _storage._avatar ?? SignalServiceProtos_DataMessage.Contact.Avatar()}
-      set {_uniqueStorage()._avatar = newValue}
+      get {return _avatar ?? SignalServiceProtos_DataMessage.Contact.Avatar()}
+      set {_avatar = newValue}
     }
     /// Returns true if `avatar` has been explicitly set.
-    var hasAvatar: Bool {return _storage._avatar != nil}
+    var hasAvatar: Bool {return self._avatar != nil}
     /// Clears the value of `avatar`. Subsequent reads from it will return its default value.
-    mutating func clearAvatar() {_uniqueStorage()._avatar = nil}
+    mutating func clearAvatar() {self._avatar = nil}
 
     var organization: String {
-      get {return _storage._organization ?? String()}
-      set {_uniqueStorage()._organization = newValue}
+      get {return _organization ?? String()}
+      set {_organization = newValue}
     }
     /// Returns true if `organization` has been explicitly set.
-    var hasOrganization: Bool {return _storage._organization != nil}
+    var hasOrganization: Bool {return self._organization != nil}
     /// Clears the value of `organization`. Subsequent reads from it will return its default value.
-    mutating func clearOrganization() {_uniqueStorage()._organization = nil}
+    mutating func clearOrganization() {self._organization = nil}
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1614,7 +1443,9 @@ struct SignalServiceProtos_DataMessage {
 
     init() {}
 
-    fileprivate var _storage = _StorageClass.defaultInstance
+    fileprivate var _name: SignalServiceProtos_DataMessage.Contact.Name?
+    fileprivate var _avatar: SignalServiceProtos_DataMessage.Contact.Avatar?
+    fileprivate var _organization: String?
   }
 
   struct Preview {
@@ -1624,55 +1455,39 @@ struct SignalServiceProtos_DataMessage {
 
     /// @required
     var url: String {
-      get {return _storage._url ?? String()}
-      set {_uniqueStorage()._url = newValue}
+      get {return _url ?? String()}
+      set {_url = newValue}
     }
     /// Returns true if `url` has been explicitly set.
-    var hasURL: Bool {return _storage._url != nil}
+    var hasURL: Bool {return self._url != nil}
     /// Clears the value of `url`. Subsequent reads from it will return its default value.
-    mutating func clearURL() {_uniqueStorage()._url = nil}
+    mutating func clearURL() {self._url = nil}
 
     var title: String {
-      get {return _storage._title ?? String()}
-      set {_uniqueStorage()._title = newValue}
+      get {return _title ?? String()}
+      set {_title = newValue}
     }
     /// Returns true if `title` has been explicitly set.
-    var hasTitle: Bool {return _storage._title != nil}
+    var hasTitle: Bool {return self._title != nil}
     /// Clears the value of `title`. Subsequent reads from it will return its default value.
-    mutating func clearTitle() {_uniqueStorage()._title = nil}
+    mutating func clearTitle() {self._title = nil}
 
     var image: SignalServiceProtos_AttachmentPointer {
-      get {return _storage._image ?? SignalServiceProtos_AttachmentPointer()}
-      set {_uniqueStorage()._image = newValue}
+      get {return _image ?? SignalServiceProtos_AttachmentPointer()}
+      set {_image = newValue}
     }
     /// Returns true if `image` has been explicitly set.
-    var hasImage: Bool {return _storage._image != nil}
+    var hasImage: Bool {return self._image != nil}
     /// Clears the value of `image`. Subsequent reads from it will return its default value.
-    mutating func clearImage() {_uniqueStorage()._image = nil}
-
-    var previewDescription: String {
-      get {return _storage._previewDescription ?? String()}
-      set {_uniqueStorage()._previewDescription = newValue}
-    }
-    /// Returns true if `previewDescription` has been explicitly set.
-    var hasPreviewDescription: Bool {return _storage._previewDescription != nil}
-    /// Clears the value of `previewDescription`. Subsequent reads from it will return its default value.
-    mutating func clearPreviewDescription() {_uniqueStorage()._previewDescription = nil}
-
-    var date: UInt64 {
-      get {return _storage._date ?? 0}
-      set {_uniqueStorage()._date = newValue}
-    }
-    /// Returns true if `date` has been explicitly set.
-    var hasDate: Bool {return _storage._date != nil}
-    /// Clears the value of `date`. Subsequent reads from it will return its default value.
-    mutating func clearDate() {_uniqueStorage()._date = nil}
+    mutating func clearImage() {self._image = nil}
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
 
-    fileprivate var _storage = _StorageClass.defaultInstance
+    fileprivate var _url: String?
+    fileprivate var _title: String?
+    fileprivate var _image: SignalServiceProtos_AttachmentPointer?
   }
 
   struct Sticker {
@@ -1682,58 +1497,52 @@ struct SignalServiceProtos_DataMessage {
 
     /// @required
     var packID: Data {
-      get {return _storage._packID ?? Data()}
-      set {_uniqueStorage()._packID = newValue}
+      get {return _packID ?? SwiftProtobuf.Internal.emptyData}
+      set {_packID = newValue}
     }
     /// Returns true if `packID` has been explicitly set.
-    var hasPackID: Bool {return _storage._packID != nil}
+    var hasPackID: Bool {return self._packID != nil}
     /// Clears the value of `packID`. Subsequent reads from it will return its default value.
-    mutating func clearPackID() {_uniqueStorage()._packID = nil}
+    mutating func clearPackID() {self._packID = nil}
 
     /// @required
     var packKey: Data {
-      get {return _storage._packKey ?? Data()}
-      set {_uniqueStorage()._packKey = newValue}
+      get {return _packKey ?? SwiftProtobuf.Internal.emptyData}
+      set {_packKey = newValue}
     }
     /// Returns true if `packKey` has been explicitly set.
-    var hasPackKey: Bool {return _storage._packKey != nil}
+    var hasPackKey: Bool {return self._packKey != nil}
     /// Clears the value of `packKey`. Subsequent reads from it will return its default value.
-    mutating func clearPackKey() {_uniqueStorage()._packKey = nil}
+    mutating func clearPackKey() {self._packKey = nil}
 
     /// @required
     var stickerID: UInt32 {
-      get {return _storage._stickerID ?? 0}
-      set {_uniqueStorage()._stickerID = newValue}
+      get {return _stickerID ?? 0}
+      set {_stickerID = newValue}
     }
     /// Returns true if `stickerID` has been explicitly set.
-    var hasStickerID: Bool {return _storage._stickerID != nil}
+    var hasStickerID: Bool {return self._stickerID != nil}
     /// Clears the value of `stickerID`. Subsequent reads from it will return its default value.
-    mutating func clearStickerID() {_uniqueStorage()._stickerID = nil}
+    mutating func clearStickerID() {self._stickerID = nil}
 
     /// @required
     var data: SignalServiceProtos_AttachmentPointer {
-      get {return _storage._data ?? SignalServiceProtos_AttachmentPointer()}
-      set {_uniqueStorage()._data = newValue}
+      get {return _data ?? SignalServiceProtos_AttachmentPointer()}
+      set {_data = newValue}
     }
     /// Returns true if `data` has been explicitly set.
-    var hasData: Bool {return _storage._data != nil}
+    var hasData: Bool {return self._data != nil}
     /// Clears the value of `data`. Subsequent reads from it will return its default value.
-    mutating func clearData() {_uniqueStorage()._data = nil}
-
-    var emoji: String {
-      get {return _storage._emoji ?? String()}
-      set {_uniqueStorage()._emoji = newValue}
-    }
-    /// Returns true if `emoji` has been explicitly set.
-    var hasEmoji: Bool {return _storage._emoji != nil}
-    /// Clears the value of `emoji`. Subsequent reads from it will return its default value.
-    mutating func clearEmoji() {_uniqueStorage()._emoji = nil}
+    mutating func clearData() {self._data = nil}
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
 
-    fileprivate var _storage = _StorageClass.defaultInstance
+    fileprivate var _packID: Data?
+    fileprivate var _packKey: Data?
+    fileprivate var _stickerID: UInt32?
+    fileprivate var _data: SignalServiceProtos_AttachmentPointer?
   }
 
   struct Reaction {
@@ -1751,6 +1560,7 @@ struct SignalServiceProtos_DataMessage {
     /// Clears the value of `emoji`. Subsequent reads from it will return its default value.
     mutating func clearEmoji() {self._emoji = nil}
 
+    /// @required
     var remove: Bool {
       get {return _remove ?? false}
       set {_remove = newValue}
@@ -1821,318 +1631,21 @@ struct SignalServiceProtos_DataMessage {
     fileprivate var _targetSentTimestamp: UInt64?
   }
 
-  struct BodyRange {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var start: UInt32 {
-      get {return _start ?? 0}
-      set {_start = newValue}
-    }
-    /// Returns true if `start` has been explicitly set.
-    var hasStart: Bool {return self._start != nil}
-    /// Clears the value of `start`. Subsequent reads from it will return its default value.
-    mutating func clearStart() {self._start = nil}
-
-    var length: UInt32 {
-      get {return _length ?? 0}
-      set {_length = newValue}
-    }
-    /// Returns true if `length` has been explicitly set.
-    var hasLength: Bool {return self._length != nil}
-    /// Clears the value of `length`. Subsequent reads from it will return its default value.
-    mutating func clearLength() {self._length = nil}
-
-    /// oneof commented out because swift generated
-    /// enum with associated values can't be converted
-    /// to objc representation
-    ///
-    /// oneof associatedValue {
-    var mentionUuid: String {
-      get {return _mentionUuid ?? String()}
-      set {_mentionUuid = newValue}
-    }
-    /// Returns true if `mentionUuid` has been explicitly set.
-    var hasMentionUuid: Bool {return self._mentionUuid != nil}
-    /// Clears the value of `mentionUuid`. Subsequent reads from it will return its default value.
-    mutating func clearMentionUuid() {self._mentionUuid = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _start: UInt32?
-    fileprivate var _length: UInt32?
-    fileprivate var _mentionUuid: String?
-  }
-
-  struct GroupCallUpdate {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var eraID: String {
-      get {return _eraID ?? String()}
-      set {_eraID = newValue}
-    }
-    /// Returns true if `eraID` has been explicitly set.
-    var hasEraID: Bool {return self._eraID != nil}
-    /// Clears the value of `eraID`. Subsequent reads from it will return its default value.
-    mutating func clearEraID() {self._eraID = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _eraID: String?
-  }
-
-  struct Payment {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    /// oneof commented out
-    /// oneof Item {
-    var notification: SignalServiceProtos_DataMessage.Payment.Notification {
-      get {return _notification ?? SignalServiceProtos_DataMessage.Payment.Notification()}
-      set {_notification = newValue}
-    }
-    /// Returns true if `notification` has been explicitly set.
-    var hasNotification: Bool {return self._notification != nil}
-    /// Clears the value of `notification`. Subsequent reads from it will return its default value.
-    mutating func clearNotification() {self._notification = nil}
-
-    var request: SignalServiceProtos_DataMessage.Payment.Request {
-      get {return _request ?? SignalServiceProtos_DataMessage.Payment.Request()}
-      set {_request = newValue}
-    }
-    /// Returns true if `request` has been explicitly set.
-    var hasRequest: Bool {return self._request != nil}
-    /// Clears the value of `request`. Subsequent reads from it will return its default value.
-    mutating func clearRequest() {self._request = nil}
-
-    /// }
-    var cancellation: SignalServiceProtos_DataMessage.Payment.Cancellation {
-      get {return _cancellation ?? SignalServiceProtos_DataMessage.Payment.Cancellation()}
-      set {_cancellation = newValue}
-    }
-    /// Returns true if `cancellation` has been explicitly set.
-    var hasCancellation: Bool {return self._cancellation != nil}
-    /// Clears the value of `cancellation`. Subsequent reads from it will return its default value.
-    mutating func clearCancellation() {self._cancellation = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    struct Amount {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      /// oneof commented out
-      /// oneof Amount {
-      var mobileCoin: SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin {
-        get {return _mobileCoin ?? SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin()}
-        set {_mobileCoin = newValue}
-      }
-      /// Returns true if `mobileCoin` has been explicitly set.
-      var hasMobileCoin: Bool {return self._mobileCoin != nil}
-      /// Clears the value of `mobileCoin`. Subsequent reads from it will return its default value.
-      mutating func clearMobileCoin() {self._mobileCoin = nil}
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      struct MobileCoin {
-        // SwiftProtobuf.Message conformance is added in an extension below. See the
-        // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-        // methods supported on all messages.
-
-        /// @required
-        var picoMob: UInt64 {
-          get {return _picoMob ?? 0}
-          set {_picoMob = newValue}
-        }
-        /// Returns true if `picoMob` has been explicitly set.
-        var hasPicoMob: Bool {return self._picoMob != nil}
-        /// Clears the value of `picoMob`. Subsequent reads from it will return its default value.
-        mutating func clearPicoMob() {self._picoMob = nil}
-
-        var unknownFields = SwiftProtobuf.UnknownStorage()
-
-        init() {}
-
-        fileprivate var _picoMob: UInt64?
-      }
-
-      init() {}
-
-      fileprivate var _mobileCoin: SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin?
-    }
-
-    struct RequestId {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      /// @required
-      var uuid: String {
-        get {return _uuid ?? String()}
-        set {_uuid = newValue}
-      }
-      /// Returns true if `uuid` has been explicitly set.
-      var hasUuid: Bool {return self._uuid != nil}
-      /// Clears the value of `uuid`. Subsequent reads from it will return its default value.
-      mutating func clearUuid() {self._uuid = nil}
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      init() {}
-
-      fileprivate var _uuid: String?
-    }
-
-    struct Request {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      /// @required
-      var requestID: SignalServiceProtos_DataMessage.Payment.RequestId {
-        get {return _requestID ?? SignalServiceProtos_DataMessage.Payment.RequestId()}
-        set {_requestID = newValue}
-      }
-      /// Returns true if `requestID` has been explicitly set.
-      var hasRequestID: Bool {return self._requestID != nil}
-      /// Clears the value of `requestID`. Subsequent reads from it will return its default value.
-      mutating func clearRequestID() {self._requestID = nil}
-
-      /// @required
-      var amount: SignalServiceProtos_DataMessage.Payment.Amount {
-        get {return _amount ?? SignalServiceProtos_DataMessage.Payment.Amount()}
-        set {_amount = newValue}
-      }
-      /// Returns true if `amount` has been explicitly set.
-      var hasAmount: Bool {return self._amount != nil}
-      /// Clears the value of `amount`. Subsequent reads from it will return its default value.
-      mutating func clearAmount() {self._amount = nil}
-
-      var note: String {
-        get {return _note ?? String()}
-        set {_note = newValue}
-      }
-      /// Returns true if `note` has been explicitly set.
-      var hasNote: Bool {return self._note != nil}
-      /// Clears the value of `note`. Subsequent reads from it will return its default value.
-      mutating func clearNote() {self._note = nil}
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      init() {}
-
-      fileprivate var _requestID: SignalServiceProtos_DataMessage.Payment.RequestId?
-      fileprivate var _amount: SignalServiceProtos_DataMessage.Payment.Amount?
-      fileprivate var _note: String?
-    }
-
-    struct Notification {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      /// oneof commented out
-      /// oneof Transaction {
-      var mobileCoin: SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin {
-        get {return _mobileCoin ?? SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin()}
-        set {_mobileCoin = newValue}
-      }
-      /// Returns true if `mobileCoin` has been explicitly set.
-      var hasMobileCoin: Bool {return self._mobileCoin != nil}
-      /// Clears the value of `mobileCoin`. Subsequent reads from it will return its default value.
-      mutating func clearMobileCoin() {self._mobileCoin = nil}
-
-      /// Optional, Refers to the PaymentRequest message, if any.
-      var note: String {
-        get {return _note ?? String()}
-        set {_note = newValue}
-      }
-      /// Returns true if `note` has been explicitly set.
-      var hasNote: Bool {return self._note != nil}
-      /// Clears the value of `note`. Subsequent reads from it will return its default value.
-      mutating func clearNote() {self._note = nil}
-
-      var requestID: SignalServiceProtos_DataMessage.Payment.RequestId {
-        get {return _requestID ?? SignalServiceProtos_DataMessage.Payment.RequestId()}
-        set {_requestID = newValue}
-      }
-      /// Returns true if `requestID` has been explicitly set.
-      var hasRequestID: Bool {return self._requestID != nil}
-      /// Clears the value of `requestID`. Subsequent reads from it will return its default value.
-      mutating func clearRequestID() {self._requestID = nil}
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      struct MobileCoin {
-        // SwiftProtobuf.Message conformance is added in an extension below. See the
-        // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-        // methods supported on all messages.
-
-        /// @required
-        var receipt: Data {
-          get {return _receipt ?? Data()}
-          set {_receipt = newValue}
-        }
-        /// Returns true if `receipt` has been explicitly set.
-        var hasReceipt: Bool {return self._receipt != nil}
-        /// Clears the value of `receipt`. Subsequent reads from it will return its default value.
-        mutating func clearReceipt() {self._receipt = nil}
-
-        var unknownFields = SwiftProtobuf.UnknownStorage()
-
-        init() {}
-
-        fileprivate var _receipt: Data?
-      }
-
-      init() {}
-
-      fileprivate var _mobileCoin: SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin?
-      fileprivate var _note: String?
-      fileprivate var _requestID: SignalServiceProtos_DataMessage.Payment.RequestId?
-    }
-
-    struct Cancellation {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      /// @required
-      var requestID: SignalServiceProtos_DataMessage.Payment.RequestId {
-        get {return _requestID ?? SignalServiceProtos_DataMessage.Payment.RequestId()}
-        set {_requestID = newValue}
-      }
-      /// Returns true if `requestID` has been explicitly set.
-      var hasRequestID: Bool {return self._requestID != nil}
-      /// Clears the value of `requestID`. Subsequent reads from it will return its default value.
-      mutating func clearRequestID() {self._requestID = nil}
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      init() {}
-
-      fileprivate var _requestID: SignalServiceProtos_DataMessage.Payment.RequestId?
-    }
-
-    init() {}
-
-    fileprivate var _notification: SignalServiceProtos_DataMessage.Payment.Notification?
-    fileprivate var _request: SignalServiceProtos_DataMessage.Payment.Request?
-    fileprivate var _cancellation: SignalServiceProtos_DataMessage.Payment.Cancellation?
-  }
-
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _body: String?
+  fileprivate var _group: SignalServiceProtos_GroupContext?
+  fileprivate var _groupV2: SignalServiceProtos_GroupContextV2?
+  fileprivate var _flags: UInt32?
+  fileprivate var _expireTimer: UInt32?
+  fileprivate var _profileKey: Data?
+  fileprivate var _timestamp: UInt64?
+  fileprivate var _quote: SignalServiceProtos_DataMessage.Quote?
+  fileprivate var _sticker: SignalServiceProtos_DataMessage.Sticker?
+  fileprivate var _requiredProtocolVersion: UInt32?
+  fileprivate var _isViewOnce: Bool?
+  fileprivate var _reaction: SignalServiceProtos_DataMessage.Reaction?
+  fileprivate var _delete: SignalServiceProtos_DataMessage.Delete?
 }
 
 #if swift(>=4.2)
@@ -2169,7 +1682,7 @@ struct SignalServiceProtos_NullMessage {
   // methods supported on all messages.
 
   var padding: Data {
-    get {return _padding ?? Data()}
+    get {return _padding ?? SwiftProtobuf.Internal.emptyData}
     set {_padding = newValue}
   }
   /// Returns true if `padding` has been explicitly set.
@@ -2206,7 +1719,6 @@ struct SignalServiceProtos_ReceiptMessage {
     typealias RawValue = Int
     case delivery // = 0
     case read // = 1
-    case viewed // = 2
 
     init() {
       self = .delivery
@@ -2216,7 +1728,6 @@ struct SignalServiceProtos_ReceiptMessage {
       switch rawValue {
       case 0: self = .delivery
       case 1: self = .read
-      case 2: self = .viewed
       default: return nil
       }
     }
@@ -2225,7 +1736,6 @@ struct SignalServiceProtos_ReceiptMessage {
       switch self {
       case .delivery: return 0
       case .read: return 1
-      case .viewed: return 2
       }
     }
 
@@ -2268,7 +1778,7 @@ struct SignalServiceProtos_Verified {
   mutating func clearDestinationUuid() {self._destinationUuid = nil}
 
   var identityKey: Data {
-    get {return _identityKey ?? Data()}
+    get {return _identityKey ?? SwiftProtobuf.Internal.emptyData}
     set {_identityKey = newValue}
   }
   /// Returns true if `identityKey` has been explicitly set.
@@ -2286,7 +1796,7 @@ struct SignalServiceProtos_Verified {
   mutating func clearState() {self._state = nil}
 
   var nullMessage: Data {
-    get {return _nullMessage ?? Data()}
+    get {return _nullMessage ?? SwiftProtobuf.Internal.emptyData}
     set {_nullMessage = newValue}
   }
   /// Returns true if `nullMessage` has been explicitly set.
@@ -2348,136 +1858,116 @@ struct SignalServiceProtos_SyncMessage {
   // methods supported on all messages.
 
   var sent: SignalServiceProtos_SyncMessage.Sent {
-    get {return _storage._sent ?? SignalServiceProtos_SyncMessage.Sent()}
-    set {_uniqueStorage()._sent = newValue}
+    get {return _sent ?? SignalServiceProtos_SyncMessage.Sent()}
+    set {_sent = newValue}
   }
   /// Returns true if `sent` has been explicitly set.
-  var hasSent: Bool {return _storage._sent != nil}
+  var hasSent: Bool {return self._sent != nil}
   /// Clears the value of `sent`. Subsequent reads from it will return its default value.
-  mutating func clearSent() {_uniqueStorage()._sent = nil}
+  mutating func clearSent() {self._sent = nil}
 
   var contacts: SignalServiceProtos_SyncMessage.Contacts {
-    get {return _storage._contacts ?? SignalServiceProtos_SyncMessage.Contacts()}
-    set {_uniqueStorage()._contacts = newValue}
+    get {return _contacts ?? SignalServiceProtos_SyncMessage.Contacts()}
+    set {_contacts = newValue}
   }
   /// Returns true if `contacts` has been explicitly set.
-  var hasContacts: Bool {return _storage._contacts != nil}
+  var hasContacts: Bool {return self._contacts != nil}
   /// Clears the value of `contacts`. Subsequent reads from it will return its default value.
-  mutating func clearContacts() {_uniqueStorage()._contacts = nil}
+  mutating func clearContacts() {self._contacts = nil}
 
   var groups: SignalServiceProtos_SyncMessage.Groups {
-    get {return _storage._groups ?? SignalServiceProtos_SyncMessage.Groups()}
-    set {_uniqueStorage()._groups = newValue}
+    get {return _groups ?? SignalServiceProtos_SyncMessage.Groups()}
+    set {_groups = newValue}
   }
   /// Returns true if `groups` has been explicitly set.
-  var hasGroups: Bool {return _storage._groups != nil}
+  var hasGroups: Bool {return self._groups != nil}
   /// Clears the value of `groups`. Subsequent reads from it will return its default value.
-  mutating func clearGroups() {_uniqueStorage()._groups = nil}
+  mutating func clearGroups() {self._groups = nil}
 
   var request: SignalServiceProtos_SyncMessage.Request {
-    get {return _storage._request ?? SignalServiceProtos_SyncMessage.Request()}
-    set {_uniqueStorage()._request = newValue}
+    get {return _request ?? SignalServiceProtos_SyncMessage.Request()}
+    set {_request = newValue}
   }
   /// Returns true if `request` has been explicitly set.
-  var hasRequest: Bool {return _storage._request != nil}
+  var hasRequest: Bool {return self._request != nil}
   /// Clears the value of `request`. Subsequent reads from it will return its default value.
-  mutating func clearRequest() {_uniqueStorage()._request = nil}
+  mutating func clearRequest() {self._request = nil}
 
-  var read: [SignalServiceProtos_SyncMessage.Read] {
-    get {return _storage._read}
-    set {_uniqueStorage()._read = newValue}
-  }
+  var read: [SignalServiceProtos_SyncMessage.Read] = []
 
   var blocked: SignalServiceProtos_SyncMessage.Blocked {
-    get {return _storage._blocked ?? SignalServiceProtos_SyncMessage.Blocked()}
-    set {_uniqueStorage()._blocked = newValue}
+    get {return _blocked ?? SignalServiceProtos_SyncMessage.Blocked()}
+    set {_blocked = newValue}
   }
   /// Returns true if `blocked` has been explicitly set.
-  var hasBlocked: Bool {return _storage._blocked != nil}
+  var hasBlocked: Bool {return self._blocked != nil}
   /// Clears the value of `blocked`. Subsequent reads from it will return its default value.
-  mutating func clearBlocked() {_uniqueStorage()._blocked = nil}
+  mutating func clearBlocked() {self._blocked = nil}
 
   var verified: SignalServiceProtos_Verified {
-    get {return _storage._verified ?? SignalServiceProtos_Verified()}
-    set {_uniqueStorage()._verified = newValue}
+    get {return _verified ?? SignalServiceProtos_Verified()}
+    set {_verified = newValue}
   }
   /// Returns true if `verified` has been explicitly set.
-  var hasVerified: Bool {return _storage._verified != nil}
+  var hasVerified: Bool {return self._verified != nil}
   /// Clears the value of `verified`. Subsequent reads from it will return its default value.
-  mutating func clearVerified() {_uniqueStorage()._verified = nil}
+  mutating func clearVerified() {self._verified = nil}
 
   var configuration: SignalServiceProtos_SyncMessage.Configuration {
-    get {return _storage._configuration ?? SignalServiceProtos_SyncMessage.Configuration()}
-    set {_uniqueStorage()._configuration = newValue}
+    get {return _configuration ?? SignalServiceProtos_SyncMessage.Configuration()}
+    set {_configuration = newValue}
   }
   /// Returns true if `configuration` has been explicitly set.
-  var hasConfiguration: Bool {return _storage._configuration != nil}
+  var hasConfiguration: Bool {return self._configuration != nil}
   /// Clears the value of `configuration`. Subsequent reads from it will return its default value.
-  mutating func clearConfiguration() {_uniqueStorage()._configuration = nil}
+  mutating func clearConfiguration() {self._configuration = nil}
 
   var padding: Data {
-    get {return _storage._padding ?? Data()}
-    set {_uniqueStorage()._padding = newValue}
+    get {return _padding ?? SwiftProtobuf.Internal.emptyData}
+    set {_padding = newValue}
   }
   /// Returns true if `padding` has been explicitly set.
-  var hasPadding: Bool {return _storage._padding != nil}
+  var hasPadding: Bool {return self._padding != nil}
   /// Clears the value of `padding`. Subsequent reads from it will return its default value.
-  mutating func clearPadding() {_uniqueStorage()._padding = nil}
+  mutating func clearPadding() {self._padding = nil}
 
-  var stickerPackOperation: [SignalServiceProtos_SyncMessage.StickerPackOperation] {
-    get {return _storage._stickerPackOperation}
-    set {_uniqueStorage()._stickerPackOperation = newValue}
-  }
+  var stickerPackOperation: [SignalServiceProtos_SyncMessage.StickerPackOperation] = []
 
   var viewOnceOpen: SignalServiceProtos_SyncMessage.ViewOnceOpen {
-    get {return _storage._viewOnceOpen ?? SignalServiceProtos_SyncMessage.ViewOnceOpen()}
-    set {_uniqueStorage()._viewOnceOpen = newValue}
+    get {return _viewOnceOpen ?? SignalServiceProtos_SyncMessage.ViewOnceOpen()}
+    set {_viewOnceOpen = newValue}
   }
   /// Returns true if `viewOnceOpen` has been explicitly set.
-  var hasViewOnceOpen: Bool {return _storage._viewOnceOpen != nil}
+  var hasViewOnceOpen: Bool {return self._viewOnceOpen != nil}
   /// Clears the value of `viewOnceOpen`. Subsequent reads from it will return its default value.
-  mutating func clearViewOnceOpen() {_uniqueStorage()._viewOnceOpen = nil}
+  mutating func clearViewOnceOpen() {self._viewOnceOpen = nil}
 
   var fetchLatest: SignalServiceProtos_SyncMessage.FetchLatest {
-    get {return _storage._fetchLatest ?? SignalServiceProtos_SyncMessage.FetchLatest()}
-    set {_uniqueStorage()._fetchLatest = newValue}
+    get {return _fetchLatest ?? SignalServiceProtos_SyncMessage.FetchLatest()}
+    set {_fetchLatest = newValue}
   }
   /// Returns true if `fetchLatest` has been explicitly set.
-  var hasFetchLatest: Bool {return _storage._fetchLatest != nil}
+  var hasFetchLatest: Bool {return self._fetchLatest != nil}
   /// Clears the value of `fetchLatest`. Subsequent reads from it will return its default value.
-  mutating func clearFetchLatest() {_uniqueStorage()._fetchLatest = nil}
+  mutating func clearFetchLatest() {self._fetchLatest = nil}
 
   var keys: SignalServiceProtos_SyncMessage.Keys {
-    get {return _storage._keys ?? SignalServiceProtos_SyncMessage.Keys()}
-    set {_uniqueStorage()._keys = newValue}
+    get {return _keys ?? SignalServiceProtos_SyncMessage.Keys()}
+    set {_keys = newValue}
   }
   /// Returns true if `keys` has been explicitly set.
-  var hasKeys: Bool {return _storage._keys != nil}
+  var hasKeys: Bool {return self._keys != nil}
   /// Clears the value of `keys`. Subsequent reads from it will return its default value.
-  mutating func clearKeys() {_uniqueStorage()._keys = nil}
+  mutating func clearKeys() {self._keys = nil}
 
   var messageRequestResponse: SignalServiceProtos_SyncMessage.MessageRequestResponse {
-    get {return _storage._messageRequestResponse ?? SignalServiceProtos_SyncMessage.MessageRequestResponse()}
-    set {_uniqueStorage()._messageRequestResponse = newValue}
+    get {return _messageRequestResponse ?? SignalServiceProtos_SyncMessage.MessageRequestResponse()}
+    set {_messageRequestResponse = newValue}
   }
   /// Returns true if `messageRequestResponse` has been explicitly set.
-  var hasMessageRequestResponse: Bool {return _storage._messageRequestResponse != nil}
+  var hasMessageRequestResponse: Bool {return self._messageRequestResponse != nil}
   /// Clears the value of `messageRequestResponse`. Subsequent reads from it will return its default value.
-  mutating func clearMessageRequestResponse() {_uniqueStorage()._messageRequestResponse = nil}
-
-  var outgoingPayment: SignalServiceProtos_SyncMessage.OutgoingPayment {
-    get {return _storage._outgoingPayment ?? SignalServiceProtos_SyncMessage.OutgoingPayment()}
-    set {_uniqueStorage()._outgoingPayment = newValue}
-  }
-  /// Returns true if `outgoingPayment` has been explicitly set.
-  var hasOutgoingPayment: Bool {return _storage._outgoingPayment != nil}
-  /// Clears the value of `outgoingPayment`. Subsequent reads from it will return its default value.
-  mutating func clearOutgoingPayment() {_uniqueStorage()._outgoingPayment = nil}
-
-  var viewed: [SignalServiceProtos_SyncMessage.Viewed] {
-    get {return _storage._viewed}
-    set {_uniqueStorage()._viewed = newValue}
-  }
+  mutating func clearMessageRequestResponse() {self._messageRequestResponse = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2766,48 +2256,6 @@ struct SignalServiceProtos_SyncMessage {
     fileprivate var _timestamp: UInt64?
   }
 
-  struct Viewed {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var senderE164: String {
-      get {return _senderE164 ?? String()}
-      set {_senderE164 = newValue}
-    }
-    /// Returns true if `senderE164` has been explicitly set.
-    var hasSenderE164: Bool {return self._senderE164 != nil}
-    /// Clears the value of `senderE164`. Subsequent reads from it will return its default value.
-    mutating func clearSenderE164() {self._senderE164 = nil}
-
-    var senderUuid: String {
-      get {return _senderUuid ?? String()}
-      set {_senderUuid = newValue}
-    }
-    /// Returns true if `senderUuid` has been explicitly set.
-    var hasSenderUuid: Bool {return self._senderUuid != nil}
-    /// Clears the value of `senderUuid`. Subsequent reads from it will return its default value.
-    mutating func clearSenderUuid() {self._senderUuid = nil}
-
-    /// @required
-    var timestamp: UInt64 {
-      get {return _timestamp ?? 0}
-      set {_timestamp = newValue}
-    }
-    /// Returns true if `timestamp` has been explicitly set.
-    var hasTimestamp: Bool {return self._timestamp != nil}
-    /// Clears the value of `timestamp`. Subsequent reads from it will return its default value.
-    mutating func clearTimestamp() {self._timestamp = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _senderE164: String?
-    fileprivate var _senderUuid: String?
-    fileprivate var _timestamp: UInt64?
-  }
-
   struct Configuration {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2840,16 +2288,6 @@ struct SignalServiceProtos_SyncMessage {
     /// Clears the value of `typingIndicators`. Subsequent reads from it will return its default value.
     mutating func clearTypingIndicators() {self._typingIndicators = nil}
 
-    /// 4 is reserved
-    var provisioningVersion: UInt32 {
-      get {return _provisioningVersion ?? 0}
-      set {_provisioningVersion = newValue}
-    }
-    /// Returns true if `provisioningVersion` has been explicitly set.
-    var hasProvisioningVersion: Bool {return self._provisioningVersion != nil}
-    /// Clears the value of `provisioningVersion`. Subsequent reads from it will return its default value.
-    mutating func clearProvisioningVersion() {self._provisioningVersion = nil}
-
     var linkPreviews: Bool {
       get {return _linkPreviews ?? false}
       set {_linkPreviews = newValue}
@@ -2859,6 +2297,15 @@ struct SignalServiceProtos_SyncMessage {
     /// Clears the value of `linkPreviews`. Subsequent reads from it will return its default value.
     mutating func clearLinkPreviews() {self._linkPreviews = nil}
 
+    var provisioningVersion: UInt32 {
+      get {return _provisioningVersion ?? 0}
+      set {_provisioningVersion = newValue}
+    }
+    /// Returns true if `provisioningVersion` has been explicitly set.
+    var hasProvisioningVersion: Bool {return self._provisioningVersion != nil}
+    /// Clears the value of `provisioningVersion`. Subsequent reads from it will return its default value.
+    mutating func clearProvisioningVersion() {self._provisioningVersion = nil}
+
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
@@ -2866,8 +2313,8 @@ struct SignalServiceProtos_SyncMessage {
     fileprivate var _readReceipts: Bool?
     fileprivate var _unidentifiedDeliveryIndicators: Bool?
     fileprivate var _typingIndicators: Bool?
-    fileprivate var _provisioningVersion: UInt32?
     fileprivate var _linkPreviews: Bool?
+    fileprivate var _provisioningVersion: UInt32?
   }
 
   struct StickerPackOperation {
@@ -2877,7 +2324,7 @@ struct SignalServiceProtos_SyncMessage {
 
     /// @required
     var packID: Data {
-      get {return _packID ?? Data()}
+      get {return _packID ?? SwiftProtobuf.Internal.emptyData}
       set {_packID = newValue}
     }
     /// Returns true if `packID` has been explicitly set.
@@ -2887,7 +2334,7 @@ struct SignalServiceProtos_SyncMessage {
 
     /// @required
     var packKey: Data {
-      get {return _packKey ?? Data()}
+      get {return _packKey ?? SwiftProtobuf.Internal.emptyData}
       set {_packKey = newValue}
     }
     /// Returns true if `packKey` has been explicitly set.
@@ -3002,7 +2449,6 @@ struct SignalServiceProtos_SyncMessage {
       case unknown // = 0
       case localProfile // = 1
       case storageManifest // = 2
-      case subscriptionStatus // = 3
 
       init() {
         self = .unknown
@@ -3013,7 +2459,6 @@ struct SignalServiceProtos_SyncMessage {
         case 0: self = .unknown
         case 1: self = .localProfile
         case 2: self = .storageManifest
-        case 3: self = .subscriptionStatus
         default: return nil
         }
       }
@@ -3023,7 +2468,6 @@ struct SignalServiceProtos_SyncMessage {
         case .unknown: return 0
         case .localProfile: return 1
         case .storageManifest: return 2
-        case .subscriptionStatus: return 3
         }
       }
 
@@ -3040,7 +2484,7 @@ struct SignalServiceProtos_SyncMessage {
     // methods supported on all messages.
 
     var storageService: Data {
-      get {return _storageService ?? Data()}
+      get {return _storageService ?? SwiftProtobuf.Internal.emptyData}
       set {_storageService = newValue}
     }
     /// Returns true if `storageService` has been explicitly set.
@@ -3079,7 +2523,7 @@ struct SignalServiceProtos_SyncMessage {
     mutating func clearThreadUuid() {self._threadUuid = nil}
 
     var groupID: Data {
-      get {return _groupID ?? Data()}
+      get {return _groupID ?? SwiftProtobuf.Internal.emptyData}
       set {_groupID = newValue}
     }
     /// Returns true if `groupID` has been explicitly set.
@@ -3141,129 +2585,20 @@ struct SignalServiceProtos_SyncMessage {
     fileprivate var _type: SignalServiceProtos_SyncMessage.MessageRequestResponse.TypeEnum?
   }
 
-  struct OutgoingPayment {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var recipientUuid: String {
-      get {return _recipientUuid ?? String()}
-      set {_recipientUuid = newValue}
-    }
-    /// Returns true if `recipientUuid` has been explicitly set.
-    var hasRecipientUuid: Bool {return self._recipientUuid != nil}
-    /// Clears the value of `recipientUuid`. Subsequent reads from it will return its default value.
-    mutating func clearRecipientUuid() {self._recipientUuid = nil}
-
-    var note: String {
-      get {return _note ?? String()}
-      set {_note = newValue}
-    }
-    /// Returns true if `note` has been explicitly set.
-    var hasNote: Bool {return self._note != nil}
-    /// Clears the value of `note`. Subsequent reads from it will return its default value.
-    mutating func clearNote() {self._note = nil}
-
-    /// oneof attachment_identifier {
-    var mobileCoin: SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin {
-      get {return _mobileCoin ?? SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin()}
-      set {_mobileCoin = newValue}
-    }
-    /// Returns true if `mobileCoin` has been explicitly set.
-    var hasMobileCoin: Bool {return self._mobileCoin != nil}
-    /// Clears the value of `mobileCoin`. Subsequent reads from it will return its default value.
-    mutating func clearMobileCoin() {self._mobileCoin = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    struct MobileCoin {
-      // SwiftProtobuf.Message conformance is added in an extension below. See the
-      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-      // methods supported on all messages.
-
-      var recipientAddress: Data {
-        get {return _recipientAddress ?? Data()}
-        set {_recipientAddress = newValue}
-      }
-      /// Returns true if `recipientAddress` has been explicitly set.
-      var hasRecipientAddress: Bool {return self._recipientAddress != nil}
-      /// Clears the value of `recipientAddress`. Subsequent reads from it will return its default value.
-      mutating func clearRecipientAddress() {self._recipientAddress = nil}
-
-      /// @required
-      var amountPicoMob: UInt64 {
-        get {return _amountPicoMob ?? 0}
-        set {_amountPicoMob = newValue}
-      }
-      /// Returns true if `amountPicoMob` has been explicitly set.
-      var hasAmountPicoMob: Bool {return self._amountPicoMob != nil}
-      /// Clears the value of `amountPicoMob`. Subsequent reads from it will return its default value.
-      mutating func clearAmountPicoMob() {self._amountPicoMob = nil}
-
-      /// @required
-      var feePicoMob: UInt64 {
-        get {return _feePicoMob ?? 0}
-        set {_feePicoMob = newValue}
-      }
-      /// Returns true if `feePicoMob` has been explicitly set.
-      var hasFeePicoMob: Bool {return self._feePicoMob != nil}
-      /// Clears the value of `feePicoMob`. Subsequent reads from it will return its default value.
-      mutating func clearFeePicoMob() {self._feePicoMob = nil}
-
-      var receipt: Data {
-        get {return _receipt ?? Data()}
-        set {_receipt = newValue}
-      }
-      /// Returns true if `receipt` has been explicitly set.
-      var hasReceipt: Bool {return self._receipt != nil}
-      /// Clears the value of `receipt`. Subsequent reads from it will return its default value.
-      mutating func clearReceipt() {self._receipt = nil}
-
-      var ledgerBlockTimestamp: UInt64 {
-        get {return _ledgerBlockTimestamp ?? 0}
-        set {_ledgerBlockTimestamp = newValue}
-      }
-      /// Returns true if `ledgerBlockTimestamp` has been explicitly set.
-      var hasLedgerBlockTimestamp: Bool {return self._ledgerBlockTimestamp != nil}
-      /// Clears the value of `ledgerBlockTimestamp`. Subsequent reads from it will return its default value.
-      mutating func clearLedgerBlockTimestamp() {self._ledgerBlockTimestamp = nil}
-
-      /// @required
-      var ledgerBlockIndex: UInt64 {
-        get {return _ledgerBlockIndex ?? 0}
-        set {_ledgerBlockIndex = newValue}
-      }
-      /// Returns true if `ledgerBlockIndex` has been explicitly set.
-      var hasLedgerBlockIndex: Bool {return self._ledgerBlockIndex != nil}
-      /// Clears the value of `ledgerBlockIndex`. Subsequent reads from it will return its default value.
-      mutating func clearLedgerBlockIndex() {self._ledgerBlockIndex = nil}
-
-      var spentKeyImages: [Data] = []
-
-      var outputPublicKeys: [Data] = []
-
-      var unknownFields = SwiftProtobuf.UnknownStorage()
-
-      init() {}
-
-      fileprivate var _recipientAddress: Data?
-      fileprivate var _amountPicoMob: UInt64?
-      fileprivate var _feePicoMob: UInt64?
-      fileprivate var _receipt: Data?
-      fileprivate var _ledgerBlockTimestamp: UInt64?
-      fileprivate var _ledgerBlockIndex: UInt64?
-    }
-
-    init() {}
-
-    fileprivate var _recipientUuid: String?
-    fileprivate var _note: String?
-    fileprivate var _mobileCoin: SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin?
-  }
-
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _sent: SignalServiceProtos_SyncMessage.Sent?
+  fileprivate var _contacts: SignalServiceProtos_SyncMessage.Contacts?
+  fileprivate var _groups: SignalServiceProtos_SyncMessage.Groups?
+  fileprivate var _request: SignalServiceProtos_SyncMessage.Request?
+  fileprivate var _blocked: SignalServiceProtos_SyncMessage.Blocked?
+  fileprivate var _verified: SignalServiceProtos_Verified?
+  fileprivate var _configuration: SignalServiceProtos_SyncMessage.Configuration?
+  fileprivate var _padding: Data?
+  fileprivate var _viewOnceOpen: SignalServiceProtos_SyncMessage.ViewOnceOpen?
+  fileprivate var _fetchLatest: SignalServiceProtos_SyncMessage.FetchLatest?
+  fileprivate var _keys: SignalServiceProtos_SyncMessage.Keys?
+  fileprivate var _messageRequestResponse: SignalServiceProtos_SyncMessage.MessageRequestResponse?
 }
 
 #if swift(>=4.2)
@@ -3325,7 +2660,7 @@ struct SignalServiceProtos_AttachmentPointer {
   mutating func clearContentType() {self._contentType = nil}
 
   var key: Data {
-    get {return _key ?? Data()}
+    get {return _key ?? SwiftProtobuf.Internal.emptyData}
     set {_key = newValue}
   }
   /// Returns true if `key` has been explicitly set.
@@ -3343,7 +2678,7 @@ struct SignalServiceProtos_AttachmentPointer {
   mutating func clearSize() {self._size = nil}
 
   var thumbnail: Data {
-    get {return _thumbnail ?? Data()}
+    get {return _thumbnail ?? SwiftProtobuf.Internal.emptyData}
     set {_thumbnail = newValue}
   }
   /// Returns true if `thumbnail` has been explicitly set.
@@ -3352,7 +2687,7 @@ struct SignalServiceProtos_AttachmentPointer {
   mutating func clearThumbnail() {self._thumbnail = nil}
 
   var digest: Data {
-    get {return _digest ?? Data()}
+    get {return _digest ?? SwiftProtobuf.Internal.emptyData}
     set {_digest = newValue}
   }
   /// Returns true if `digest` has been explicitly set.
@@ -3423,7 +2758,6 @@ struct SignalServiceProtos_AttachmentPointer {
   /// Clears the value of `uploadTimestamp`. Subsequent reads from it will return its default value.
   mutating func clearUploadTimestamp() {self._uploadTimestamp = nil}
 
-  /// Next ID: 16
   var cdnNumber: UInt32 {
     get {return _cdnNumber ?? 0}
     set {_cdnNumber = newValue}
@@ -3440,9 +2774,6 @@ struct SignalServiceProtos_AttachmentPointer {
     case voiceMessage // = 1
     case borderless // = 2
 
-    /// 4 is reserved
-    case gif // = 8
-
     init() {
       self = .voiceMessage
     }
@@ -3451,7 +2782,6 @@ struct SignalServiceProtos_AttachmentPointer {
       switch rawValue {
       case 1: self = .voiceMessage
       case 2: self = .borderless
-      case 8: self = .gif
       default: return nil
       }
     }
@@ -3460,7 +2790,6 @@ struct SignalServiceProtos_AttachmentPointer {
       switch self {
       case .voiceMessage: return 1
       case .borderless: return 2
-      case .gif: return 8
       }
     }
 
@@ -3500,50 +2829,47 @@ struct SignalServiceProtos_GroupContext {
 
   /// @required
   var id: Data {
-    get {return _storage._id ?? Data()}
-    set {_uniqueStorage()._id = newValue}
+    get {return _id ?? SwiftProtobuf.Internal.emptyData}
+    set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return _storage._id != nil}
+  var hasID: Bool {return self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {_uniqueStorage()._id = nil}
+  mutating func clearID() {self._id = nil}
 
   var type: SignalServiceProtos_GroupContext.TypeEnum {
-    get {return _storage._type ?? .unknown}
-    set {_uniqueStorage()._type = newValue}
+    get {return _type ?? .unknown}
+    set {_type = newValue}
   }
   /// Returns true if `type` has been explicitly set.
-  var hasType: Bool {return _storage._type != nil}
+  var hasType: Bool {return self._type != nil}
   /// Clears the value of `type`. Subsequent reads from it will return its default value.
-  mutating func clearType() {_uniqueStorage()._type = nil}
+  mutating func clearType() {self._type = nil}
 
   var name: String {
-    get {return _storage._name ?? String()}
-    set {_uniqueStorage()._name = newValue}
+    get {return _name ?? String()}
+    set {_name = newValue}
   }
   /// Returns true if `name` has been explicitly set.
-  var hasName: Bool {return _storage._name != nil}
+  var hasName: Bool {return self._name != nil}
   /// Clears the value of `name`. Subsequent reads from it will return its default value.
-  mutating func clearName() {_uniqueStorage()._name = nil}
+  mutating func clearName() {self._name = nil}
 
-  var membersE164: [String] {
-    get {return _storage._membersE164}
-    set {_uniqueStorage()._membersE164 = newValue}
-  }
+  /// A list of known phone numbers in the group, only maintained
+  /// to support legacy apps that don't know about UUIDs. We may want
+  /// to eventually stop populating this.
+  var membersE164: [String] = []
 
   var avatar: SignalServiceProtos_AttachmentPointer {
-    get {return _storage._avatar ?? SignalServiceProtos_AttachmentPointer()}
-    set {_uniqueStorage()._avatar = newValue}
+    get {return _avatar ?? SignalServiceProtos_AttachmentPointer()}
+    set {_avatar = newValue}
   }
   /// Returns true if `avatar` has been explicitly set.
-  var hasAvatar: Bool {return _storage._avatar != nil}
+  var hasAvatar: Bool {return self._avatar != nil}
   /// Clears the value of `avatar`. Subsequent reads from it will return its default value.
-  mutating func clearAvatar() {_uniqueStorage()._avatar = nil}
+  mutating func clearAvatar() {self._avatar = nil}
 
-  var members: [SignalServiceProtos_GroupContext.Member] {
-    get {return _storage._members}
-    set {_uniqueStorage()._members = newValue}
-  }
+  var members: [SignalServiceProtos_GroupContext.Member] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3554,7 +2880,8 @@ struct SignalServiceProtos_GroupContext {
     case deliver // = 2
     case quit // = 3
     case requestInfo // = 4
-
+    case pinMessage // = 5
+    
     init() {
       self = .unknown
     }
@@ -3566,6 +2893,7 @@ struct SignalServiceProtos_GroupContext {
       case 2: self = .deliver
       case 3: self = .quit
       case 4: self = .requestInfo
+      case 5: self = .pinMessage
       default: return nil
       }
     }
@@ -3577,6 +2905,7 @@ struct SignalServiceProtos_GroupContext {
       case .deliver: return 2
       case .quit: return 3
       case .requestInfo: return 4
+      case .pinMessage: return 5
       }
     }
 
@@ -3587,7 +2916,15 @@ struct SignalServiceProtos_GroupContext {
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    /// skip 1, formerly uuid
+    var uuid: String {
+      get {return _uuid ?? String()}
+      set {_uuid = newValue}
+    }
+    /// Returns true if `uuid` has been explicitly set.
+    var hasUuid: Bool {return self._uuid != nil}
+    /// Clears the value of `uuid`. Subsequent reads from it will return its default value.
+    mutating func clearUuid() {self._uuid = nil}
+
     var e164: String {
       get {return _e164 ?? String()}
       set {_e164 = newValue}
@@ -3601,12 +2938,16 @@ struct SignalServiceProtos_GroupContext {
 
     init() {}
 
+    fileprivate var _uuid: String?
     fileprivate var _e164: String?
   }
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _id: Data?
+  fileprivate var _type: SignalServiceProtos_GroupContext.TypeEnum?
+  fileprivate var _name: String?
+  fileprivate var _avatar: SignalServiceProtos_AttachmentPointer?
 }
 
 #if swift(>=4.2)
@@ -3623,7 +2964,7 @@ struct SignalServiceProtos_GroupContextV2 {
   // methods supported on all messages.
 
   var masterKey: Data {
-    get {return _masterKey ?? Data()}
+    get {return _masterKey ?? SwiftProtobuf.Internal.emptyData}
     set {_masterKey = newValue}
   }
   /// Returns true if `masterKey` has been explicitly set.
@@ -3641,7 +2982,7 @@ struct SignalServiceProtos_GroupContextV2 {
   mutating func clearRevision() {self._revision = nil}
 
   var groupChange: Data {
-    get {return _groupChange ?? Data()}
+    get {return _groupChange ?? SwiftProtobuf.Internal.emptyData}
     set {_groupChange = newValue}
   }
   /// Returns true if `groupChange` has been explicitly set.
@@ -3663,24 +3004,23 @@ struct SignalServiceProtos_ContactDetails {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var contactE164: String {
-    get {return _contactE164 ?? String()}
-    set {_contactE164 = newValue}
+  var number: String {
+    get {return _number ?? String()}
+    set {_number = newValue}
   }
-  /// Returns true if `contactE164` has been explicitly set.
-  var hasContactE164: Bool {return self._contactE164 != nil}
-  /// Clears the value of `contactE164`. Subsequent reads from it will return its default value.
-  mutating func clearContactE164() {self._contactE164 = nil}
+  /// Returns true if `number` has been explicitly set.
+  var hasNumber: Bool {return self._number != nil}
+  /// Clears the value of `number`. Subsequent reads from it will return its default value.
+  mutating func clearNumber() {self._number = nil}
 
-  /// @trustedMapping
-  var contactUuid: String {
-    get {return _contactUuid ?? String()}
-    set {_contactUuid = newValue}
+  var uuid: String {
+    get {return _uuid ?? String()}
+    set {_uuid = newValue}
   }
-  /// Returns true if `contactUuid` has been explicitly set.
-  var hasContactUuid: Bool {return self._contactUuid != nil}
-  /// Clears the value of `contactUuid`. Subsequent reads from it will return its default value.
-  mutating func clearContactUuid() {self._contactUuid = nil}
+  /// Returns true if `uuid` has been explicitly set.
+  var hasUuid: Bool {return self._uuid != nil}
+  /// Clears the value of `uuid`. Subsequent reads from it will return its default value.
+  mutating func clearUuid() {self._uuid = nil}
 
   var name: String {
     get {return _name ?? String()}
@@ -3719,7 +3059,7 @@ struct SignalServiceProtos_ContactDetails {
   mutating func clearVerified() {self._verified = nil}
 
   var profileKey: Data {
-    get {return _profileKey ?? Data()}
+    get {return _profileKey ?? SwiftProtobuf.Internal.emptyData}
     set {_profileKey = newValue}
   }
   /// Returns true if `profileKey` has been explicitly set.
@@ -3798,8 +3138,8 @@ struct SignalServiceProtos_ContactDetails {
 
   init() {}
 
-  fileprivate var _contactE164: String?
-  fileprivate var _contactUuid: String?
+  fileprivate var _number: String?
+  fileprivate var _uuid: String?
   fileprivate var _name: String?
   fileprivate var _avatar: SignalServiceProtos_ContactDetails.Avatar?
   fileprivate var _color: String?
@@ -3818,7 +3158,7 @@ struct SignalServiceProtos_GroupDetails {
 
   /// @required
   var id: Data {
-    get {return _id ?? Data()}
+    get {return _id ?? SwiftProtobuf.Internal.emptyData}
     set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
@@ -3835,6 +3175,9 @@ struct SignalServiceProtos_GroupDetails {
   /// Clears the value of `name`. Subsequent reads from it will return its default value.
   mutating func clearName() {self._name = nil}
 
+  /// A list of known phone numbers in the group, only maintained
+  /// to support legacy apps that don't know about UUIDs. We may want
+  /// to eventually stop populating this.
   var membersE164: [String] = []
 
   var avatar: SignalServiceProtos_GroupDetails.Avatar {
@@ -3940,7 +3283,15 @@ struct SignalServiceProtos_GroupDetails {
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    /// skip 1, formerly uuid
+    var uuid: String {
+      get {return _uuid ?? String()}
+      set {_uuid = newValue}
+    }
+    /// Returns true if `uuid` has been explicitly set.
+    var hasUuid: Bool {return self._uuid != nil}
+    /// Clears the value of `uuid`. Subsequent reads from it will return its default value.
+    mutating func clearUuid() {self._uuid = nil}
+
     var e164: String {
       get {return _e164 ?? String()}
       set {_e164 = newValue}
@@ -3954,6 +3305,7 @@ struct SignalServiceProtos_GroupDetails {
 
     init() {}
 
+    fileprivate var _uuid: String?
     fileprivate var _e164: String?
   }
 
@@ -4030,22 +3382,12 @@ struct SignalServiceProtos_Pack {
     /// Clears the value of `emoji`. Subsequent reads from it will return its default value.
     mutating func clearEmoji() {self._emoji = nil}
 
-    var contentType: String {
-      get {return _contentType ?? String()}
-      set {_contentType = newValue}
-    }
-    /// Returns true if `contentType` has been explicitly set.
-    var hasContentType: Bool {return self._contentType != nil}
-    /// Clears the value of `contentType`. Subsequent reads from it will return its default value.
-    mutating func clearContentType() {self._contentType = nil}
-
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
 
     fileprivate var _id: UInt32?
     fileprivate var _emoji: String?
-    fileprivate var _contentType: String?
   }
 
   init() {}
@@ -4053,103 +3395,6 @@ struct SignalServiceProtos_Pack {
   fileprivate var _title: String?
   fileprivate var _author: String?
   fileprivate var _cover: SignalServiceProtos_Pack.Sticker?
-}
-
-struct SignalServiceProtos_PaymentAddress {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// oneof commented out
-  /// oneof Address {
-  var mobileCoin: SignalServiceProtos_PaymentAddress.MobileCoin {
-    get {return _mobileCoin ?? SignalServiceProtos_PaymentAddress.MobileCoin()}
-    set {_mobileCoin = newValue}
-  }
-  /// Returns true if `mobileCoin` has been explicitly set.
-  var hasMobileCoin: Bool {return self._mobileCoin != nil}
-  /// Clears the value of `mobileCoin`. Subsequent reads from it will return its default value.
-  mutating func clearMobileCoin() {self._mobileCoin = nil}
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  struct MobileCoin {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    /// @required
-    var publicAddress: Data {
-      get {return _publicAddress ?? Data()}
-      set {_publicAddress = newValue}
-    }
-    /// Returns true if `publicAddress` has been explicitly set.
-    var hasPublicAddress: Bool {return self._publicAddress != nil}
-    /// Clears the value of `publicAddress`. Subsequent reads from it will return its default value.
-    mutating func clearPublicAddress() {self._publicAddress = nil}
-
-    /// @required
-    var signature: Data {
-      get {return _signature ?? Data()}
-      set {_signature = newValue}
-    }
-    /// Returns true if `signature` has been explicitly set.
-    var hasSignature: Bool {return self._signature != nil}
-    /// Clears the value of `signature`. Subsequent reads from it will return its default value.
-    mutating func clearSignature() {self._signature = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _publicAddress: Data?
-    fileprivate var _signature: Data?
-  }
-
-  init() {}
-
-  fileprivate var _mobileCoin: SignalServiceProtos_PaymentAddress.MobileCoin?
-}
-
-struct SignalServiceProtos_DecryptionErrorMessage {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var ratchetKey: Data {
-    get {return _ratchetKey ?? Data()}
-    set {_ratchetKey = newValue}
-  }
-  /// Returns true if `ratchetKey` has been explicitly set.
-  var hasRatchetKey: Bool {return self._ratchetKey != nil}
-  /// Clears the value of `ratchetKey`. Subsequent reads from it will return its default value.
-  mutating func clearRatchetKey() {self._ratchetKey = nil}
-
-  var timestamp: UInt64 {
-    get {return _timestamp ?? 0}
-    set {_timestamp = newValue}
-  }
-  /// Returns true if `timestamp` has been explicitly set.
-  var hasTimestamp: Bool {return self._timestamp != nil}
-  /// Clears the value of `timestamp`. Subsequent reads from it will return its default value.
-  mutating func clearTimestamp() {self._timestamp = nil}
-
-  var deviceID: UInt32 {
-    get {return _deviceID ?? 0}
-    set {_deviceID = newValue}
-  }
-  /// Returns true if `deviceID` has been explicitly set.
-  var hasDeviceID: Bool {return self._deviceID != nil}
-  /// Clears the value of `deviceID`. Subsequent reads from it will return its default value.
-  mutating func clearDeviceID() {self._deviceID = nil}
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-
-  fileprivate var _ratchetKey: Data?
-  fileprivate var _timestamp: UInt64?
-  fileprivate var _deviceID: UInt32?
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -4173,60 +3418,53 @@ extension SignalServiceProtos_Envelope: SwiftProtobuf.Message, SwiftProtobuf._Me
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._sourceE164) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._relay) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 6: try { try decoder.decodeSingularBytesField(value: &self._legacyMessage) }()
-      case 7: try { try decoder.decodeSingularUInt32Field(value: &self._sourceDevice) }()
-      case 8: try { try decoder.decodeSingularBytesField(value: &self._content) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._serverGuid) }()
-      case 10: try { try decoder.decodeSingularUInt64Field(value: &self._serverTimestamp) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self._sourceUuid) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
+      case 2: try decoder.decodeSingularStringField(value: &self._sourceE164)
+      case 3: try decoder.decodeSingularStringField(value: &self._relay)
+      case 5: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 6: try decoder.decodeSingularBytesField(value: &self._legacyMessage)
+      case 7: try decoder.decodeSingularUInt32Field(value: &self._sourceDevice)
+      case 8: try decoder.decodeSingularBytesField(value: &self._content)
+      case 9: try decoder.decodeSingularStringField(value: &self._serverGuid)
+      case 10: try decoder.decodeSingularUInt64Field(value: &self._serverTimestamp)
+      case 11: try decoder.decodeSingularStringField(value: &self._sourceUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._sourceE164 {
+    }
+    if let v = self._sourceE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._relay {
+    }
+    if let v = self._relay {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._timestamp {
+    }
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._legacyMessage {
+    }
+    if let v = self._legacyMessage {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._sourceDevice {
+    }
+    if let v = self._sourceDevice {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._content {
+    }
+    if let v = self._content {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._serverGuid {
+    }
+    if let v = self._serverGuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._serverTimestamp {
+    }
+    if let v = self._serverTimestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 10)
-    } }()
-    try { if let v = self._sourceUuid {
+    }
+    if let v = self._sourceUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4253,9 +3491,7 @@ extension SignalServiceProtos_Envelope.TypeEnum: SwiftProtobuf._ProtoNameProvidi
     2: .same(proto: "KEY_EXCHANGE"),
     3: .same(proto: "PREKEY_BUNDLE"),
     5: .same(proto: "RECEIPT"),
-    6: .same(proto: "UNIDENTIFIED_SENDER"),
-    7: .same(proto: "SENDERKEY_MESSAGE"),
-    8: .same(proto: "PLAINTEXT_CONTENT")
+    6: .same(proto: "UNIDENTIFIED_SENDER")
   ]
 }
 
@@ -4269,32 +3505,25 @@ extension SignalServiceProtos_TypingMessage: SwiftProtobuf.Message, SwiftProtobu
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._action) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._groupID) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 2: try decoder.decodeSingularEnumField(value: &self._action)
+      case 3: try decoder.decodeSingularBytesField(value: &self._groupID)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._timestamp {
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._action {
+    }
+    if let v = self._action {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._groupID {
+    }
+    if let v = self._groupID {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4322,59 +3551,42 @@ extension SignalServiceProtos_Content: SwiftProtobuf.Message, SwiftProtobuf._Mes
     3: .same(proto: "callMessage"),
     4: .same(proto: "nullMessage"),
     5: .same(proto: "receiptMessage"),
-    6: .same(proto: "typingMessage"),
-    7: .same(proto: "senderKeyDistributionMessage"),
-    8: .same(proto: "decryptionErrorMessage")
+    6: .same(proto: "typingMessage")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._dataMessage) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._syncMessage) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._callMessage) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._nullMessage) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._receiptMessage) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._typingMessage) }()
-      case 7: try { try decoder.decodeSingularBytesField(value: &self._senderKeyDistributionMessage) }()
-      case 8: try { try decoder.decodeSingularBytesField(value: &self._decryptionErrorMessage) }()
+      case 1: try decoder.decodeSingularMessageField(value: &self._dataMessage)
+      case 2: try decoder.decodeSingularMessageField(value: &self._syncMessage)
+      case 3: try decoder.decodeSingularMessageField(value: &self._callMessage)
+      case 4: try decoder.decodeSingularMessageField(value: &self._nullMessage)
+      case 5: try decoder.decodeSingularMessageField(value: &self._receiptMessage)
+      case 6: try decoder.decodeSingularMessageField(value: &self._typingMessage)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._dataMessage {
+    if let v = self._dataMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._syncMessage {
+    }
+    if let v = self._syncMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._callMessage {
+    }
+    if let v = self._callMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._nullMessage {
+    }
+    if let v = self._nullMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._receiptMessage {
+    }
+    if let v = self._receiptMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._typingMessage {
+    }
+    if let v = self._typingMessage {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._senderKeyDistributionMessage {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._decryptionErrorMessage {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 8)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4385,8 +3597,6 @@ extension SignalServiceProtos_Content: SwiftProtobuf.Message, SwiftProtobuf._Mes
     if lhs._nullMessage != rhs._nullMessage {return false}
     if lhs._receiptMessage != rhs._receiptMessage {return false}
     if lhs._typingMessage != rhs._typingMessage {return false}
-    if lhs._senderKeyDistributionMessage != rhs._senderKeyDistributionMessage {return false}
-    if lhs._decryptionErrorMessage != rhs._decryptionErrorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4403,130 +3613,67 @@ extension SignalServiceProtos_CallMessage: SwiftProtobuf.Message, SwiftProtobuf.
     6: .same(proto: "profileKey"),
     7: .same(proto: "hangup"),
     8: .same(proto: "supportsMultiRing"),
-    9: .same(proto: "destinationDeviceId"),
-    10: .same(proto: "opaque")
+    9: .same(proto: "destinationDeviceId")
   ]
 
-  fileprivate class _StorageClass {
-    var _offer: SignalServiceProtos_CallMessage.Offer?
-    var _answer: SignalServiceProtos_CallMessage.Answer?
-    var _iceUpdate: [SignalServiceProtos_CallMessage.IceUpdate] = []
-    var _legacyHangup: SignalServiceProtos_CallMessage.Hangup?
-    var _busy: SignalServiceProtos_CallMessage.Busy?
-    var _profileKey: Data?
-    var _hangup: SignalServiceProtos_CallMessage.Hangup?
-    var _supportsMultiRing: Bool?
-    var _destinationDeviceID: UInt32?
-    var _opaque: SignalServiceProtos_CallMessage.Opaque?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _offer = source._offer
-      _answer = source._answer
-      _iceUpdate = source._iceUpdate
-      _legacyHangup = source._legacyHangup
-      _busy = source._busy
-      _profileKey = source._profileKey
-      _hangup = source._hangup
-      _supportsMultiRing = source._supportsMultiRing
-      _destinationDeviceID = source._destinationDeviceID
-      _opaque = source._opaque
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._offer) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._answer) }()
-        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._iceUpdate) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._legacyHangup) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._busy) }()
-        case 6: try { try decoder.decodeSingularBytesField(value: &_storage._profileKey) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._hangup) }()
-        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._supportsMultiRing) }()
-        case 9: try { try decoder.decodeSingularUInt32Field(value: &_storage._destinationDeviceID) }()
-        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._opaque) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularMessageField(value: &self._offer)
+      case 2: try decoder.decodeSingularMessageField(value: &self._answer)
+      case 3: try decoder.decodeRepeatedMessageField(value: &self.iceUpdate)
+      case 4: try decoder.decodeSingularMessageField(value: &self._legacyHangup)
+      case 5: try decoder.decodeSingularMessageField(value: &self._busy)
+      case 6: try decoder.decodeSingularBytesField(value: &self._profileKey)
+      case 7: try decoder.decodeSingularMessageField(value: &self._hangup)
+      case 8: try decoder.decodeSingularBoolField(value: &self._supportsMultiRing)
+      case 9: try decoder.decodeSingularUInt32Field(value: &self._destinationDeviceID)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._offer {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._answer {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if !_storage._iceUpdate.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._iceUpdate, fieldNumber: 3)
-      }
-      try { if let v = _storage._legacyHangup {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._busy {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._profileKey {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._hangup {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._supportsMultiRing {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._destinationDeviceID {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
-      } }()
-      try { if let v = _storage._opaque {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-      } }()
+    if let v = self._offer {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }
+    if let v = self._answer {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }
+    if !self.iceUpdate.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.iceUpdate, fieldNumber: 3)
+    }
+    if let v = self._legacyHangup {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    }
+    if let v = self._busy {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }
+    if let v = self._profileKey {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
+    }
+    if let v = self._hangup {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    }
+    if let v = self._supportsMultiRing {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+    }
+    if let v = self._destinationDeviceID {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_CallMessage, rhs: SignalServiceProtos_CallMessage) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._offer != rhs_storage._offer {return false}
-        if _storage._answer != rhs_storage._answer {return false}
-        if _storage._iceUpdate != rhs_storage._iceUpdate {return false}
-        if _storage._legacyHangup != rhs_storage._legacyHangup {return false}
-        if _storage._busy != rhs_storage._busy {return false}
-        if _storage._profileKey != rhs_storage._profileKey {return false}
-        if _storage._hangup != rhs_storage._hangup {return false}
-        if _storage._supportsMultiRing != rhs_storage._supportsMultiRing {return false}
-        if _storage._destinationDeviceID != rhs_storage._destinationDeviceID {return false}
-        if _storage._opaque != rhs_storage._opaque {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._offer != rhs._offer {return false}
+    if lhs._answer != rhs._answer {return false}
+    if lhs.iceUpdate != rhs.iceUpdate {return false}
+    if lhs._legacyHangup != rhs._legacyHangup {return false}
+    if lhs._busy != rhs._busy {return false}
+    if lhs._profileKey != rhs._profileKey {return false}
+    if lhs._hangup != rhs._hangup {return false}
+    if lhs._supportsMultiRing != rhs._supportsMultiRing {return false}
+    if lhs._destinationDeviceID != rhs._destinationDeviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4537,42 +3684,30 @@ extension SignalServiceProtos_CallMessage.Offer: SwiftProtobuf.Message, SwiftPro
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
     2: .same(proto: "sdp"),
-    3: .same(proto: "type"),
-    4: .same(proto: "opaque")
+    3: .same(proto: "type")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._sdp) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 4: try { try decoder.decodeSingularBytesField(value: &self._opaque) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._sdp)
+      case 3: try decoder.decodeSingularEnumField(value: &self._type)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._sdp {
+    }
+    if let v = self._sdp {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._opaque {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 4)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4580,7 +3715,6 @@ extension SignalServiceProtos_CallMessage.Offer: SwiftProtobuf.Message, SwiftPro
     if lhs._id != rhs._id {return false}
     if lhs._sdp != rhs._sdp {return false}
     if lhs._type != rhs._type {return false}
-    if lhs._opaque != rhs._opaque {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4597,45 +3731,32 @@ extension SignalServiceProtos_CallMessage.Answer: SwiftProtobuf.Message, SwiftPr
   static let protoMessageName: String = SignalServiceProtos_CallMessage.protoMessageName + ".Answer"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
-    2: .same(proto: "sdp"),
-    3: .same(proto: "opaque")
+    2: .same(proto: "sdp")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._sdp) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._opaque) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._sdp)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._sdp {
+    }
+    if let v = self._sdp {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._opaque {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_CallMessage.Answer, rhs: SignalServiceProtos_CallMessage.Answer) -> Bool {
     if lhs._id != rhs._id {return false}
     if lhs._sdp != rhs._sdp {return false}
-    if lhs._opaque != rhs._opaque {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4645,57 +3766,44 @@ extension SignalServiceProtos_CallMessage.IceUpdate: SwiftProtobuf.Message, Swif
   static let protoMessageName: String = SignalServiceProtos_CallMessage.protoMessageName + ".IceUpdate"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
-    2: .same(proto: "mid"),
-    3: .same(proto: "line"),
-    4: .same(proto: "sdp"),
-    5: .same(proto: "opaque")
+    2: .same(proto: "sdpMid"),
+    3: .same(proto: "sdpMLineIndex"),
+    4: .same(proto: "sdp")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._mid) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._line) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._sdp) }()
-      case 5: try { try decoder.decodeSingularBytesField(value: &self._opaque) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._sdpMid)
+      case 3: try decoder.decodeSingularUInt32Field(value: &self._sdpMlineIndex)
+      case 4: try decoder.decodeSingularStringField(value: &self._sdp)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._mid {
+    }
+    if let v = self._sdpMid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._line {
+    }
+    if let v = self._sdpMlineIndex {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._sdp {
+    }
+    if let v = self._sdp {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._opaque {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_CallMessage.IceUpdate, rhs: SignalServiceProtos_CallMessage.IceUpdate) -> Bool {
     if lhs._id != rhs._id {return false}
-    if lhs._mid != rhs._mid {return false}
-    if lhs._line != rhs._line {return false}
+    if lhs._sdpMid != rhs._sdpMid {return false}
+    if lhs._sdpMlineIndex != rhs._sdpMlineIndex {return false}
     if lhs._sdp != rhs._sdp {return false}
-    if lhs._opaque != rhs._opaque {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4709,24 +3817,17 @@ extension SignalServiceProtos_CallMessage.Busy: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4747,32 +3848,25 @@ extension SignalServiceProtos_CallMessage.Hangup: SwiftProtobuf.Message, SwiftPr
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._deviceID) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
+      case 2: try decoder.decodeSingularEnumField(value: &self._type)
+      case 3: try decoder.decodeSingularUInt32Field(value: &self._deviceID)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._deviceID {
+    }
+    if let v = self._deviceID {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4795,55 +3889,6 @@ extension SignalServiceProtos_CallMessage.Hangup.TypeEnum: SwiftProtobuf._ProtoN
   ]
 }
 
-extension SignalServiceProtos_CallMessage.Opaque: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_CallMessage.protoMessageName + ".Opaque"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "data"),
-    2: .same(proto: "urgency")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._data) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._urgency) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._data {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._urgency {
-      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_CallMessage.Opaque, rhs: SignalServiceProtos_CallMessage.Opaque) -> Bool {
-    if lhs._data != rhs._data {return false}
-    if lhs._urgency != rhs._urgency {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_CallMessage.Opaque.Urgency: SwiftProtobuf._ProtoNameProviding {
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "DROPPABLE"),
-    1: .same(proto: "HANDLE_IMMEDIATELY")
-  ]
-}
-
 extension SignalServiceProtos_DataMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DataMessage"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -4862,195 +3907,102 @@ extension SignalServiceProtos_DataMessage: SwiftProtobuf.Message, SwiftProtobuf.
     12: .same(proto: "requiredProtocolVersion"),
     14: .same(proto: "isViewOnce"),
     16: .same(proto: "reaction"),
-    17: .same(proto: "delete"),
-    18: .same(proto: "bodyRanges"),
-    19: .same(proto: "groupCallUpdate"),
-    20: .same(proto: "payment")
+    17: .same(proto: "delete")
   ]
 
-  fileprivate class _StorageClass {
-    var _body: String?
-    var _attachments: [SignalServiceProtos_AttachmentPointer] = []
-    var _group: SignalServiceProtos_GroupContext?
-    var _groupV2: SignalServiceProtos_GroupContextV2?
-    var _flags: UInt32?
-    var _expireTimer: UInt32?
-    var _profileKey: Data?
-    var _timestamp: UInt64?
-    var _quote: SignalServiceProtos_DataMessage.Quote?
-    var _contact: [SignalServiceProtos_DataMessage.Contact] = []
-    var _preview: [SignalServiceProtos_DataMessage.Preview] = []
-    var _sticker: SignalServiceProtos_DataMessage.Sticker?
-    var _requiredProtocolVersion: UInt32?
-    var _isViewOnce: Bool?
-    var _reaction: SignalServiceProtos_DataMessage.Reaction?
-    var _delete: SignalServiceProtos_DataMessage.Delete?
-    var _bodyRanges: [SignalServiceProtos_DataMessage.BodyRange] = []
-    var _groupCallUpdate: SignalServiceProtos_DataMessage.GroupCallUpdate?
-    var _payment: SignalServiceProtos_DataMessage.Payment?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _body = source._body
-      _attachments = source._attachments
-      _group = source._group
-      _groupV2 = source._groupV2
-      _flags = source._flags
-      _expireTimer = source._expireTimer
-      _profileKey = source._profileKey
-      _timestamp = source._timestamp
-      _quote = source._quote
-      _contact = source._contact
-      _preview = source._preview
-      _sticker = source._sticker
-      _requiredProtocolVersion = source._requiredProtocolVersion
-      _isViewOnce = source._isViewOnce
-      _reaction = source._reaction
-      _delete = source._delete
-      _bodyRanges = source._bodyRanges
-      _groupCallUpdate = source._groupCallUpdate
-      _payment = source._payment
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._body) }()
-        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._attachments) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._group) }()
-        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._flags) }()
-        case 5: try { try decoder.decodeSingularUInt32Field(value: &_storage._expireTimer) }()
-        case 6: try { try decoder.decodeSingularBytesField(value: &_storage._profileKey) }()
-        case 7: try { try decoder.decodeSingularUInt64Field(value: &_storage._timestamp) }()
-        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._quote) }()
-        case 9: try { try decoder.decodeRepeatedMessageField(value: &_storage._contact) }()
-        case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._preview) }()
-        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._sticker) }()
-        case 12: try { try decoder.decodeSingularUInt32Field(value: &_storage._requiredProtocolVersion) }()
-        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._isViewOnce) }()
-        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._groupV2) }()
-        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._reaction) }()
-        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._delete) }()
-        case 18: try { try decoder.decodeRepeatedMessageField(value: &_storage._bodyRanges) }()
-        case 19: try { try decoder.decodeSingularMessageField(value: &_storage._groupCallUpdate) }()
-        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._payment) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularStringField(value: &self._body)
+      case 2: try decoder.decodeRepeatedMessageField(value: &self.attachments)
+      case 3: try decoder.decodeSingularMessageField(value: &self._group)
+      case 4: try decoder.decodeSingularUInt32Field(value: &self._flags)
+      case 5: try decoder.decodeSingularUInt32Field(value: &self._expireTimer)
+      case 6: try decoder.decodeSingularBytesField(value: &self._profileKey)
+      case 7: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 8: try decoder.decodeSingularMessageField(value: &self._quote)
+      case 9: try decoder.decodeRepeatedMessageField(value: &self.contact)
+      case 10: try decoder.decodeRepeatedMessageField(value: &self.preview)
+      case 11: try decoder.decodeSingularMessageField(value: &self._sticker)
+      case 12: try decoder.decodeSingularUInt32Field(value: &self._requiredProtocolVersion)
+      case 14: try decoder.decodeSingularBoolField(value: &self._isViewOnce)
+      case 15: try decoder.decodeSingularMessageField(value: &self._groupV2)
+      case 16: try decoder.decodeSingularMessageField(value: &self._reaction)
+      case 17: try decoder.decodeSingularMessageField(value: &self._delete)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._body {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-      } }()
-      if !_storage._attachments.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._attachments, fieldNumber: 2)
-      }
-      try { if let v = _storage._group {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._flags {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._expireTimer {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._profileKey {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._timestamp {
-        try visitor.visitSingularUInt64Field(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._quote {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-      } }()
-      if !_storage._contact.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._contact, fieldNumber: 9)
-      }
-      if !_storage._preview.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._preview, fieldNumber: 10)
-      }
-      try { if let v = _storage._sticker {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
-      } }()
-      try { if let v = _storage._requiredProtocolVersion {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 12)
-      } }()
-      try { if let v = _storage._isViewOnce {
-        try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
-      } }()
-      try { if let v = _storage._groupV2 {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
-      } }()
-      try { if let v = _storage._reaction {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
-      } }()
-      try { if let v = _storage._delete {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
-      } }()
-      if !_storage._bodyRanges.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._bodyRanges, fieldNumber: 18)
-      }
-      try { if let v = _storage._groupCallUpdate {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
-      } }()
-      try { if let v = _storage._payment {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
-      } }()
+    if let v = self._body {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }
+    if !self.attachments.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 2)
+    }
+    if let v = self._group {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }
+    if let v = self._flags {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
+    }
+    if let v = self._expireTimer {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
+    }
+    if let v = self._profileKey {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
+    }
+    if let v = self._timestamp {
+      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 7)
+    }
+    if let v = self._quote {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    }
+    if !self.contact.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.contact, fieldNumber: 9)
+    }
+    if !self.preview.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.preview, fieldNumber: 10)
+    }
+    if let v = self._sticker {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    }
+    if let v = self._requiredProtocolVersion {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 12)
+    }
+    if let v = self._isViewOnce {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 14)
+    }
+    if let v = self._groupV2 {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+    }
+    if let v = self._reaction {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
+    }
+    if let v = self._delete {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage, rhs: SignalServiceProtos_DataMessage) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._body != rhs_storage._body {return false}
-        if _storage._attachments != rhs_storage._attachments {return false}
-        if _storage._group != rhs_storage._group {return false}
-        if _storage._groupV2 != rhs_storage._groupV2 {return false}
-        if _storage._flags != rhs_storage._flags {return false}
-        if _storage._expireTimer != rhs_storage._expireTimer {return false}
-        if _storage._profileKey != rhs_storage._profileKey {return false}
-        if _storage._timestamp != rhs_storage._timestamp {return false}
-        if _storage._quote != rhs_storage._quote {return false}
-        if _storage._contact != rhs_storage._contact {return false}
-        if _storage._preview != rhs_storage._preview {return false}
-        if _storage._sticker != rhs_storage._sticker {return false}
-        if _storage._requiredProtocolVersion != rhs_storage._requiredProtocolVersion {return false}
-        if _storage._isViewOnce != rhs_storage._isViewOnce {return false}
-        if _storage._reaction != rhs_storage._reaction {return false}
-        if _storage._delete != rhs_storage._delete {return false}
-        if _storage._bodyRanges != rhs_storage._bodyRanges {return false}
-        if _storage._groupCallUpdate != rhs_storage._groupCallUpdate {return false}
-        if _storage._payment != rhs_storage._payment {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._body != rhs._body {return false}
+    if lhs.attachments != rhs.attachments {return false}
+    if lhs._group != rhs._group {return false}
+    if lhs._groupV2 != rhs._groupV2 {return false}
+    if lhs._flags != rhs._flags {return false}
+    if lhs._expireTimer != rhs._expireTimer {return false}
+    if lhs._profileKey != rhs._profileKey {return false}
+    if lhs._timestamp != rhs._timestamp {return false}
+    if lhs._quote != rhs._quote {return false}
+    if lhs.contact != rhs.contact {return false}
+    if lhs.preview != rhs.preview {return false}
+    if lhs._sticker != rhs._sticker {return false}
+    if lhs._requiredProtocolVersion != rhs._requiredProtocolVersion {return false}
+    if lhs._isViewOnce != rhs._isViewOnce {return false}
+    if lhs._reaction != rhs._reaction {return false}
+    if lhs._delete != rhs._delete {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5071,9 +4023,7 @@ extension SignalServiceProtos_DataMessage.ProtocolVersion: SwiftProtobuf._ProtoN
     2: .same(proto: "VIEW_ONCE"),
     3: .same(proto: "VIEW_ONCE_VIDEO"),
     4: .same(proto: "REACTIONS"),
-    5: .same(proto: "CDN_SELECTOR_ATTACHMENTS"),
-    6: .same(proto: "MENTIONS"),
-    7: .aliased(proto: "PAYMENTS", aliases: ["CURRENT"])
+    5: .aliased(proto: "CDN_SELECTOR_ATTACHMENTS", aliases: ["CURRENT"])
   ]
 }
 
@@ -5084,49 +4034,37 @@ extension SignalServiceProtos_DataMessage.Quote: SwiftProtobuf.Message, SwiftPro
     2: .same(proto: "authorE164"),
     5: .same(proto: "authorUuid"),
     3: .same(proto: "text"),
-    4: .same(proto: "attachments"),
-    6: .same(proto: "bodyRanges")
+    4: .same(proto: "attachments")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._authorE164) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._text) }()
-      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._authorUuid) }()
-      case 6: try { try decoder.decodeRepeatedMessageField(value: &self.bodyRanges) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._authorE164)
+      case 3: try decoder.decodeSingularStringField(value: &self._text)
+      case 4: try decoder.decodeRepeatedMessageField(value: &self.attachments)
+      case 5: try decoder.decodeSingularStringField(value: &self._authorUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._authorE164 {
+    }
+    if let v = self._authorE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._text {
+    }
+    if let v = self._text {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     if !self.attachments.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 4)
     }
-    try { if let v = self._authorUuid {
+    if let v = self._authorUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    if !self.bodyRanges.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.bodyRanges, fieldNumber: 6)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5137,7 +4075,6 @@ extension SignalServiceProtos_DataMessage.Quote: SwiftProtobuf.Message, SwiftPro
     if lhs._authorUuid != rhs._authorUuid {return false}
     if lhs._text != rhs._text {return false}
     if lhs.attachments != rhs.attachments {return false}
-    if lhs.bodyRanges != rhs.bodyRanges {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5152,84 +4089,39 @@ extension SignalServiceProtos_DataMessage.Quote.QuotedAttachment: SwiftProtobuf.
     4: .same(proto: "flags")
   ]
 
-  fileprivate class _StorageClass {
-    var _contentType: String?
-    var _fileName: String?
-    var _thumbnail: SignalServiceProtos_AttachmentPointer?
-    var _flags: UInt32?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _contentType = source._contentType
-      _fileName = source._fileName
-      _thumbnail = source._thumbnail
-      _flags = source._flags
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._contentType) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._fileName) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._thumbnail) }()
-        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._flags) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularStringField(value: &self._contentType)
+      case 2: try decoder.decodeSingularStringField(value: &self._fileName)
+      case 3: try decoder.decodeSingularMessageField(value: &self._thumbnail)
+      case 4: try decoder.decodeSingularUInt32Field(value: &self._flags)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._contentType {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._fileName {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._thumbnail {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._flags {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
-      } }()
+    if let v = self._contentType {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }
+    if let v = self._fileName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }
+    if let v = self._thumbnail {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }
+    if let v = self._flags {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage.Quote.QuotedAttachment, rhs: SignalServiceProtos_DataMessage.Quote.QuotedAttachment) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._contentType != rhs_storage._contentType {return false}
-        if _storage._fileName != rhs_storage._fileName {return false}
-        if _storage._thumbnail != rhs_storage._thumbnail {return false}
-        if _storage._flags != rhs_storage._flags {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._contentType != rhs._contentType {return false}
+    if lhs._fileName != rhs._fileName {return false}
+    if lhs._thumbnail != rhs._thumbnail {return false}
+    if lhs._flags != rhs._flags {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5252,98 +4144,49 @@ extension SignalServiceProtos_DataMessage.Contact: SwiftProtobuf.Message, SwiftP
     7: .same(proto: "organization")
   ]
 
-  fileprivate class _StorageClass {
-    var _name: SignalServiceProtos_DataMessage.Contact.Name?
-    var _number: [SignalServiceProtos_DataMessage.Contact.Phone] = []
-    var _email: [SignalServiceProtos_DataMessage.Contact.Email] = []
-    var _address: [SignalServiceProtos_DataMessage.Contact.PostalAddress] = []
-    var _avatar: SignalServiceProtos_DataMessage.Contact.Avatar?
-    var _organization: String?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _name = source._name
-      _number = source._number
-      _email = source._email
-      _address = source._address
-      _avatar = source._avatar
-      _organization = source._organization
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._name) }()
-        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._number) }()
-        case 4: try { try decoder.decodeRepeatedMessageField(value: &_storage._email) }()
-        case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._address) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._avatar) }()
-        case 7: try { try decoder.decodeSingularStringField(value: &_storage._organization) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularMessageField(value: &self._name)
+      case 3: try decoder.decodeRepeatedMessageField(value: &self.number)
+      case 4: try decoder.decodeRepeatedMessageField(value: &self.email)
+      case 5: try decoder.decodeRepeatedMessageField(value: &self.address)
+      case 6: try decoder.decodeSingularMessageField(value: &self._avatar)
+      case 7: try decoder.decodeSingularStringField(value: &self._organization)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._name {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      if !_storage._number.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._number, fieldNumber: 3)
-      }
-      if !_storage._email.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._email, fieldNumber: 4)
-      }
-      if !_storage._address.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._address, fieldNumber: 5)
-      }
-      try { if let v = _storage._avatar {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._organization {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-      } }()
+    if let v = self._name {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }
+    if !self.number.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.number, fieldNumber: 3)
+    }
+    if !self.email.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.email, fieldNumber: 4)
+    }
+    if !self.address.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.address, fieldNumber: 5)
+    }
+    if let v = self._avatar {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    }
+    if let v = self._organization {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage.Contact, rhs: SignalServiceProtos_DataMessage.Contact) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._name != rhs_storage._name {return false}
-        if _storage._number != rhs_storage._number {return false}
-        if _storage._email != rhs_storage._email {return false}
-        if _storage._address != rhs_storage._address {return false}
-        if _storage._avatar != rhs_storage._avatar {return false}
-        if _storage._organization != rhs_storage._organization {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._name != rhs._name {return false}
+    if lhs.number != rhs.number {return false}
+    if lhs.email != rhs.email {return false}
+    if lhs.address != rhs.address {return false}
+    if lhs._avatar != rhs._avatar {return false}
+    if lhs._organization != rhs._organization {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5362,44 +4205,37 @@ extension SignalServiceProtos_DataMessage.Contact.Name: SwiftProtobuf.Message, S
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._givenName) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._familyName) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._prefix) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._suffix) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._middleName) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._displayName) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._givenName)
+      case 2: try decoder.decodeSingularStringField(value: &self._familyName)
+      case 3: try decoder.decodeSingularStringField(value: &self._prefix)
+      case 4: try decoder.decodeSingularStringField(value: &self._suffix)
+      case 5: try decoder.decodeSingularStringField(value: &self._middleName)
+      case 6: try decoder.decodeSingularStringField(value: &self._displayName)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._givenName {
+    if let v = self._givenName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._familyName {
+    }
+    if let v = self._familyName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._prefix {
+    }
+    if let v = self._prefix {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._suffix {
+    }
+    if let v = self._suffix {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._middleName {
+    }
+    if let v = self._middleName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._displayName {
+    }
+    if let v = self._displayName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5425,32 +4261,25 @@ extension SignalServiceProtos_DataMessage.Contact.Phone: SwiftProtobuf.Message, 
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._label) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._value)
+      case 2: try decoder.decodeSingularEnumField(value: &self._type)
+      case 3: try decoder.decodeSingularStringField(value: &self._label)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._value {
+    if let v = self._value {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._label {
+    }
+    if let v = self._label {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5482,32 +4311,25 @@ extension SignalServiceProtos_DataMessage.Contact.Email: SwiftProtobuf.Message, 
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._value) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._label) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._value)
+      case 2: try decoder.decodeSingularEnumField(value: &self._type)
+      case 3: try decoder.decodeSingularStringField(value: &self._label)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._value {
+    if let v = self._value {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._label {
+    }
+    if let v = self._label {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5545,56 +4367,49 @@ extension SignalServiceProtos_DataMessage.Contact.PostalAddress: SwiftProtobuf.M
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._label) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._street) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._pobox) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._neighborhood) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._city) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._region) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._postcode) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._country) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
+      case 2: try decoder.decodeSingularStringField(value: &self._label)
+      case 3: try decoder.decodeSingularStringField(value: &self._street)
+      case 4: try decoder.decodeSingularStringField(value: &self._pobox)
+      case 5: try decoder.decodeSingularStringField(value: &self._neighborhood)
+      case 6: try decoder.decodeSingularStringField(value: &self._city)
+      case 7: try decoder.decodeSingularStringField(value: &self._region)
+      case 8: try decoder.decodeSingularStringField(value: &self._postcode)
+      case 9: try decoder.decodeSingularStringField(value: &self._country)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._label {
+    }
+    if let v = self._label {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._street {
+    }
+    if let v = self._street {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._pobox {
+    }
+    if let v = self._pobox {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._neighborhood {
+    }
+    if let v = self._neighborhood {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._city {
+    }
+    if let v = self._city {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._region {
+    }
+    if let v = self._region {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._postcode {
+    }
+    if let v = self._postcode {
       try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._country {
+    }
+    if let v = self._country {
       try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5630,28 +4445,21 @@ extension SignalServiceProtos_DataMessage.Contact.Avatar: SwiftProtobuf.Message,
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._avatar) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._isProfile) }()
+      case 1: try decoder.decodeSingularMessageField(value: &self._avatar)
+      case 2: try decoder.decodeSingularBoolField(value: &self._isProfile)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._avatar {
+    if let v = self._avatar {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._isProfile {
+    }
+    if let v = self._isProfile {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5668,96 +4476,37 @@ extension SignalServiceProtos_DataMessage.Preview: SwiftProtobuf.Message, SwiftP
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "url"),
     2: .same(proto: "title"),
-    3: .same(proto: "image"),
-    4: .same(proto: "previewDescription"),
-    5: .same(proto: "date")
+    3: .same(proto: "image")
   ]
 
-  fileprivate class _StorageClass {
-    var _url: String?
-    var _title: String?
-    var _image: SignalServiceProtos_AttachmentPointer?
-    var _previewDescription: String?
-    var _date: UInt64?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _url = source._url
-      _title = source._title
-      _image = source._image
-      _previewDescription = source._previewDescription
-      _date = source._date
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._url) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._title) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._image) }()
-        case 4: try { try decoder.decodeSingularStringField(value: &_storage._previewDescription) }()
-        case 5: try { try decoder.decodeSingularUInt64Field(value: &_storage._date) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularStringField(value: &self._url)
+      case 2: try decoder.decodeSingularStringField(value: &self._title)
+      case 3: try decoder.decodeSingularMessageField(value: &self._image)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._url {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._title {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._image {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._previewDescription {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._date {
-        try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
-      } }()
+    if let v = self._url {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }
+    if let v = self._title {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }
+    if let v = self._image {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage.Preview, rhs: SignalServiceProtos_DataMessage.Preview) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._url != rhs_storage._url {return false}
-        if _storage._title != rhs_storage._title {return false}
-        if _storage._image != rhs_storage._image {return false}
-        if _storage._previewDescription != rhs_storage._previewDescription {return false}
-        if _storage._date != rhs_storage._date {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._url != rhs._url {return false}
+    if lhs._title != rhs._title {return false}
+    if lhs._image != rhs._image {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5769,95 +4518,42 @@ extension SignalServiceProtos_DataMessage.Sticker: SwiftProtobuf.Message, SwiftP
     1: .same(proto: "packId"),
     2: .same(proto: "packKey"),
     3: .same(proto: "stickerId"),
-    4: .same(proto: "data"),
-    5: .same(proto: "emoji")
+    4: .same(proto: "data")
   ]
 
-  fileprivate class _StorageClass {
-    var _packID: Data?
-    var _packKey: Data?
-    var _stickerID: UInt32?
-    var _data: SignalServiceProtos_AttachmentPointer?
-    var _emoji: String?
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _packID = source._packID
-      _packKey = source._packKey
-      _stickerID = source._stickerID
-      _data = source._data
-      _emoji = source._emoji
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBytesField(value: &_storage._packID) }()
-        case 2: try { try decoder.decodeSingularBytesField(value: &_storage._packKey) }()
-        case 3: try { try decoder.decodeSingularUInt32Field(value: &_storage._stickerID) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._data) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._emoji) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularBytesField(value: &self._packID)
+      case 2: try decoder.decodeSingularBytesField(value: &self._packKey)
+      case 3: try decoder.decodeSingularUInt32Field(value: &self._stickerID)
+      case 4: try decoder.decodeSingularMessageField(value: &self._data)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._packID {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._packKey {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._stickerID {
-        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._data {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      try { if let v = _storage._emoji {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-      } }()
+    if let v = self._packID {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
+    }
+    if let v = self._packKey {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
+    }
+    if let v = self._stickerID {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
+    }
+    if let v = self._data {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage.Sticker, rhs: SignalServiceProtos_DataMessage.Sticker) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._packID != rhs_storage._packID {return false}
-        if _storage._packKey != rhs_storage._packKey {return false}
-        if _storage._stickerID != rhs_storage._stickerID {return false}
-        if _storage._data != rhs_storage._data {return false}
-        if _storage._emoji != rhs_storage._emoji {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._packID != rhs._packID {return false}
+    if lhs._packKey != rhs._packKey {return false}
+    if lhs._stickerID != rhs._stickerID {return false}
+    if lhs._data != rhs._data {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5875,40 +4571,33 @@ extension SignalServiceProtos_DataMessage.Reaction: SwiftProtobuf.Message, Swift
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._emoji) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._remove) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._authorE164) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._authorUuid) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._emoji)
+      case 2: try decoder.decodeSingularBoolField(value: &self._remove)
+      case 3: try decoder.decodeSingularStringField(value: &self._authorE164)
+      case 4: try decoder.decodeSingularStringField(value: &self._authorUuid)
+      case 5: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._emoji {
+    if let v = self._emoji {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._remove {
+    }
+    if let v = self._remove {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._authorE164 {
+    }
+    if let v = self._authorE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._authorUuid {
+    }
+    if let v = self._authorUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._timestamp {
+    }
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5931,437 +4620,22 @@ extension SignalServiceProtos_DataMessage.Delete: SwiftProtobuf.Message, SwiftPr
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._targetSentTimestamp) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self._targetSentTimestamp)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._targetSentTimestamp {
+    if let v = self._targetSentTimestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_DataMessage.Delete, rhs: SignalServiceProtos_DataMessage.Delete) -> Bool {
     if lhs._targetSentTimestamp != rhs._targetSentTimestamp {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.BodyRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.protoMessageName + ".BodyRange"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "start"),
-    2: .same(proto: "length"),
-    3: .same(proto: "mentionUuid")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._start) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self._length) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._mentionUuid) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._start {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._length {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._mentionUuid {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.BodyRange, rhs: SignalServiceProtos_DataMessage.BodyRange) -> Bool {
-    if lhs._start != rhs._start {return false}
-    if lhs._length != rhs._length {return false}
-    if lhs._mentionUuid != rhs._mentionUuid {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.GroupCallUpdate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.protoMessageName + ".GroupCallUpdate"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "eraId")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._eraID) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._eraID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.GroupCallUpdate, rhs: SignalServiceProtos_DataMessage.GroupCallUpdate) -> Bool {
-    if lhs._eraID != rhs._eraID {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.protoMessageName + ".Payment"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "notification"),
-    1002: .same(proto: "request"),
-    1003: .same(proto: "cancellation")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._notification) }()
-      case 1002: try { try decoder.decodeSingularMessageField(value: &self._request) }()
-      case 1003: try { try decoder.decodeSingularMessageField(value: &self._cancellation) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._notification {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._request {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1002)
-    } }()
-    try { if let v = self._cancellation {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1003)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment, rhs: SignalServiceProtos_DataMessage.Payment) -> Bool {
-    if lhs._notification != rhs._notification {return false}
-    if lhs._request != rhs._request {return false}
-    if lhs._cancellation != rhs._cancellation {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Amount: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.protoMessageName + ".Amount"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mobileCoin")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._mobileCoin) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._mobileCoin {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Amount, rhs: SignalServiceProtos_DataMessage.Payment.Amount) -> Bool {
-    if lhs._mobileCoin != rhs._mobileCoin {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.Amount.protoMessageName + ".MobileCoin"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "picoMob")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self._picoMob) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._picoMob {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin, rhs: SignalServiceProtos_DataMessage.Payment.Amount.MobileCoin) -> Bool {
-    if lhs._picoMob != rhs._picoMob {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.RequestId: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.protoMessageName + ".RequestId"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "uuid")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._uuid) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._uuid {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.RequestId, rhs: SignalServiceProtos_DataMessage.Payment.RequestId) -> Bool {
-    if lhs._uuid != rhs._uuid {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.protoMessageName + ".Request"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "requestId"),
-    2: .same(proto: "amount"),
-    3: .same(proto: "note")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._requestID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._amount) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._note) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._requestID {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._amount {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._note {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Request, rhs: SignalServiceProtos_DataMessage.Payment.Request) -> Bool {
-    if lhs._requestID != rhs._requestID {return false}
-    if lhs._amount != rhs._amount {return false}
-    if lhs._note != rhs._note {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Notification: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.protoMessageName + ".Notification"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mobileCoin"),
-    2: .same(proto: "note"),
-    1003: .same(proto: "requestId")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._mobileCoin) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._note) }()
-      case 1003: try { try decoder.decodeSingularMessageField(value: &self._requestID) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._mobileCoin {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._note {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._requestID {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1003)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Notification, rhs: SignalServiceProtos_DataMessage.Payment.Notification) -> Bool {
-    if lhs._mobileCoin != rhs._mobileCoin {return false}
-    if lhs._note != rhs._note {return false}
-    if lhs._requestID != rhs._requestID {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.Notification.protoMessageName + ".MobileCoin"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "receipt")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._receipt) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._receipt {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin, rhs: SignalServiceProtos_DataMessage.Payment.Notification.MobileCoin) -> Bool {
-    if lhs._receipt != rhs._receipt {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DataMessage.Payment.Cancellation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_DataMessage.Payment.protoMessageName + ".Cancellation"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "requestId")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._requestID) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._requestID {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DataMessage.Payment.Cancellation, rhs: SignalServiceProtos_DataMessage.Payment.Cancellation) -> Bool {
-    if lhs._requestID != rhs._requestID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6375,24 +4649,17 @@ extension SignalServiceProtos_NullMessage: SwiftProtobuf.Message, SwiftProtobuf.
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._padding) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._padding)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._padding {
+    if let v = self._padding {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6412,25 +4679,18 @@ extension SignalServiceProtos_ReceiptMessage: SwiftProtobuf.Message, SwiftProtob
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
-      case 2: try { try decoder.decodeRepeatedUInt64Field(value: &self.timestamp) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
+      case 2: try decoder.decodeRepeatedUInt64Field(value: &self.timestamp)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
+    }
     if !self.timestamp.isEmpty {
       try visitor.visitRepeatedUInt64Field(value: self.timestamp, fieldNumber: 2)
     }
@@ -6448,8 +4708,7 @@ extension SignalServiceProtos_ReceiptMessage: SwiftProtobuf.Message, SwiftProtob
 extension SignalServiceProtos_ReceiptMessage.TypeEnum: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     0: .same(proto: "DELIVERY"),
-    1: .same(proto: "READ"),
-    2: .same(proto: "VIEWED")
+    1: .same(proto: "READ")
   ]
 }
 
@@ -6465,40 +4724,33 @@ extension SignalServiceProtos_Verified: SwiftProtobuf.Message, SwiftProtobuf._Me
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._destinationE164) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._identityKey) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self._state) }()
-      case 4: try { try decoder.decodeSingularBytesField(value: &self._nullMessage) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._destinationUuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._destinationE164)
+      case 2: try decoder.decodeSingularBytesField(value: &self._identityKey)
+      case 3: try decoder.decodeSingularEnumField(value: &self._state)
+      case 4: try decoder.decodeSingularBytesField(value: &self._nullMessage)
+      case 5: try decoder.decodeSingularStringField(value: &self._destinationUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._destinationE164 {
+    if let v = self._destinationE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._identityKey {
+    }
+    if let v = self._identityKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._state {
+    }
+    if let v = self._state {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._nullMessage {
+    }
+    if let v = self._nullMessage {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._destinationUuid {
+    }
+    if let v = self._destinationUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6537,173 +4789,92 @@ extension SignalServiceProtos_SyncMessage: SwiftProtobuf.Message, SwiftProtobuf.
     11: .same(proto: "viewOnceOpen"),
     12: .same(proto: "fetchLatest"),
     13: .same(proto: "keys"),
-    14: .same(proto: "messageRequestResponse"),
-    15: .same(proto: "outgoingPayment"),
-    16: .same(proto: "viewed")
+    14: .same(proto: "messageRequestResponse")
   ]
 
-  fileprivate class _StorageClass {
-    var _sent: SignalServiceProtos_SyncMessage.Sent?
-    var _contacts: SignalServiceProtos_SyncMessage.Contacts?
-    var _groups: SignalServiceProtos_SyncMessage.Groups?
-    var _request: SignalServiceProtos_SyncMessage.Request?
-    var _read: [SignalServiceProtos_SyncMessage.Read] = []
-    var _blocked: SignalServiceProtos_SyncMessage.Blocked?
-    var _verified: SignalServiceProtos_Verified?
-    var _configuration: SignalServiceProtos_SyncMessage.Configuration?
-    var _padding: Data?
-    var _stickerPackOperation: [SignalServiceProtos_SyncMessage.StickerPackOperation] = []
-    var _viewOnceOpen: SignalServiceProtos_SyncMessage.ViewOnceOpen?
-    var _fetchLatest: SignalServiceProtos_SyncMessage.FetchLatest?
-    var _keys: SignalServiceProtos_SyncMessage.Keys?
-    var _messageRequestResponse: SignalServiceProtos_SyncMessage.MessageRequestResponse?
-    var _outgoingPayment: SignalServiceProtos_SyncMessage.OutgoingPayment?
-    var _viewed: [SignalServiceProtos_SyncMessage.Viewed] = []
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _sent = source._sent
-      _contacts = source._contacts
-      _groups = source._groups
-      _request = source._request
-      _read = source._read
-      _blocked = source._blocked
-      _verified = source._verified
-      _configuration = source._configuration
-      _padding = source._padding
-      _stickerPackOperation = source._stickerPackOperation
-      _viewOnceOpen = source._viewOnceOpen
-      _fetchLatest = source._fetchLatest
-      _keys = source._keys
-      _messageRequestResponse = source._messageRequestResponse
-      _outgoingPayment = source._outgoingPayment
-      _viewed = source._viewed
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._sent) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._contacts) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._groups) }()
-        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._request) }()
-        case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._read) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._blocked) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._verified) }()
-        case 8: try { try decoder.decodeSingularBytesField(value: &_storage._padding) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._configuration) }()
-        case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._stickerPackOperation) }()
-        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._viewOnceOpen) }()
-        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._fetchLatest) }()
-        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._keys) }()
-        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._messageRequestResponse) }()
-        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._outgoingPayment) }()
-        case 16: try { try decoder.decodeRepeatedMessageField(value: &_storage._viewed) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularMessageField(value: &self._sent)
+      case 2: try decoder.decodeSingularMessageField(value: &self._contacts)
+      case 3: try decoder.decodeSingularMessageField(value: &self._groups)
+      case 4: try decoder.decodeSingularMessageField(value: &self._request)
+      case 5: try decoder.decodeRepeatedMessageField(value: &self.read)
+      case 6: try decoder.decodeSingularMessageField(value: &self._blocked)
+      case 7: try decoder.decodeSingularMessageField(value: &self._verified)
+      case 8: try decoder.decodeSingularBytesField(value: &self._padding)
+      case 9: try decoder.decodeSingularMessageField(value: &self._configuration)
+      case 10: try decoder.decodeRepeatedMessageField(value: &self.stickerPackOperation)
+      case 11: try decoder.decodeSingularMessageField(value: &self._viewOnceOpen)
+      case 12: try decoder.decodeSingularMessageField(value: &self._fetchLatest)
+      case 13: try decoder.decodeSingularMessageField(value: &self._keys)
+      case 14: try decoder.decodeSingularMessageField(value: &self._messageRequestResponse)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._sent {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._contacts {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._groups {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      try { if let v = _storage._request {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-      } }()
-      if !_storage._read.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._read, fieldNumber: 5)
-      }
-      try { if let v = _storage._blocked {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._verified {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      try { if let v = _storage._padding {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 8)
-      } }()
-      try { if let v = _storage._configuration {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
-      if !_storage._stickerPackOperation.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._stickerPackOperation, fieldNumber: 10)
-      }
-      try { if let v = _storage._viewOnceOpen {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
-      } }()
-      try { if let v = _storage._fetchLatest {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
-      } }()
-      try { if let v = _storage._keys {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
-      } }()
-      try { if let v = _storage._messageRequestResponse {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
-      } }()
-      try { if let v = _storage._outgoingPayment {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
-      } }()
-      if !_storage._viewed.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._viewed, fieldNumber: 16)
-      }
+    if let v = self._sent {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }
+    if let v = self._contacts {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }
+    if let v = self._groups {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }
+    if let v = self._request {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    }
+    if !self.read.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.read, fieldNumber: 5)
+    }
+    if let v = self._blocked {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    }
+    if let v = self._verified {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    }
+    if let v = self._padding {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 8)
+    }
+    if let v = self._configuration {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    }
+    if !self.stickerPackOperation.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.stickerPackOperation, fieldNumber: 10)
+    }
+    if let v = self._viewOnceOpen {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+    }
+    if let v = self._fetchLatest {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+    }
+    if let v = self._keys {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+    }
+    if let v = self._messageRequestResponse {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_SyncMessage, rhs: SignalServiceProtos_SyncMessage) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._sent != rhs_storage._sent {return false}
-        if _storage._contacts != rhs_storage._contacts {return false}
-        if _storage._groups != rhs_storage._groups {return false}
-        if _storage._request != rhs_storage._request {return false}
-        if _storage._read != rhs_storage._read {return false}
-        if _storage._blocked != rhs_storage._blocked {return false}
-        if _storage._verified != rhs_storage._verified {return false}
-        if _storage._configuration != rhs_storage._configuration {return false}
-        if _storage._padding != rhs_storage._padding {return false}
-        if _storage._stickerPackOperation != rhs_storage._stickerPackOperation {return false}
-        if _storage._viewOnceOpen != rhs_storage._viewOnceOpen {return false}
-        if _storage._fetchLatest != rhs_storage._fetchLatest {return false}
-        if _storage._keys != rhs_storage._keys {return false}
-        if _storage._messageRequestResponse != rhs_storage._messageRequestResponse {return false}
-        if _storage._outgoingPayment != rhs_storage._outgoingPayment {return false}
-        if _storage._viewed != rhs_storage._viewed {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._sent != rhs._sent {return false}
+    if lhs._contacts != rhs._contacts {return false}
+    if lhs._groups != rhs._groups {return false}
+    if lhs._request != rhs._request {return false}
+    if lhs.read != rhs.read {return false}
+    if lhs._blocked != rhs._blocked {return false}
+    if lhs._verified != rhs._verified {return false}
+    if lhs._configuration != rhs._configuration {return false}
+    if lhs._padding != rhs._padding {return false}
+    if lhs.stickerPackOperation != rhs.stickerPackOperation {return false}
+    if lhs._viewOnceOpen != rhs._viewOnceOpen {return false}
+    if lhs._fetchLatest != rhs._fetchLatest {return false}
+    if lhs._keys != rhs._keys {return false}
+    if lhs._messageRequestResponse != rhs._messageRequestResponse {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6723,48 +4894,41 @@ extension SignalServiceProtos_SyncMessage.Sent: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._destinationE164) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._message) }()
-      case 4: try { try decoder.decodeSingularUInt64Field(value: &self._expirationStartTimestamp) }()
-      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.unidentifiedStatus) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self._isRecipientUpdate) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._destinationUuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._destinationE164)
+      case 2: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 3: try decoder.decodeSingularMessageField(value: &self._message)
+      case 4: try decoder.decodeSingularUInt64Field(value: &self._expirationStartTimestamp)
+      case 5: try decoder.decodeRepeatedMessageField(value: &self.unidentifiedStatus)
+      case 6: try decoder.decodeSingularBoolField(value: &self._isRecipientUpdate)
+      case 7: try decoder.decodeSingularStringField(value: &self._destinationUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._destinationE164 {
+    if let v = self._destinationE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._timestamp {
+    }
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._message {
+    }
+    if let v = self._message {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._expirationStartTimestamp {
+    }
+    if let v = self._expirationStartTimestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 4)
-    } }()
+    }
     if !self.unidentifiedStatus.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.unidentifiedStatus, fieldNumber: 5)
     }
-    try { if let v = self._isRecipientUpdate {
+    if let v = self._isRecipientUpdate {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._destinationUuid {
+    }
+    if let v = self._destinationUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6791,32 +4955,25 @@ extension SignalServiceProtos_SyncMessage.Sent.UnidentifiedDeliveryStatus: Swift
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._destinationE164) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._unidentified) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._destinationUuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._destinationE164)
+      case 2: try decoder.decodeSingularBoolField(value: &self._unidentified)
+      case 3: try decoder.decodeSingularStringField(value: &self._destinationUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._destinationE164 {
+    if let v = self._destinationE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._unidentified {
+    }
+    if let v = self._unidentified {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._destinationUuid {
+    }
+    if let v = self._destinationUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6838,28 +4995,21 @@ extension SignalServiceProtos_SyncMessage.Contacts: SwiftProtobuf.Message, Swift
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._blob) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._isComplete) }()
+      case 1: try decoder.decodeSingularMessageField(value: &self._blob)
+      case 2: try decoder.decodeSingularBoolField(value: &self._isComplete)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._blob {
+    if let v = self._blob {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._isComplete {
+    }
+    if let v = self._isComplete {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6879,24 +5029,17 @@ extension SignalServiceProtos_SyncMessage.Groups: SwiftProtobuf.Message, SwiftPr
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._blob) }()
+      case 1: try decoder.decodeSingularMessageField(value: &self._blob)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._blob {
+    if let v = self._blob {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6917,13 +5060,10 @@ extension SignalServiceProtos_SyncMessage.Blocked: SwiftProtobuf.Message, SwiftP
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedStringField(value: &self.numbers) }()
-      case 2: try { try decoder.decodeRepeatedBytesField(value: &self.groupIds) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.uuids) }()
+      case 1: try decoder.decodeRepeatedStringField(value: &self.numbers)
+      case 2: try decoder.decodeRepeatedBytesField(value: &self.groupIds)
+      case 3: try decoder.decodeRepeatedStringField(value: &self.uuids)
       default: break
       }
     }
@@ -6959,24 +5099,17 @@ extension SignalServiceProtos_SyncMessage.Request: SwiftProtobuf.Message, SwiftP
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7008,84 +5141,29 @@ extension SignalServiceProtos_SyncMessage.Read: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._senderE164) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._senderUuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._senderE164)
+      case 2: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 3: try decoder.decodeSingularStringField(value: &self._senderUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._senderE164 {
+    if let v = self._senderE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._timestamp {
+    }
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._senderUuid {
+    }
+    if let v = self._senderUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_SyncMessage.Read, rhs: SignalServiceProtos_SyncMessage.Read) -> Bool {
-    if lhs._senderE164 != rhs._senderE164 {return false}
-    if lhs._senderUuid != rhs._senderUuid {return false}
-    if lhs._timestamp != rhs._timestamp {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_SyncMessage.Viewed: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_SyncMessage.protoMessageName + ".Viewed"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "senderE164"),
-    3: .same(proto: "senderUuid"),
-    2: .same(proto: "timestamp")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._senderE164) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._senderUuid) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._senderE164 {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._timestamp {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._senderUuid {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_SyncMessage.Viewed, rhs: SignalServiceProtos_SyncMessage.Viewed) -> Bool {
     if lhs._senderE164 != rhs._senderE164 {return false}
     if lhs._senderUuid != rhs._senderUuid {return false}
     if lhs._timestamp != rhs._timestamp {return false}
@@ -7100,46 +5178,39 @@ extension SignalServiceProtos_SyncMessage.Configuration: SwiftProtobuf.Message, 
     1: .same(proto: "readReceipts"),
     2: .same(proto: "unidentifiedDeliveryIndicators"),
     3: .same(proto: "typingIndicators"),
-    5: .same(proto: "provisioningVersion"),
-    6: .same(proto: "linkPreviews")
+    4: .same(proto: "linkPreviews"),
+    5: .same(proto: "provisioningVersion")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self._readReceipts) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._unidentifiedDeliveryIndicators) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self._typingIndicators) }()
-      case 5: try { try decoder.decodeSingularUInt32Field(value: &self._provisioningVersion) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self._linkPreviews) }()
+      case 1: try decoder.decodeSingularBoolField(value: &self._readReceipts)
+      case 2: try decoder.decodeSingularBoolField(value: &self._unidentifiedDeliveryIndicators)
+      case 3: try decoder.decodeSingularBoolField(value: &self._typingIndicators)
+      case 4: try decoder.decodeSingularBoolField(value: &self._linkPreviews)
+      case 5: try decoder.decodeSingularUInt32Field(value: &self._provisioningVersion)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._readReceipts {
+    if let v = self._readReceipts {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._unidentifiedDeliveryIndicators {
+    }
+    if let v = self._unidentifiedDeliveryIndicators {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._typingIndicators {
+    }
+    if let v = self._typingIndicators {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._provisioningVersion {
+    }
+    if let v = self._linkPreviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+    }
+    if let v = self._provisioningVersion {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._linkPreviews {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7147,8 +5218,8 @@ extension SignalServiceProtos_SyncMessage.Configuration: SwiftProtobuf.Message, 
     if lhs._readReceipts != rhs._readReceipts {return false}
     if lhs._unidentifiedDeliveryIndicators != rhs._unidentifiedDeliveryIndicators {return false}
     if lhs._typingIndicators != rhs._typingIndicators {return false}
-    if lhs._provisioningVersion != rhs._provisioningVersion {return false}
     if lhs._linkPreviews != rhs._linkPreviews {return false}
+    if lhs._provisioningVersion != rhs._provisioningVersion {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7164,32 +5235,25 @@ extension SignalServiceProtos_SyncMessage.StickerPackOperation: SwiftProtobuf.Me
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._packID) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._packKey) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._packID)
+      case 2: try decoder.decodeSingularBytesField(value: &self._packKey)
+      case 3: try decoder.decodeSingularEnumField(value: &self._type)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._packID {
+    if let v = self._packID {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._packKey {
+    }
+    if let v = self._packKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7219,32 +5283,25 @@ extension SignalServiceProtos_SyncMessage.ViewOnceOpen: SwiftProtobuf.Message, S
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._senderE164) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._senderUuid) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._senderE164)
+      case 2: try decoder.decodeSingularUInt64Field(value: &self._timestamp)
+      case 3: try decoder.decodeSingularStringField(value: &self._senderUuid)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._senderE164 {
+    if let v = self._senderE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._timestamp {
+    }
+    if let v = self._timestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._senderUuid {
+    }
+    if let v = self._senderUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7265,24 +5322,17 @@ extension SignalServiceProtos_SyncMessage.FetchLatest: SwiftProtobuf.Message, Sw
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 1: try decoder.decodeSingularEnumField(value: &self._type)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._type {
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7297,8 +5347,7 @@ extension SignalServiceProtos_SyncMessage.FetchLatest.TypeEnum: SwiftProtobuf._P
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     0: .same(proto: "UNKNOWN"),
     1: .same(proto: "LOCAL_PROFILE"),
-    2: .same(proto: "STORAGE_MANIFEST"),
-    3: .same(proto: "SUBSCRIPTION_STATUS")
+    2: .same(proto: "STORAGE_MANIFEST")
   ]
 }
 
@@ -7310,24 +5359,17 @@ extension SignalServiceProtos_SyncMessage.Keys: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._storageService) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._storageService)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._storageService {
+    if let v = self._storageService {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7349,36 +5391,29 @@ extension SignalServiceProtos_SyncMessage.MessageRequestResponse: SwiftProtobuf.
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._threadE164) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._threadUuid) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._groupID) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self._type) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._threadE164)
+      case 2: try decoder.decodeSingularStringField(value: &self._threadUuid)
+      case 3: try decoder.decodeSingularBytesField(value: &self._groupID)
+      case 4: try decoder.decodeSingularEnumField(value: &self._type)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._threadE164 {
+    if let v = self._threadE164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._threadUuid {
+    }
+    if let v = self._threadUuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._groupID {
+    }
+    if let v = self._groupID {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._type {
+    }
+    if let v = self._type {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7400,132 +5435,6 @@ extension SignalServiceProtos_SyncMessage.MessageRequestResponse.TypeEnum: Swift
     3: .same(proto: "BLOCK"),
     4: .same(proto: "BLOCK_AND_DELETE")
   ]
-}
-
-extension SignalServiceProtos_SyncMessage.OutgoingPayment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_SyncMessage.protoMessageName + ".OutgoingPayment"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "recipientUuid"),
-    2: .same(proto: "note"),
-    3: .same(proto: "mobileCoin")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._recipientUuid) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._note) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._mobileCoin) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._recipientUuid {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._note {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._mobileCoin {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_SyncMessage.OutgoingPayment, rhs: SignalServiceProtos_SyncMessage.OutgoingPayment) -> Bool {
-    if lhs._recipientUuid != rhs._recipientUuid {return false}
-    if lhs._note != rhs._note {return false}
-    if lhs._mobileCoin != rhs._mobileCoin {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_SyncMessage.OutgoingPayment.protoMessageName + ".MobileCoin"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "recipientAddress"),
-    2: .same(proto: "amountPicoMob"),
-    3: .same(proto: "feePicoMob"),
-    4: .same(proto: "receipt"),
-    5: .same(proto: "ledgerBlockTimestamp"),
-    6: .same(proto: "ledgerBlockIndex"),
-    7: .same(proto: "spentKeyImages"),
-    8: .same(proto: "outputPublicKeys")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._recipientAddress) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._amountPicoMob) }()
-      case 3: try { try decoder.decodeSingularUInt64Field(value: &self._feePicoMob) }()
-      case 4: try { try decoder.decodeSingularBytesField(value: &self._receipt) }()
-      case 5: try { try decoder.decodeSingularUInt64Field(value: &self._ledgerBlockTimestamp) }()
-      case 6: try { try decoder.decodeSingularUInt64Field(value: &self._ledgerBlockIndex) }()
-      case 7: try { try decoder.decodeRepeatedBytesField(value: &self.spentKeyImages) }()
-      case 8: try { try decoder.decodeRepeatedBytesField(value: &self.outputPublicKeys) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._recipientAddress {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._amountPicoMob {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._feePicoMob {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._receipt {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._ledgerBlockTimestamp {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._ledgerBlockIndex {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 6)
-    } }()
-    if !self.spentKeyImages.isEmpty {
-      try visitor.visitRepeatedBytesField(value: self.spentKeyImages, fieldNumber: 7)
-    }
-    if !self.outputPublicKeys.isEmpty {
-      try visitor.visitRepeatedBytesField(value: self.outputPublicKeys, fieldNumber: 8)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin, rhs: SignalServiceProtos_SyncMessage.OutgoingPayment.MobileCoin) -> Bool {
-    if lhs._recipientAddress != rhs._recipientAddress {return false}
-    if lhs._amountPicoMob != rhs._amountPicoMob {return false}
-    if lhs._feePicoMob != rhs._feePicoMob {return false}
-    if lhs._receipt != rhs._receipt {return false}
-    if lhs._ledgerBlockTimestamp != rhs._ledgerBlockTimestamp {return false}
-    if lhs._ledgerBlockIndex != rhs._ledgerBlockIndex {return false}
-    if lhs.spentKeyImages != rhs.spentKeyImages {return false}
-    if lhs.outputPublicKeys != rhs.outputPublicKeys {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
 }
 
 extension SignalServiceProtos_AttachmentPointer: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -7550,80 +5459,73 @@ extension SignalServiceProtos_AttachmentPointer: SwiftProtobuf.Message, SwiftPro
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularFixed64Field(value: &self._cdnID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._contentType) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._key) }()
-      case 4: try { try decoder.decodeSingularUInt32Field(value: &self._size) }()
-      case 5: try { try decoder.decodeSingularBytesField(value: &self._thumbnail) }()
-      case 6: try { try decoder.decodeSingularBytesField(value: &self._digest) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._fileName) }()
-      case 8: try { try decoder.decodeSingularUInt32Field(value: &self._flags) }()
-      case 9: try { try decoder.decodeSingularUInt32Field(value: &self._width) }()
-      case 10: try { try decoder.decodeSingularUInt32Field(value: &self._height) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self._caption) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self._blurHash) }()
-      case 13: try { try decoder.decodeSingularUInt64Field(value: &self._uploadTimestamp) }()
-      case 14: try { try decoder.decodeSingularUInt32Field(value: &self._cdnNumber) }()
-      case 15: try { try decoder.decodeSingularStringField(value: &self._cdnKey) }()
+      case 1: try decoder.decodeSingularFixed64Field(value: &self._cdnID)
+      case 2: try decoder.decodeSingularStringField(value: &self._contentType)
+      case 3: try decoder.decodeSingularBytesField(value: &self._key)
+      case 4: try decoder.decodeSingularUInt32Field(value: &self._size)
+      case 5: try decoder.decodeSingularBytesField(value: &self._thumbnail)
+      case 6: try decoder.decodeSingularBytesField(value: &self._digest)
+      case 7: try decoder.decodeSingularStringField(value: &self._fileName)
+      case 8: try decoder.decodeSingularUInt32Field(value: &self._flags)
+      case 9: try decoder.decodeSingularUInt32Field(value: &self._width)
+      case 10: try decoder.decodeSingularUInt32Field(value: &self._height)
+      case 11: try decoder.decodeSingularStringField(value: &self._caption)
+      case 12: try decoder.decodeSingularStringField(value: &self._blurHash)
+      case 13: try decoder.decodeSingularUInt64Field(value: &self._uploadTimestamp)
+      case 14: try decoder.decodeSingularUInt32Field(value: &self._cdnNumber)
+      case 15: try decoder.decodeSingularStringField(value: &self._cdnKey)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._cdnID {
+    if let v = self._cdnID {
       try visitor.visitSingularFixed64Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._contentType {
+    }
+    if let v = self._contentType {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._key {
+    }
+    if let v = self._key {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._size {
+    }
+    if let v = self._size {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._thumbnail {
+    }
+    if let v = self._thumbnail {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._digest {
+    }
+    if let v = self._digest {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._fileName {
+    }
+    if let v = self._fileName {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._flags {
+    }
+    if let v = self._flags {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._width {
+    }
+    if let v = self._width {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._height {
+    }
+    if let v = self._height {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 10)
-    } }()
-    try { if let v = self._caption {
+    }
+    if let v = self._caption {
       try visitor.visitSingularStringField(value: v, fieldNumber: 11)
-    } }()
-    try { if let v = self._blurHash {
+    }
+    if let v = self._blurHash {
       try visitor.visitSingularStringField(value: v, fieldNumber: 12)
-    } }()
-    try { if let v = self._uploadTimestamp {
+    }
+    if let v = self._uploadTimestamp {
       try visitor.visitSingularUInt64Field(value: v, fieldNumber: 13)
-    } }()
-    try { if let v = self._cdnNumber {
+    }
+    if let v = self._cdnNumber {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 14)
-    } }()
-    try { if let v = self._cdnKey {
+    }
+    if let v = self._cdnKey {
       try visitor.visitSingularStringField(value: v, fieldNumber: 15)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7651,8 +5553,7 @@ extension SignalServiceProtos_AttachmentPointer: SwiftProtobuf.Message, SwiftPro
 extension SignalServiceProtos_AttachmentPointer.Flags: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "VOICE_MESSAGE"),
-    2: .same(proto: "BORDERLESS"),
-    8: .same(proto: "GIF")
+    2: .same(proto: "BORDERLESS")
   ]
 }
 
@@ -7667,98 +5568,49 @@ extension SignalServiceProtos_GroupContext: SwiftProtobuf.Message, SwiftProtobuf
     6: .same(proto: "members")
   ]
 
-  fileprivate class _StorageClass {
-    var _id: Data?
-    var _type: SignalServiceProtos_GroupContext.TypeEnum?
-    var _name: String?
-    var _membersE164: [String] = []
-    var _avatar: SignalServiceProtos_AttachmentPointer?
-    var _members: [SignalServiceProtos_GroupContext.Member] = []
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _id = source._id
-      _type = source._type
-      _name = source._name
-      _membersE164 = source._membersE164
-      _avatar = source._avatar
-      _members = source._members
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBytesField(value: &_storage._id) }()
-        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._type) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
-        case 4: try { try decoder.decodeRepeatedStringField(value: &_storage._membersE164) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._avatar) }()
-        case 6: try { try decoder.decodeRepeatedMessageField(value: &_storage._members) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      switch fieldNumber {
+      case 1: try decoder.decodeSingularBytesField(value: &self._id)
+      case 2: try decoder.decodeSingularEnumField(value: &self._type)
+      case 3: try decoder.decodeSingularStringField(value: &self._name)
+      case 4: try decoder.decodeRepeatedStringField(value: &self.membersE164)
+      case 5: try decoder.decodeSingularMessageField(value: &self._avatar)
+      case 6: try decoder.decodeRepeatedMessageField(value: &self.members)
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._id {
-        try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._type {
-        try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._name {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-      } }()
-      if !_storage._membersE164.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._membersE164, fieldNumber: 4)
-      }
-      try { if let v = _storage._avatar {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
-      if !_storage._members.isEmpty {
-        try visitor.visitRepeatedMessageField(value: _storage._members, fieldNumber: 6)
-      }
+    if let v = self._id {
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
+    }
+    if let v = self._type {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
+    }
+    if let v = self._name {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    }
+    if !self.membersE164.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.membersE164, fieldNumber: 4)
+    }
+    if let v = self._avatar {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    }
+    if !self.members.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.members, fieldNumber: 6)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_GroupContext, rhs: SignalServiceProtos_GroupContext) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._id != rhs_storage._id {return false}
-        if _storage._type != rhs_storage._type {return false}
-        if _storage._name != rhs_storage._name {return false}
-        if _storage._membersE164 != rhs_storage._membersE164 {return false}
-        if _storage._avatar != rhs_storage._avatar {return false}
-        if _storage._members != rhs_storage._members {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._id != rhs._id {return false}
+    if lhs._type != rhs._type {return false}
+    if lhs._name != rhs._name {return false}
+    if lhs.membersE164 != rhs.membersE164 {return false}
+    if lhs._avatar != rhs._avatar {return false}
+    if lhs.members != rhs.members {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7777,33 +5629,32 @@ extension SignalServiceProtos_GroupContext.TypeEnum: SwiftProtobuf._ProtoNamePro
 extension SignalServiceProtos_GroupContext.Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = SignalServiceProtos_GroupContext.protoMessageName + ".Member"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "uuid"),
     2: .same(proto: "e164")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 2: try { try decoder.decodeSingularStringField(value: &self._e164) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._uuid)
+      case 2: try decoder.decodeSingularStringField(value: &self._e164)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._e164 {
+    if let v = self._uuid {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }
+    if let v = self._e164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_GroupContext.Member, rhs: SignalServiceProtos_GroupContext.Member) -> Bool {
+    if lhs._uuid != rhs._uuid {return false}
     if lhs._e164 != rhs._e164 {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -7820,32 +5671,25 @@ extension SignalServiceProtos_GroupContextV2: SwiftProtobuf.Message, SwiftProtob
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._masterKey) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self._revision) }()
-      case 3: try { try decoder.decodeSingularBytesField(value: &self._groupChange) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._masterKey)
+      case 2: try decoder.decodeSingularUInt32Field(value: &self._revision)
+      case 3: try decoder.decodeSingularBytesField(value: &self._groupChange)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._masterKey {
+    if let v = self._masterKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._revision {
+    }
+    if let v = self._revision {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._groupChange {
+    }
+    if let v = self._groupChange {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -7861,8 +5705,8 @@ extension SignalServiceProtos_GroupContextV2: SwiftProtobuf.Message, SwiftProtob
 extension SignalServiceProtos_ContactDetails: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ContactDetails"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "contactE164"),
-    9: .same(proto: "contactUuid"),
+    1: .same(proto: "number"),
+    9: .same(proto: "uuid"),
     2: .same(proto: "name"),
     3: .same(proto: "avatar"),
     4: .same(proto: "color"),
@@ -7876,70 +5720,63 @@ extension SignalServiceProtos_ContactDetails: SwiftProtobuf.Message, SwiftProtob
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._contactE164) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._name) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._avatar) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._color) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._verified) }()
-      case 6: try { try decoder.decodeSingularBytesField(value: &self._profileKey) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self._blocked) }()
-      case 8: try { try decoder.decodeSingularUInt32Field(value: &self._expireTimer) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self._contactUuid) }()
-      case 10: try { try decoder.decodeSingularUInt32Field(value: &self._inboxPosition) }()
-      case 11: try { try decoder.decodeSingularBoolField(value: &self._archived) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._number)
+      case 2: try decoder.decodeSingularStringField(value: &self._name)
+      case 3: try decoder.decodeSingularMessageField(value: &self._avatar)
+      case 4: try decoder.decodeSingularStringField(value: &self._color)
+      case 5: try decoder.decodeSingularMessageField(value: &self._verified)
+      case 6: try decoder.decodeSingularBytesField(value: &self._profileKey)
+      case 7: try decoder.decodeSingularBoolField(value: &self._blocked)
+      case 8: try decoder.decodeSingularUInt32Field(value: &self._expireTimer)
+      case 9: try decoder.decodeSingularStringField(value: &self._uuid)
+      case 10: try decoder.decodeSingularUInt32Field(value: &self._inboxPosition)
+      case 11: try decoder.decodeSingularBoolField(value: &self._archived)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._contactE164 {
+    if let v = self._number {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._name {
+    }
+    if let v = self._name {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._avatar {
+    }
+    if let v = self._avatar {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._color {
+    }
+    if let v = self._color {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._verified {
+    }
+    if let v = self._verified {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._profileKey {
+    }
+    if let v = self._profileKey {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._blocked {
+    }
+    if let v = self._blocked {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._expireTimer {
+    }
+    if let v = self._expireTimer {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._contactUuid {
+    }
+    if let v = self._uuid {
       try visitor.visitSingularStringField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._inboxPosition {
+    }
+    if let v = self._inboxPosition {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 10)
-    } }()
-    try { if let v = self._archived {
+    }
+    if let v = self._archived {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 11)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_ContactDetails, rhs: SignalServiceProtos_ContactDetails) -> Bool {
-    if lhs._contactE164 != rhs._contactE164 {return false}
-    if lhs._contactUuid != rhs._contactUuid {return false}
+    if lhs._number != rhs._number {return false}
+    if lhs._uuid != rhs._uuid {return false}
     if lhs._name != rhs._name {return false}
     if lhs._avatar != rhs._avatar {return false}
     if lhs._color != rhs._color {return false}
@@ -7963,28 +5800,21 @@ extension SignalServiceProtos_ContactDetails.Avatar: SwiftProtobuf.Message, Swif
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._contentType) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self._length) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._contentType)
+      case 2: try decoder.decodeSingularUInt32Field(value: &self._length)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._contentType {
+    if let v = self._contentType {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._length {
+    }
+    if let v = self._length {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -8014,64 +5844,57 @@ extension SignalServiceProtos_GroupDetails: SwiftProtobuf.Message, SwiftProtobuf
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._name) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.membersE164) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._avatar) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self._active) }()
-      case 6: try { try decoder.decodeSingularUInt32Field(value: &self._expireTimer) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._color) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self._blocked) }()
-      case 9: try { try decoder.decodeRepeatedMessageField(value: &self.members) }()
-      case 10: try { try decoder.decodeSingularUInt32Field(value: &self._inboxPosition) }()
-      case 11: try { try decoder.decodeSingularBoolField(value: &self._archived) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._name)
+      case 3: try decoder.decodeRepeatedStringField(value: &self.membersE164)
+      case 4: try decoder.decodeSingularMessageField(value: &self._avatar)
+      case 5: try decoder.decodeSingularBoolField(value: &self._active)
+      case 6: try decoder.decodeSingularUInt32Field(value: &self._expireTimer)
+      case 7: try decoder.decodeSingularStringField(value: &self._color)
+      case 8: try decoder.decodeSingularBoolField(value: &self._blocked)
+      case 9: try decoder.decodeRepeatedMessageField(value: &self.members)
+      case 10: try decoder.decodeSingularUInt32Field(value: &self._inboxPosition)
+      case 11: try decoder.decodeSingularBoolField(value: &self._archived)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._name {
+    }
+    if let v = self._name {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
+    }
     if !self.membersE164.isEmpty {
       try visitor.visitRepeatedStringField(value: self.membersE164, fieldNumber: 3)
     }
-    try { if let v = self._avatar {
+    if let v = self._avatar {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._active {
+    }
+    if let v = self._active {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._expireTimer {
+    }
+    if let v = self._expireTimer {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._color {
+    }
+    if let v = self._color {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._blocked {
+    }
+    if let v = self._blocked {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
-    } }()
+    }
     if !self.members.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.members, fieldNumber: 9)
     }
-    try { if let v = self._inboxPosition {
+    if let v = self._inboxPosition {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 10)
-    } }()
-    try { if let v = self._archived {
+    }
+    if let v = self._archived {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 11)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -8101,28 +5924,21 @@ extension SignalServiceProtos_GroupDetails.Avatar: SwiftProtobuf.Message, SwiftP
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._contentType) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self._length) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._contentType)
+      case 2: try decoder.decodeSingularUInt32Field(value: &self._length)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._contentType {
+    if let v = self._contentType {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._length {
+    }
+    if let v = self._length {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -8137,33 +5953,32 @@ extension SignalServiceProtos_GroupDetails.Avatar: SwiftProtobuf.Message, SwiftP
 extension SignalServiceProtos_GroupDetails.Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = SignalServiceProtos_GroupDetails.protoMessageName + ".Member"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "uuid"),
     2: .same(proto: "e164")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 2: try { try decoder.decodeSingularStringField(value: &self._e164) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._uuid)
+      case 2: try decoder.decodeSingularStringField(value: &self._e164)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._e164 {
+    if let v = self._uuid {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    }
+    if let v = self._e164 {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_GroupDetails.Member, rhs: SignalServiceProtos_GroupDetails.Member) -> Bool {
+    if lhs._uuid != rhs._uuid {return false}
     if lhs._e164 != rhs._e164 {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -8181,33 +5996,26 @@ extension SignalServiceProtos_Pack: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._title) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._author) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._cover) }()
-      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.stickers) }()
+      case 1: try decoder.decodeSingularStringField(value: &self._title)
+      case 2: try decoder.decodeSingularStringField(value: &self._author)
+      case 3: try decoder.decodeSingularMessageField(value: &self._cover)
+      case 4: try decoder.decodeRepeatedMessageField(value: &self.stickers)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._title {
+    if let v = self._title {
       try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._author {
+    }
+    if let v = self._author {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._cover {
+    }
+    if let v = self._cover {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
+    }
     if !self.stickers.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.stickers, fieldNumber: 4)
     }
@@ -8228,171 +6036,32 @@ extension SignalServiceProtos_Pack.Sticker: SwiftProtobuf.Message, SwiftProtobuf
   static let protoMessageName: String = SignalServiceProtos_Pack.protoMessageName + ".Sticker"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
-    2: .same(proto: "emoji"),
-    3: .same(proto: "contentType")
+    2: .same(proto: "emoji")
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._emoji) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._contentType) }()
+      case 1: try decoder.decodeSingularUInt32Field(value: &self._id)
+      case 2: try decoder.decodeSingularStringField(value: &self._emoji)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
+    if let v = self._id {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._emoji {
+    }
+    if let v = self._emoji {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._contentType {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: SignalServiceProtos_Pack.Sticker, rhs: SignalServiceProtos_Pack.Sticker) -> Bool {
     if lhs._id != rhs._id {return false}
     if lhs._emoji != rhs._emoji {return false}
-    if lhs._contentType != rhs._contentType {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_PaymentAddress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".PaymentAddress"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "mobileCoin")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._mobileCoin) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._mobileCoin {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_PaymentAddress, rhs: SignalServiceProtos_PaymentAddress) -> Bool {
-    if lhs._mobileCoin != rhs._mobileCoin {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_PaymentAddress.MobileCoin: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = SignalServiceProtos_PaymentAddress.protoMessageName + ".MobileCoin"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "publicAddress"),
-    2: .same(proto: "signature")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._publicAddress) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self._signature) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._publicAddress {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._signature {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_PaymentAddress.MobileCoin, rhs: SignalServiceProtos_PaymentAddress.MobileCoin) -> Bool {
-    if lhs._publicAddress != rhs._publicAddress {return false}
-    if lhs._signature != rhs._signature {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension SignalServiceProtos_DecryptionErrorMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".DecryptionErrorMessage"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "ratchetKey"),
-    2: .same(proto: "timestamp"),
-    3: .same(proto: "deviceId")
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._ratchetKey) }()
-      case 2: try { try decoder.decodeSingularUInt64Field(value: &self._timestamp) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._deviceID) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._ratchetKey {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._timestamp {
-      try visitor.visitSingularUInt64Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._deviceID {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: SignalServiceProtos_DecryptionErrorMessage, rhs: SignalServiceProtos_DecryptionErrorMessage) -> Bool {
-    if lhs._ratchetKey != rhs._ratchetKey {return false}
-    if lhs._timestamp != rhs._timestamp {return false}
-    if lhs._deviceID != rhs._deviceID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

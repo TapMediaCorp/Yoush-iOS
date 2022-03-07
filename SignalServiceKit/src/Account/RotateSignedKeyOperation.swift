@@ -1,11 +1,23 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc(SSKRotateSignedPreKeyOperation)
 public class RotateSignedPreKeyOperation: OWSOperation {
+    private var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
+    private var accountServiceClient: AccountServiceClient {
+        return SSKEnvironment.shared.accountServiceClient
+    }
+
+    private var signedPreKeyStore: SSKSignedPreKeyStore {
+        return SSKEnvironment.shared.signedPreKeyStore
+    }
 
     public override func run() {
         Logger.debug("")
@@ -18,22 +30,12 @@ public class RotateSignedPreKeyOperation: OWSOperation {
         let signedPreKeyRecord: SignedPreKeyRecord = self.signedPreKeyStore.generateRandomSignedRecord()
 
         firstly(on: .global()) { () -> Promise<Void> in
-            self.messageProcessor.fetchingAndProcessingCompletePromise()
-        }.then(on: .global()) { () -> Promise<Void> in
-            self.databaseStorage.write { transaction in
-                self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id,
-                                                         signedPreKeyRecord: signedPreKeyRecord,
-                                                         transaction: transaction)
-            }
+            self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id, signedPreKeyRecord: signedPreKeyRecord)
             return self.accountServiceClient.setSignedPreKey(signedPreKeyRecord)
         }.done(on: .global()) { () in
             Logger.info("Successfully uploaded signed PreKey")
             signedPreKeyRecord.markAsAcceptedByService()
-            self.databaseStorage.write { transaction in
-                self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id,
-                                                         signedPreKeyRecord: signedPreKeyRecord,
-                                                         transaction: transaction)
-            }
+            self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id, signedPreKeyRecord: signedPreKeyRecord)
             self.signedPreKeyStore.setCurrentSignedPrekeyId(signedPreKeyRecord.id)
 
             TSPreKeyManager.clearPreKeyUpdateFailureCount()
@@ -47,7 +49,7 @@ public class RotateSignedPreKeyOperation: OWSOperation {
     }
 
     override public func didFail(error: Error) {
-        guard !error.isNetworkConnectivityFailure else {
+        guard !IsNetworkConnectivityFailure(error) else {
             Logger.debug("don't report SPK rotation failure w/ network error")
             return
         }

@@ -1,32 +1,40 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSDevice.h"
-#import "AppReadiness.h"
+#import "NSNotificationCenter+OWS.h"
 #import "OWSError.h"
-#import "OWSIdentityManager.h"
 #import "SSKEnvironment.h"
 #import "TSAccountManager.h"
 #import <Mantle/MTLValueTransformer.h>
 #import <SignalCoreKit/NSDate+OWS.h>
+#import <SignalServiceKit/OWSIdentityManager.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 uint32_t const OWSDevicePrimaryDeviceId = 1;
 NSString *const kMayHaveLinkedDevicesKey = @"kTSStorageManager_MayHaveLinkedDevices";
-NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
 
 @interface OWSDeviceManager ()
 
-@property (atomic, nullable) NSDate *lastReceivedSyncMessage;
+@property (atomic) NSDate *lastReceivedSyncMessage;
 
 @end
 
 #pragma mark -
 
 @implementation OWSDeviceManager
+
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
 
 + (SDSKeyValueStore *)keyValueStore
 {
@@ -38,7 +46,7 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
     return instance;
 }
 
-+ (instancetype)shared
++ (instancetype)sharedManager
 {
     static OWSDeviceManager *instance = nil;
     static dispatch_once_t onceToken;
@@ -50,22 +58,7 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
 
 - (instancetype)initDefault
 {
-    self = [super init];
-
-    if (!self) {
-        return self;
-    }
-
-    OWSSingletonAssert();
-
-    AppReadinessRunNowOrWhenAppDidBecomeReadyAsync(^{
-        [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
-            self.lastReceivedSyncMessage = [OWSDeviceManager.keyValueStore getDate:kLastReceivedSyncMessageKey
-                                                                       transaction:transaction];
-        }];
-    });
-
-    return self;
+    return [super init];
 }
 
 - (BOOL)mayHaveLinkedDevicesWithTransaction:(SDSAnyReadTransaction *)transaction
@@ -93,33 +86,21 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
 - (void)setMayHaveLinkedDevices
 {
     // Note that we write async to avoid opening transactions within transactions.
-    DatabaseStorageAsyncWrite(self.databaseStorage,
-        ^(SDSAnyWriteTransaction *transaction) { [self setMayHaveLinkedDevicesWithTransaction:transaction]; });
-}
-
-- (void)setMayHaveLinkedDevicesWithTransaction:(SDSAnyWriteTransaction *)transaction
-{
-    [OWSDeviceManager.keyValueStore setBool:YES key:kMayHaveLinkedDevicesKey transaction:transaction];
+    DatabaseStorageAsyncWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+        [OWSDeviceManager.keyValueStore setBool:YES key:kMayHaveLinkedDevicesKey transaction:transaction];
+    });
 }
 
 - (BOOL)hasReceivedSyncMessageInLastSeconds:(NSTimeInterval)intervalSeconds
 {
-    NSDate *_Nullable lastReceivedSyncMessage = self.lastReceivedSyncMessage;
-    return (lastReceivedSyncMessage && fabs(lastReceivedSyncMessage.timeIntervalSinceNow) < intervalSeconds);
+    return (self.lastReceivedSyncMessage && fabs(self.lastReceivedSyncMessage.timeIntervalSinceNow) < intervalSeconds);
 }
 
 - (void)setHasReceivedSyncMessage
 {
-    NSDate *lastReceivedSyncMessage = [NSDate new];
-    self.lastReceivedSyncMessage = lastReceivedSyncMessage;
+    self.lastReceivedSyncMessage = [NSDate new];
 
-    // Note that we write async to avoid opening transactions within transactions.
-    DatabaseStorageAsyncWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-        [OWSDeviceManager.keyValueStore setDate:lastReceivedSyncMessage
-                                            key:kLastReceivedSyncMessageKey
-                                    transaction:transaction];
-        [self setMayHaveLinkedDevicesWithTransaction:transaction];
-    });
+    [self setMayHaveLinkedDevices];
 }
 
 @end
@@ -138,6 +119,22 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
 #pragma mark -
 
 @implementation OWSDevice
+
+#pragma mark - Dependencies
+
++ (TSAccountManager *)tsAccountManager
+{
+    return TSAccountManager.sharedInstance;
+}
+
+- (OWSIdentityManager *)identityManager
+{
+    OWSAssertDebug(SSKEnvironment.shared.identityManager);
+
+    return SSKEnvironment.shared.identityManager;
+}
+
+#pragma mark -
 
 - (nullable instancetype)initWithCoder:(NSCoder *)coder
 {
@@ -201,7 +198,7 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
     OWSDevice *device = [MTLJSONAdapter modelOfClass:[self class] fromJSONDictionary:deviceAttributes error:error];
     if (device.deviceId < OWSDevicePrimaryDeviceId) {
         OWSFailDebug(@"Invalid device id: %lu", (unsigned long)device.deviceId);
-        *error = [OWSError withError:OWSErrorCodeFailedToDecodeJson description:@"Invalid device id." isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodeFailedToDecodeJson, @"Invalid device id.");
         return nil;
     }
     return device;
@@ -243,9 +240,7 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
             }
             *success = NO;
             OWSLogError(@"unable to decode date from %@", value);
-            *error = [OWSError withError:OWSErrorCodeFailedToDecodeJson
-                             description:@"Unable to decode date from JSON."
-                             isRetryable:NO];
+            *error = OWSErrorWithCodeDescription(OWSErrorCodeFailedToDecodeJson, @"Unable to decode date from JSON.");
             return nil;
         }
             reverseBlock:^id(id value, BOOL *success, NSError **error) {
@@ -258,9 +253,7 @@ NSString *const kLastReceivedSyncMessageKey = @"kLastReceivedSyncMessage";
                     }
                 }
                 OWSLogError(@"unable to encode date from %@", value);
-                *error = [OWSError withError:OWSErrorCodeFailedToEncodeJson
-                                 description:@"Unable to encode date to JSON."
-                                 isRetryable:NO];
+                *error = OWSErrorWithCodeDescription(OWSErrorCodeFailedToEncodeJson, @"Unable to encode date to JSON.");
                 *success = NO;
                 return nil;
             }];

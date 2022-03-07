@@ -1,11 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 @objc
 public class SSKPreferences: NSObject {
+    private static var shared: SSKPreferences {
+        return SSKEnvironment.shared.sskPreferences
+    }
 
     public static let store = SDSKeyValueStore(collection: "SSKPreferences")
 
@@ -15,8 +18,7 @@ public class SSKPreferences: NSObject {
 
     // MARK: -
 
-    private static var areLinkPreviewsEnabledKey: String { "areLinkPreviewsEnabled" }
-    private static var areLegacyLinkPreviewsEnabledKey: String { "areLegacyLinkPreviewsEnabled" }
+    private static let areLinkPreviewsEnabledKey = "areLinkPreviewsEnabled"
 
     @objc
     public static func areLinkPreviewsEnabled(transaction: SDSAnyReadTransaction) -> Bool {
@@ -24,38 +26,15 @@ public class SSKPreferences: NSObject {
     }
 
     @objc
-    public static func setAreLinkPreviewsEnabled(_ newValue: Bool,
-                                                 sendSyncMessage shouldSync: Bool = false,
-                                                 transaction: SDSAnyWriteTransaction) {
+    public static func setAreLinkPreviewsEnabledAndSendSyncMessage(_ newValue: Bool, transaction: SDSAnyWriteTransaction) {
+        setAreLinkPreviewsEnabled(newValue, transaction: transaction)
+        SSKEnvironment.shared.syncManager.sendConfigurationSyncMessage()
+        SSKEnvironment.shared.storageServiceManager.recordPendingLocalAccountUpdates()
+    }
+
+    @objc
+    public static func setAreLinkPreviewsEnabled(_ newValue: Bool, transaction: SDSAnyWriteTransaction) {
         store.setBool(newValue, key: areLinkPreviewsEnabledKey, transaction: transaction)
-
-        if shouldSync {
-            Self.syncManager.sendConfigurationSyncMessage()
-            Self.storageServiceManager.recordPendingLocalAccountUpdates()
-        }
-    }
-
-    // The following two methods are just to make sure we can store and forward in storage service updates
-    public static func areLegacyLinkPreviewsEnabled(transaction: SDSAnyReadTransaction) -> Bool {
-        return store.getBool(areLegacyLinkPreviewsEnabledKey, defaultValue: true, transaction: transaction)
-    }
-
-    public static func setAreLegacyLinkPreviewsEnabled(_ newValue: Bool, transaction: SDSAnyWriteTransaction) {
-        store.setBool(newValue, key: areLegacyLinkPreviewsEnabledKey, transaction: transaction)
-    }
-
-    // MARK: -
-
-    private static var areIntentDonationsEnabledKey: String { "areSharingSuggestionsEnabled" }
-
-    @objc
-    public static func areIntentDonationsEnabled(transaction: SDSAnyReadTransaction) -> Bool {
-        return store.getBool(areIntentDonationsEnabledKey, defaultValue: true, transaction: transaction)
-    }
-
-    @objc
-    public static func setAreIntentDonationsEnabled(_ newValue: Bool, transaction: SDSAnyWriteTransaction) {
-        store.setBool(newValue, key: areIntentDonationsEnabledKey, transaction: transaction)
     }
 
     // MARK: -
@@ -92,7 +71,27 @@ public class SSKPreferences: NSObject {
 
     // MARK: -
 
-    private static var didEverUseYdbKey: String { "didEverUseYdb" }
+    private static let isYdbMigratedKey = "isYdbMigrated1"
+
+    @objc
+    public static func isYdbMigrated() -> Bool {
+        let appUserDefaults = CurrentAppContext().appUserDefaults()
+        guard let preference = appUserDefaults.object(forKey: isYdbMigratedKey) as? NSNumber else {
+            return false
+        }
+        return preference.boolValue
+    }
+
+    @objc
+    public static func setIsYdbMigrated(_ value: Bool) {
+        let appUserDefaults = CurrentAppContext().appUserDefaults()
+        appUserDefaults.set(value, forKey: isYdbMigratedKey)
+        appUserDefaults.synchronize()
+    }
+
+    // MARK: -
+
+    private static let didEverUseYdbKey = "didEverUseYdb"
 
     @objc
     public static func didEverUseYdb() -> Bool {
@@ -110,27 +109,9 @@ public class SSKPreferences: NSObject {
         appUserDefaults.synchronize()
     }
 
-    private static var didDropYdbKey: String { "didDropYdb" }
-
-    @objc
-    public static func didDropYdb() -> Bool {
-        let appUserDefaults = CurrentAppContext().appUserDefaults()
-        guard let preference = appUserDefaults.object(forKey: didDropYdbKey) as? NSNumber else {
-            return false
-        }
-        return preference.boolValue
-    }
-
-    @objc
-    public static func setDidDropYdb(_ value: Bool) {
-        let appUserDefaults = CurrentAppContext().appUserDefaults()
-        appUserDefaults.set(value, forKey: didDropYdbKey)
-        appUserDefaults.synchronize()
-    }
-
     // MARK: - messageRequestInteractionIdEpoch
 
-    private static var messageRequestInteractionIdEpochKey: String { "messageRequestInteractionIdEpoch" }
+    private static let messageRequestInteractionIdEpochKey = "messageRequestInteractionIdEpoch"
     private static var messageRequestInteractionIdEpochCached: Int?
     public static func messageRequestInteractionIdEpoch(transaction: GRDBReadTransaction) -> Int? {
         if let value = messageRequestInteractionIdEpochCached {
@@ -171,39 +152,6 @@ public class SSKPreferences: NSObject {
         includeMutedThreadsInBadgeCountCached = value
     }
 
-    // MARK: - Profile avatar preference
-
-    @objc
-    public static let preferContactAvatarsPreferenceDidChange = Notification.Name("PreferContactAvatarsPreferenceDidChange")
-    private static var preferContactAvatarsKey: String { "preferContactAvatarsKey" }
-    private static var preferContactAvatarsCached: Bool?
-
-    @objc
-    public static func preferContactAvatars(transaction: SDSAnyReadTransaction) -> Bool {
-        if let value = preferContactAvatarsCached { return value }
-        let value = store.getBool(preferContactAvatarsKey, defaultValue: false, transaction: transaction)
-        preferContactAvatarsCached = value
-        return value
-    }
-
-    @objc
-    public static func setPreferContactAvatars(
-        _ value: Bool,
-        updateStorageService: Bool = true,
-        transaction: SDSAnyWriteTransaction) {
-
-        let oldValue = store.getBool(preferContactAvatarsKey, transaction: transaction)
-        store.setBool(value, key: preferContactAvatarsKey, transaction: transaction)
-        preferContactAvatarsCached = value
-
-        if oldValue != value {
-            if updateStorageService {
-                Self.storageServiceManager.recordPendingLocalAccountUpdates()
-            }
-            NotificationCenter.default.postNotificationNameAsync(Self.preferContactAvatarsPreferenceDidChange, object: nil)
-        }
-    }
-
     // MARK: -
 
     public class var grdbSchemaVersionDefault: UInt {
@@ -213,7 +161,7 @@ public class SSKPreferences: NSObject {
         return GRDBSchemaMigrator.grdbSchemaVersionLatest
     }
 
-    private static var grdbSchemaVersionKey: String { "grdbSchemaVersion" }
+    private static let grdbSchemaVersionKey = "grdbSchemaVersion"
 
     private static func grdbSchemaVersion() -> UInt {
         let appUserDefaults = CurrentAppContext().appUserDefaults()
@@ -250,38 +198,5 @@ public class SSKPreferences: NSObject {
             return true
         }
         return false
-    }
-
-    // MARK: - Keep Muted Chats Archived
-
-    private static var shouldKeepMutedChatsArchivedKey: String { "shouldKeepMutedChatsArchived" }
-
-    @objc
-    public static func shouldKeepMutedChatsArchived(transaction: SDSAnyReadTransaction) -> Bool {
-        return store.getBool(shouldKeepMutedChatsArchivedKey, defaultValue: false, transaction: transaction)
-    }
-
-    @objc
-    public static func setShouldKeepMutedChatsArchived(_ newValue: Bool, transaction: SDSAnyWriteTransaction) {
-        store.setBool(newValue, key: shouldKeepMutedChatsArchivedKey, transaction: transaction)
-    }
-
-    private static var hasGrdbDatabaseCorruptionKey: String { "hasGrdbDatabaseCorruption" }
-    @objc
-    public static func hasGrdbDatabaseCorruption() -> Bool {
-        let appUserDefaults = CurrentAppContext().appUserDefaults()
-        guard let preference = appUserDefaults.object(forKey: hasGrdbDatabaseCorruptionKey) as? NSNumber else {
-            return false
-        }
-        return preference.boolValue
-    }
-
-    @objc
-    public static func setHasGrdbDatabaseCorruption(_ value: Bool) {
-        if value { Logger.warn("Flagging GRDB database as corrupted.") }
-
-        let appUserDefaults = CurrentAppContext().appUserDefaults()
-        appUserDefaults.set(value, forKey: hasGrdbDatabaseCorruptionKey)
-        appUserDefaults.synchronize()
     }
 }

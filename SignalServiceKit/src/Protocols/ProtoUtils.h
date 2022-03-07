@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -16,16 +16,16 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init NS_UNAVAILABLE;
 
 + (void)addLocalProfileKeyIfNecessary:(TSThread *)thread
+                              address:(SignalServiceAddress *_Nullable)address
                    dataMessageBuilder:(SSKProtoDataMessageBuilder *)dataMessageBuilder
                           transaction:(SDSAnyReadTransaction *)transaction;
 
 + (void)addLocalProfileKeyToDataMessageBuilder:(SSKProtoDataMessageBuilder *)dataMessageBuilder;
 
 + (void)addLocalProfileKeyIfNecessary:(TSThread *)thread
+                              address:(SignalServiceAddress *)address
                    callMessageBuilder:(SSKProtoCallMessageBuilder *)callMessageBuilder
                           transaction:(SDSAnyReadTransaction *)transaction;
-
-+ (nullable NSString *)parseProtoE164:(nullable NSString *)value name:(NSString *)name;
 
 @end
 

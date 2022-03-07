@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/OWSReadTracking.h>
-#import <SignalServiceKit/TSMessage.h>
+#import "OWSReadTracking.h"
+#import "TSMessage.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -11,7 +11,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface TSInfoMessage : TSMessage <OWSReadTracking>
 
-typedef NS_CLOSED_ENUM(NSInteger, TSInfoMessageType) {
+typedef NS_ENUM(NSInteger, TSInfoMessageType) {
     TSInfoMessageTypeSessionDidEnd,
     TSInfoMessageUserNotRegistered,
     // TSInfoMessageTypeUnsupportedMessage appears to be obsolete.
@@ -26,8 +26,12 @@ typedef NS_CLOSED_ENUM(NSInteger, TSInfoMessageType) {
     TSInfoMessageUnknownProtocolVersion,
     TSInfoMessageUserJoinedSignal,
     TSInfoMessageSyncedThread,
-    TSInfoMessageProfileUpdate
+    TSInfoMessageProfileUpdate,
+    TSInfoMessagePinMessage,
+    TSInfoMessageGroupCall,
+    TSInfoMessageSetWallPaper,
 };
+
 
 typedef NSString *InfoMessageUserInfoKey NS_STRING_ENUM;
 
@@ -38,12 +42,24 @@ extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyNewDisappearingMessage
 extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyGroupUpdateSourceAddress;
 extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyProfileChanges;
 
+//HoangHo: For pin message
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageId;
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageTimestamp;
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageAction;
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageSequence;
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageAuthor;//Author of message
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageUserAction;//User did action
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageGroupId;
+extern InfoMessageUserInfoKey const InfoMessageUserInfoPinMessageReorder;
+
 + (instancetype)userNotRegisteredMessageInThread:(TSThread *)thread address:(SignalServiceAddress *)address;
 
 @property (nonatomic, readonly) TSInfoMessageType messageType;
 @property (nonatomic, readonly, nullable) NSString *customMessage;
-@property (nonatomic, readonly, nullable) NSDictionary<InfoMessageUserInfoKey, id> *infoMessageUserInfo;
+@property (nonatomic, nullable) NSDictionary<InfoMessageUserInfoKey, id> *infoMessageUserInfo;
 @property (nonatomic, readonly, nullable) SignalServiceAddress *unregisteredAddress;
+
+- (void)changeInfoMessage:(id)anyValue;
 
 - (instancetype)initMessageWithBuilder:(TSMessageBuilder *)messageBuilder NS_UNAVAILABLE;
 
@@ -79,7 +95,7 @@ extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyProfileChanges;
 // Convenience initializer which is neither "designated" nor "unavailable".
 - (instancetype)initWithThread:(TSThread *)thread
                    messageType:(TSInfoMessageType)infoMessage
-           infoMessageUserInfo:(NSDictionary<InfoMessageUserInfoKey, id> *)infoMessageUserInfo;
+           infoMessageUserInfo:(id)infoMessageUserInfo;
 
 // Convenience initializer which is neither "designated" nor "unavailable".
 - (instancetype)initWithThread:(TSThread *)thread
@@ -100,7 +116,6 @@ extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyProfileChanges;
                   uniqueThreadId:(NSString *)uniqueThreadId
                    attachmentIds:(NSArray<NSString *> *)attachmentIds
                             body:(nullable NSString *)body
-                      bodyRanges:(nullable MessageBodyRanges *)bodyRanges
                     contactShare:(nullable OWSContact *)contactShare
                  expireStartedAt:(uint64_t)expireStartedAt
                        expiresAt:(uint64_t)expiresAt
@@ -117,7 +132,7 @@ extern InfoMessageUserInfoKey const InfoMessageUserInfoKeyProfileChanges;
                      messageType:(TSInfoMessageType)messageType
                             read:(BOOL)read
              unregisteredAddress:(nullable SignalServiceAddress *)unregisteredAddress
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:bodyRanges:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:customMessage:infoMessageUserInfo:messageType:read:unregisteredAddress:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:customMessage:infoMessageUserInfo:messageType:read:unregisteredAddress:));
 
 // clang-format on
 

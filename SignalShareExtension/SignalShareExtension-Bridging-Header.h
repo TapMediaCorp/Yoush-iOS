@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>
@@ -16,12 +16,12 @@
 #import <SignalMessaging/Environment.h>
 #import <SignalMessaging/OWSContactsManager.h>
 #import <SignalMessaging/OWSPreferences.h>
+#import <SignalMessaging/UIFont+OWS.h>
+#import <SignalMessaging/UIView+OWS.h>
 #import <SignalMessaging/VersionMigrations.h>
 #import <SignalServiceKit/AppContext.h>
 #import <SignalServiceKit/AppReadiness.h>
 #import <SignalServiceKit/AppVersion.h>
-#import <SignalServiceKit/MessageSender.h>
 #import <SignalServiceKit/OWSMath.h>
+#import <SignalServiceKit/OWSMessageSender.h>
 #import <SignalServiceKit/TSAccountManager.h>
-#import <SignalUI/UIFont+OWS.h>
-#import <SignalUI/UIView+SignalUI.h>

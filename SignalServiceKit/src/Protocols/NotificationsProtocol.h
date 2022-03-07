@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -9,48 +9,42 @@ NS_ASSUME_NONNULL_BEGIN
 @class SDSAnyWriteTransaction;
 @class TSErrorMessage;
 @class TSIncomingMessage;
-@class TSInteraction;
+@class TSInfoMessage;
 @class TSOutgoingMessage;
 @class TSThread;
 @class ThreadlessErrorMessage;
 
 @protocol ContactsManagerProtocol;
-@protocol OWSPreviewText;
 
 @protocol NotificationsProtocol <NSObject>
 
 - (void)notifyUserForIncomingMessage:(TSIncomingMessage *)incomingMessage
                               thread:(TSThread *)thread
-                         transaction:(SDSAnyReadTransaction *)transaction
-    NS_SWIFT_NAME(notifyUser(forIncomingMessage:thread:transaction:));
+                         transaction:(SDSAnyReadTransaction *)transaction;
 
 - (void)notifyUserForReaction:(OWSReaction *)reaction
             onOutgoingMessage:(TSOutgoingMessage *)message
                        thread:(TSThread *)thread
-                  transaction:(SDSAnyReadTransaction *)transaction
-    NS_SWIFT_NAME(notifyUser(forReaction:onOutgoingMessage:thread:transaction:));
+                  transaction:(SDSAnyReadTransaction *)transaction;
 
 - (void)notifyUserForErrorMessage:(TSErrorMessage *)errorMessage
                            thread:(TSThread *)thread
-                      transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(notifyUser(forErrorMessage:thread:transaction:));
+                      transaction:(SDSAnyWriteTransaction *)transaction;
 
-- (void)notifyUserForPreviewableInteraction:(TSInteraction<OWSPreviewText> *)previewableInteraction
-                                     thread:(TSThread *)thread
-                                 wantsSound:(BOOL)wantsSound
-                                transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(notifyUser(forPreviewableInteraction:thread:wantsSound:transaction:));
+- (void)notifyUserForInfoMessage:(TSInfoMessage *)infoMessage
+                          thread:(TSThread *)thread
+                      wantsSound:(BOOL)wantsSound
+                     transaction:(SDSAnyWriteTransaction *)transaction;
 
 - (void)notifyUserForThreadlessErrorMessage:(ThreadlessErrorMessage *)errorMessage
-                                transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(notifyUser(forThreadlessErrorMessage:transaction:));
-
-- (void)notifyTestPopulationOfErrorMessage:(NSString *)errorString;
+                                transaction:(SDSAnyWriteTransaction *)transaction;
 
 - (void)clearAllNotifications;
 
 - (void)cancelNotificationsForMessageId:(NSString *)uniqueMessageId NS_SWIFT_NAME(cancelNotifications(messageId:));
 - (void)cancelNotificationsForReactionId:(NSString *)uniqueReactionId NS_SWIFT_NAME(cancelNotifications(reactionId:));
+
+- (void)notifyUserForGRDBMigration;
 
 @end
 

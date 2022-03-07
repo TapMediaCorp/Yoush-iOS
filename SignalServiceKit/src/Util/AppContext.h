@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -7,15 +7,6 @@ NS_ASSUME_NONNULL_BEGIN
 static inline BOOL OWSIsDebugBuild()
 {
 #ifdef DEBUG
-    return YES;
-#else
-    return NO;
-#endif
-}
-
-static inline BOOL OWSIsTestableBuild()
-{
-#ifdef TESTABLE_BUILD
     return YES;
 #else
     return NO;
@@ -32,6 +23,8 @@ extern NSString *const OWSApplicationDidEnterBackgroundNotification;
 extern NSString *const OWSApplicationWillEnterForegroundNotification;
 extern NSString *const OWSApplicationWillResignActiveNotification;
 extern NSString *const OWSApplicationDidBecomeActiveNotification;
+extern NSString *const OWSConversationWallPaperDidChange;
+extern NSString *const OWSGroupCallStateDidChange;
 
 typedef void (^BackgroundTaskExpirationHandler)(void);
 typedef void (^AppActiveBlock)(void);
@@ -47,7 +40,6 @@ NSString *NSStringForUIApplicationState(UIApplicationState value);
 
 @property (nonatomic, readonly) BOOL isMainApp;
 @property (nonatomic, readonly) BOOL isMainAppAndActive;
-@property (nonatomic, readonly) BOOL isNSE;
 
 // Whether the user is using a right-to-left language like Arabic.
 @property (nonatomic, readonly) BOOL isRTL;
@@ -100,6 +92,7 @@ NSString *NSStringForUIApplicationState(UIApplicationState value);
 // Should be a NOOP if isMainApp is NO.
 - (void)ensureSleepBlocking:(BOOL)shouldBeBlocking blockingObjectsDescription:(NSString *)blockingObjectsDescription;
 
+// Should only be called if isMainApp is YES.
 - (void)setMainAppBadgeNumber:(NSInteger)value;
 
 - (void)setStatusBarHidden:(BOOL)isHidden animated:(BOOL)isAnimated;
@@ -109,7 +102,8 @@ NSString *NSStringForUIApplicationState(UIApplicationState value);
 // Returns the VC that should be used to present alerts, modals, etc.
 - (nullable UIViewController *)frontmostViewController;
 
-- (void)openSystemSettings;
+// Returns nil if isMainApp is NO
+- (nullable ActionSheetAction *)openSystemSettingsActionWithCompletion:(void (^_Nullable)(void))completion;
 
 // Should be a NOOP if isMainApp is NO.
 - (void)setNetworkActivityIndicatorVisible:(BOOL)value;
@@ -139,9 +133,7 @@ NSString *NSStringForUIApplicationState(UIApplicationState value);
 
 @property (nonatomic, readonly) BOOL didLastLaunchNotTerminate;
 
-@property (nonatomic, readonly) NSString *debugLogsDirPath;
-
-@property (nonatomic, readonly) BOOL hasActiveCall;
+@property (atomic, nullable) NSString *hideConversationPinCode;
 
 @end
 

@@ -1,12 +1,33 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 import ZKGroup
 
 public struct GroupV2SnapshotImpl: GroupV2Snapshot {
+
+    public struct Member {
+        let userID: Data
+        let uuid: UUID
+        var address: SignalServiceAddress {
+            return SignalServiceAddress(uuid: uuid)
+        }
+        let role: GroupsProtoMemberRole
+    }
+
+    public struct PendingMember {
+        let userID: Data
+        let uuid: UUID
+        var address: SignalServiceAddress {
+            return SignalServiceAddress(uuid: uuid)
+        }
+        let timestamp: UInt64
+        let role: GroupsProtoMemberRole
+        let addedByUuid: UUID
+    }
 
     public let groupSecretParamsData: Data
 
@@ -15,20 +36,17 @@ public struct GroupV2SnapshotImpl: GroupV2Snapshot {
     public let revision: UInt32
 
     public let title: String
-    public let descriptionText: String?
 
     public let avatarUrlPath: String?
     public let avatarData: Data?
 
-    public let groupMembership: GroupMembership
+    private let members: [Member]
+    private let pendingMembers: [PendingMember]
 
-    public let groupAccess: GroupAccess
-
-    public let inviteLinkPassword: Data?
+    public let accessControlForAttributes: GroupsProtoAccessControlAccessRequired
+    public let accessControlForMembers: GroupsProtoAccessControlAccessRequired
 
     public let disappearingMessageToken: DisappearingMessageToken
-
-    public let isAnnouncementsOnly: Bool
 
     public let profileKeys: [UUID: Data]
 
@@ -40,28 +58,52 @@ public struct GroupV2SnapshotImpl: GroupV2Snapshot {
                 groupProto: GroupsProtoGroup,
                 revision: UInt32,
                 title: String,
-                descriptionText: String?,
                 avatarUrlPath: String?,
                 avatarData: Data?,
-                groupMembership: GroupMembership,
-                groupAccess: GroupAccess,
-                inviteLinkPassword: Data?,
+                members: [Member],
+                pendingMembers: [PendingMember],
+                accessControlForAttributes: GroupsProtoAccessControlAccessRequired,
+                accessControlForMembers: GroupsProtoAccessControlAccessRequired,
                 disappearingMessageToken: DisappearingMessageToken,
-                isAnnouncementsOnly: Bool,
                 profileKeys: [UUID: Data]) {
 
         self.groupSecretParamsData = groupSecretParamsData
         self.groupProto = groupProto
         self.revision = revision
         self.title = title
-        self.descriptionText = descriptionText
         self.avatarUrlPath = avatarUrlPath
         self.avatarData = avatarData
-        self.groupMembership = groupMembership
-        self.groupAccess = groupAccess
-        self.inviteLinkPassword = inviteLinkPassword
+        self.members = members
+        self.pendingMembers = pendingMembers
+        self.accessControlForAttributes = accessControlForAttributes
+        self.accessControlForMembers = accessControlForMembers
         self.disappearingMessageToken = disappearingMessageToken
-        self.isAnnouncementsOnly = isAnnouncementsOnly
         self.profileKeys = profileKeys
+    }
+
+    public var groupMembership: GroupMembership {
+        var builder = GroupMembership.Builder()
+        for member in members {
+            guard let role = TSGroupMemberRole.role(for: member.role) else {
+                owsFailDebug("Invalid value: \(member.role.rawValue)")
+                continue
+            }
+            builder.addNonPendingMember(member.address, role: role)
+        }
+
+        for member in pendingMembers {
+            guard let role = TSGroupMemberRole.role(for: member.role) else {
+                owsFailDebug("Invalid value: \(member.role.rawValue)")
+                continue
+            }
+            builder.addPendingMember(member.address, role: role, addedByUuid: member.addedByUuid)
+        }
+
+        return builder.build()
+    }
+
+    public var groupAccess: GroupAccess {
+        return GroupAccess(members: GroupAccess.groupV2Access(forProtoAccess: accessControlForMembers),
+                           attributes: GroupAccess.groupV2Access(forProtoAccess: accessControlForAttributes))
     }
 }

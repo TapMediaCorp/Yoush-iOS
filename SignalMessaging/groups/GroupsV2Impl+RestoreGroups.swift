@@ -1,11 +1,34 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 
 public extension GroupsV2Impl {
+
+    // MARK: - Dependencies
+
+    private static var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
+    private static var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    private static var groupV2Updates: GroupV2UpdatesSwift {
+        return SSKEnvironment.shared.groupV2Updates as! GroupV2UpdatesSwift
+    }
+
+    private static var groupsV2: GroupsV2 {
+        return SSKEnvironment.shared.groupsV2
+    }
+
+    private static var reachabilityManager: SSKReachabilityManager {
+        return SSKEnvironment.shared.reachabilityManager
+    }
 
     // MARK: - Restore Groups
 
@@ -69,7 +92,7 @@ public extension GroupsV2Impl {
         // Mark as needing restore.
         groupsFromStorageService_EnqueuedForRestore.setData(masterKeyData, key: key, transaction: transaction)
 
-        transaction.addAsyncCompletionOffMain {
+        transaction.addAsyncCompletion {
             self.enqueueRestoreGroupPass()
         }
     }
@@ -134,12 +157,12 @@ public extension GroupsV2Impl {
         guard canProcessGroupRestore else {
             return Promise.value(.cantProcess)
         }
-        return Promise<RestoreGroupOutcome> { future in
+        return Promise<RestoreGroupOutcome> { resolver in
             DispatchQueue.global().async {
                 guard let masterKeyData = (self.databaseStorage.read { transaction in
                     groupsFromStorageService_EnqueuedForRestore.anyDataValue(transaction: transaction)
                 }) else {
-                    return future.resolve(.emptyQueue)
+                    return resolver.fulfill(.emptyQueue)
                 }
                 let key = self.restoreGroupKey(forMasterKeyData: masterKeyData)
 
@@ -164,7 +187,7 @@ public extension GroupsV2Impl {
                 } catch {
                     owsFailDebug("Error: \(error)")
                     markAsFailed()
-                    return future.resolve(.unretryableFailure)
+                    return resolver.fulfill(.unretryableFailure)
                 }
 
                 let isGroupInDatabase = self.databaseStorage.read { transaction in
@@ -173,7 +196,7 @@ public extension GroupsV2Impl {
                 guard !isGroupInDatabase else {
                     // No work to be done, group already in database.
                     markAsComplete()
-                    return future.resolve(.success)
+                    return resolver.fulfill(.success)
                 }
 
                 // This will try to update the group using incremental "changes" but
@@ -186,11 +209,11 @@ public extension GroupsV2Impl {
                 }.done { _ in
                     Logger.verbose("Update succeeded.")
                     markAsComplete()
-                    future.resolve(.success)
+                    resolver.fulfill(.success)
                 }.catch { error in
-                    if error.isNetworkConnectivityFailure {
+                    if IsNetworkConnectivityFailure(error) {
                         Logger.warn("Error: \(error)")
-                        return future.resolve(.retryableFailure)
+                        return resolver.fulfill(.retryableFailure)
                     } else {
                         switch error {
                         case GroupsV2Error.localUserNotInGroup:
@@ -199,7 +222,7 @@ public extension GroupsV2Impl {
                             owsFailDebug("Error: \(error)")
                         }
                         markAsFailed()
-                        return future.resolve(.unretryableFailure)
+                        return resolver.fulfill(.unretryableFailure)
                     }
                 }
             }
@@ -236,7 +259,9 @@ public extension GroupsV2Impl {
             }.catch(on: .global()) { (error) in
                 // tryToRestoreNextGroup() should never fail.
                 owsFailDebug("Group restore failed: \(error)")
-                self.reportError(SSKUnretryableError.restoreGroupFailed)
+                let nsError: NSError = error as NSError
+                nsError.isRetryable = false
+                self.reportError(nsError)
             }
         }
 

@@ -6,7 +6,7 @@ public enum PhotoGridItemType {
     case photo, animated, video
 }
 
-public protocol PhotoGridItem: AnyObject {
+public protocol PhotoGridItem: class {
     var type: PhotoGridItemType { get }
     func asyncThumbnail(completion: @escaping (UIImage?) -> Void) -> UIImage?
 }

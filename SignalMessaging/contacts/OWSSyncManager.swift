@@ -1,10 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 extension OWSSyncManager: SyncManagerProtocolSwift {
+
+    var profileManager: OWSProfileManager { .shared() }
+    var blockingManager: OWSBlockingManager { .shared() }
 
     // MARK: - Sync Requests
 
@@ -34,11 +38,11 @@ extension OWSSyncManager: SyncManagerProtocolSwift {
             self.sendSyncRequestMessage(.keys, transaction: transaction)
         }
 
-        return Promise.when(fulfilled: [
+        return when(fulfilled: [
             NotificationCenter.default.observe(once: .IncomingContactSyncDidComplete).asVoid(),
             NotificationCenter.default.observe(once: .IncomingGroupSyncDidComplete).asVoid(),
             NotificationCenter.default.observe(once: .OWSSyncManagerConfigurationSyncDidComplete).asVoid(),
-            NotificationCenter.default.observe(once: BlockingManager.blockedSyncDidComplete).asVoid(),
+            NotificationCenter.default.observe(once: .OWSBlockingManagerBlockedSyncDidComplete).asVoid(),
             NotificationCenter.default.observe(once: .OWSSyncManagerKeysSyncDidComplete).asVoid()
         ])
     }
@@ -75,7 +79,7 @@ extension OWSSyncManager: SyncManagerProtocolSwift {
 
         KeyBackupService.storeSyncedKey(type: .storageService, data: syncMessage.storageService, transaction: transaction)
 
-        transaction.addAsyncCompletionOffMain {
+        transaction.addAsyncCompletion {
             NotificationCenter.default.postNotificationNameAsync(.OWSSyncManagerKeysSyncDidComplete, object: nil)
         }
     }
@@ -92,9 +96,10 @@ extension OWSSyncManager: SyncManagerProtocolSwift {
     ) {
         let thread: TSThread
         if let groupId = syncMessage.groupID {
-            TSGroupThread.ensureGroupIdMapping(forGroupId: groupId, transaction: transaction)
-            guard let groupThread = TSGroupThread.fetch(groupId: groupId,
-                                                        transaction: transaction) else {
+            guard let groupThread = TSGroupThread.anyFetchGroupThread(
+                uniqueId: TSGroupThread.threadId(fromGroupId: groupId),
+                transaction: transaction
+            ) else {
                 return owsFailDebug("message request response for missing group thread")
             }
             thread = groupThread
@@ -116,10 +121,10 @@ extension OWSSyncManager: SyncManagerProtocolSwift {
         case .delete:
             thread.softDelete(with: transaction)
         case .block:
-            blockingManager.addBlockedThread(thread, blockMode: .remote, transaction: transaction)
+            blockingManager.addBlockedThread(thread, wasLocallyInitiated: false, transaction: transaction)
         case .blockAndDelete:
             thread.softDelete(with: transaction)
-            blockingManager.addBlockedThread(thread, blockMode: .remote, transaction: transaction)
+            blockingManager.addBlockedThread(thread, wasLocallyInitiated: false, transaction: transaction)
         case .unknown:
             owsFailDebug("unexpected message request response type")
         }
@@ -155,9 +160,23 @@ extension OWSSyncManager: SyncManagerProtocolSwift {
     }
 }
 
-// MARK: -
+public extension SyncManagerProtocolSwift {
 
-public extension OWSSyncManager {
+    // MARK: -
+
+    var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return .shared
+    }
+
+    var messageSenderJobQueue: MessageSenderJobQueue {
+        return SSKEnvironment.shared.messageSenderJobQueue
+    }
+
+    // MARK: -
 
     func sendInitialSyncRequestsAwaitingCreatedThreadOrdering(timeoutSeconds: TimeInterval) -> Promise<[String]> {
         Logger.info("")
@@ -172,11 +191,11 @@ public extension OWSSyncManager {
             self.sendSyncRequestMessage(.contacts, transaction: transaction)
         }
 
-        let notificationsPromise: Promise<([(threadId: String, sortOrder: UInt32)], [(threadId: String, sortOrder: UInt32)], Void, Void)> = Promise.when(fulfilled:
+        let notificationsPromise: Promise<([(threadId: String, sortOrder: UInt32)], [(threadId: String, sortOrder: UInt32)], Void, Void)> = when(fulfilled:
             NotificationCenter.default.observe(once: .IncomingContactSyncDidComplete).map { $0.newThreads }.timeout(seconds: timeoutSeconds, substituteValue: []),
             NotificationCenter.default.observe(once: .IncomingGroupSyncDidComplete).map { $0.newThreads }.timeout(seconds: timeoutSeconds, substituteValue: []),
             NotificationCenter.default.observe(once: .OWSSyncManagerConfigurationSyncDidComplete).asVoid().timeout(seconds: timeoutSeconds),
-            NotificationCenter.default.observe(once: BlockingManager.blockedSyncDidComplete).asVoid().timeout(seconds: timeoutSeconds)
+            NotificationCenter.default.observe(once: .OWSBlockingManagerBlockedSyncDidComplete).asVoid().timeout(seconds: timeoutSeconds)
         )
 
         return notificationsPromise.map { (newContactThreads, newGroupThreads, _, _) -> [String] in
@@ -217,8 +236,6 @@ public extension OWSSyncManager {
         messageSenderJobQueue.add(message: syncRequestMessage.asPreparer, transaction: transaction)
     }
 }
-
-// MARK: -
 
 private extension Notification {
     var newThreads: [(threadId: String, sortOrder: UInt32)] {

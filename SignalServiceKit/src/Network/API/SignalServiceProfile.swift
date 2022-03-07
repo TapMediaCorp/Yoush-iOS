@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -16,19 +16,13 @@ public class SignalServiceProfile: NSObject {
     public let address: SignalServiceAddress
     public let identityKey: Data
     public let profileNameEncrypted: Data?
-    public let bioEncrypted: Data?
-    public let bioEmojiEncrypted: Data?
     public let username: String?
     public let avatarUrlPath: String?
-    public let paymentAddressEncrypted: Data?
     public let unidentifiedAccessVerifier: Data?
     public let hasUnrestrictedUnidentifiedAccess: Bool
+    public let supportsUUID: Bool
     public let supportsGroupsV2: Bool
-    public let supportsGroupsV2Migration: Bool
-    public let supportsAnnouncementOnlyGroups: Bool
-    public let supportsSenderKey: Bool
     public let credential: Data?
-    public let badges: [(OWSUserProfileBadgeInfo, ProfileBadge)]
 
     public init(address: SignalServiceAddress?, responseObject: Any?) throws {
         guard let params = ParamParser(responseObject: responseObject) else {
@@ -59,88 +53,40 @@ public class SignalServiceProfile: NSObject {
 
         self.profileNameEncrypted = try params.optionalBase64EncodedData(key: "name")
 
-        self.bioEncrypted = try params.optionalBase64EncodedData(key: "about")
-
-        self.bioEmojiEncrypted = try params.optionalBase64EncodedData(key: "aboutEmoji")
-
         self.username = try params.optional(key: "username")
 
         let avatarUrlPath: String? = try params.optional(key: "avatar")
         self.avatarUrlPath = avatarUrlPath
 
-        self.paymentAddressEncrypted = try params.optionalBase64EncodedData(key: "paymentAddress")
-
         self.unidentifiedAccessVerifier = try params.optionalBase64EncodedData(key: "unidentifiedAccess")
 
         self.hasUnrestrictedUnidentifiedAccess = try params.optional(key: "unrestrictedUnidentifiedAccess") ?? false
 
-        self.supportsGroupsV2 = Self.parseCapabilityFlag(capabilityKey: "gv2",
-                                                         params: params,
-                                                         requireCapability: true)
-        self.supportsGroupsV2Migration = Self.parseCapabilityFlag(capabilityKey: "gv1-migration",
-                                                                  params: params,
-                                                                  requireCapability: true)
-        self.supportsAnnouncementOnlyGroups = Self.parseCapabilityFlag(capabilityKey: "announcementGroup",
-                                                                       params: params,
-                                                                       requireCapability: true)
-        self.supportsSenderKey = Self.parseCapabilityFlag(capabilityKey: "senderKey",
-                                                          params: params,
-                                                          requireCapability: true)
-
-        self.credential = try params.optionalBase64EncodedData(key: "credential")
-
-        if RemoteConfig.donorBadgeDisplay,
-           let badgeArray: [[String: Any]] = try params.optional(key: "badges") {
-            self.badges = badgeArray.compactMap {
-                do {
-                    let badgeParams = ParamParser(dictionary: $0)
-                    let isVisible: Bool? = try badgeParams.optional(key: "visible")
-                    let expiration: TimeInterval? = try badgeParams.optional(key: "expiration")
-                    let expirationMills = expiration.flatMap { UInt64($0 * 1000) }
-
-                    let badge = try ProfileBadge(jsonDictionary: $0)
-                    let badgeMetadata: OWSUserProfileBadgeInfo
-                    if let expirationMills = expirationMills, let isVisible = isVisible {
-                        badgeMetadata = OWSUserProfileBadgeInfo(badgeId: badge.id, expiration: expirationMills, isVisible: isVisible)
-                    } else {
-                        badgeMetadata = OWSUserProfileBadgeInfo(badgeId: badge.id)
-                    }
-                    return (badgeMetadata, badge)
-                } catch {
-                    owsFailDebug("Invalid badge: \(error)")
-                    return nil
+        if let capabilities = ParamParser(responseObject: try params.required(key: "capabilities")) {
+            if let value: Bool = try capabilities.optional(key: "uuid") {
+                self.supportsUUID = value
+            } else {
+//                if FeatureFlags.uuidCapabilities {
+//                    owsFailDebug("Missing uuid capability.")
+//                }
+                // The capability has been retired from the service.
+                self.supportsUUID = true
+            }
+            if let value: Bool = try capabilities.optional(key: "gv2") {
+                self.supportsGroupsV2 = value
+            } else {
+                if RemoteConfig.groupsV2GoodCitizen {
+                    owsFailDebug("Missing groups v2 capability.")
                 }
+                // The capability has been retired from the service.
+                self.supportsGroupsV2 = true
             }
         } else {
-            self.badges = []
+            owsFailDebug("Missing capabilities.")
+            self.supportsUUID = false
+            self.supportsGroupsV2 = false
         }
-    }
 
-    private static func parseCapabilityFlag(capabilityKey: String,
-                                            params: ParamParser,
-                                            requireCapability: Bool) -> Bool {
-        do {
-            let capabilitiesJson: Any? = try params.required(key: "capabilities")
-            if let capabilities = ParamParser(responseObject: capabilitiesJson) {
-                if let value: Bool = try capabilities.optional(key: capabilityKey) {
-                    return value
-                } else {
-                    if requireCapability {
-                        Logger.verbose("capabilitiesJson: \(String(describing: capabilitiesJson))")
-                        owsFailDebug("Missing capability: \(capabilityKey).")
-                    } else {
-                        Logger.warn("Missing capability: \(capabilityKey).")
-                    }
-                    // The capability has been retired from the service.
-                    return true
-                }
-            } else {
-                owsFailDebug("Missing capabilities.")
-                return true
-            }
-        } catch {
-            owsFailDebug("Error: \(error)")
-            return true
-        }
+        self.credential = try params.optionalBase64EncodedData(key: "credential")
     }
 }

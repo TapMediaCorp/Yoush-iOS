@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSCountryMetadata.h"
@@ -341,10 +341,7 @@ NS_ASSUME_NONNULL_BEGIN
                                          frontingDomain:nil
                                             countryCode:@"US"],
             [OWSCountryMetadata countryMetadataWithName:@"Uruguay" tld:@".uy" frontingDomain:nil countryCode:@"UY"],
-            [OWSCountryMetadata countryMetadataWithName:@"Uzbekistan"
-                                                    tld:@".uz"
-                                         frontingDomain:OWSFrontingHost_GoogleUzbekistan
-                                            countryCode:@"UZ"],
+            [OWSCountryMetadata countryMetadataWithName:@"Uzbekistan" tld:@".uz" frontingDomain:nil countryCode:@"UZ"],
             [OWSCountryMetadata countryMetadataWithName:@"Saint Vincent and the Grenadines"
                                                     tld:@".vc"
                                          frontingDomain:nil

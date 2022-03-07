@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct InstalledStickerRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        InstalledStickerSerializer.table
+        return InstalledStickerSerializer.table
     }
 
-    public static var databaseTableName: String {
-        InstalledStickerSerializer.table.tableName
-    }
+    public static let databaseTableName: String = InstalledStickerSerializer.table.tableName
 
     public var id: Int64?
 
@@ -32,7 +30,6 @@ public struct InstalledStickerRecord: SDSRecord {
     // Properties
     public let emojiString: String?
     public let info: Data
-    public let contentType: String?
 
     public enum CodingKeys: String, CodingKey, ColumnExpression, CaseIterable {
         case id
@@ -40,11 +37,10 @@ public struct InstalledStickerRecord: SDSRecord {
         case uniqueId
         case emojiString
         case info
-        case contentType
     }
 
     public static func columnName(_ column: InstalledStickerRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -60,7 +56,7 @@ public struct InstalledStickerRecord: SDSRecord {
 
 public extension InstalledStickerRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -69,7 +65,6 @@ public extension InstalledStickerRecord {
         uniqueId = row[2]
         emojiString = row[3]
         info = row[4]
-        contentType = row[5]
     }
 }
 
@@ -101,14 +96,12 @@ extension InstalledSticker {
         case .installedSticker:
 
             let uniqueId: String = record.uniqueId
-            let contentType: String? = record.contentType
             let emojiString: String? = record.emojiString
             let infoSerialized: Data = record.info
             let info: StickerInfo = try SDSDeserialization.unarchive(infoSerialized, name: "info")
 
             return InstalledSticker(grdbId: recordId,
                                     uniqueId: uniqueId,
-                                    contentType: contentType,
                                     emojiString: emojiString,
                                     info: info)
 
@@ -133,15 +126,15 @@ extension InstalledSticker: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        InstalledStickerRecord.databaseTableName
+        return InstalledStickerRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        InstalledStickerSerializer.table
+        return InstalledStickerSerializer.table
     }
 }
 
@@ -161,7 +154,6 @@ extension InstalledSticker: DeepCopyable {
             let modelToCopy = self
             assert(type(of: modelToCopy) == InstalledSticker.self)
             let uniqueId: String = modelToCopy.uniqueId
-            let contentType: String? = modelToCopy.contentType
             let emojiString: String? = modelToCopy.emojiString
             // NOTE: If this generates build errors, you made need to
             // implement DeepCopyable for this type in DeepCopy.swift.
@@ -169,7 +161,6 @@ extension InstalledSticker: DeepCopyable {
 
             return InstalledSticker(grdbId: id,
                                     uniqueId: uniqueId,
-                                    contentType: contentType,
                                     emojiString: emojiString,
                                     info: info)
         }
@@ -183,28 +174,24 @@ extension InstalledStickerSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var emojiStringColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "emojiString", columnType: .unicodeString, isOptional: true) }
-    static var infoColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "info", columnType: .blob) }
-    static var contentTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "contentType", columnType: .unicodeString, isOptional: true) }
+    static let emojiStringColumn = SDSColumnMetadata(columnName: "emojiString", columnType: .unicodeString, isOptional: true)
+    static let infoColumn = SDSColumnMetadata(columnName: "info", columnType: .blob)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: InstalledSticker.collection(),
-                         tableName: "model_InstalledSticker",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: InstalledSticker.collection(),
+                                               tableName: "model_InstalledSticker",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
         emojiStringColumn,
         infoColumn,
-        contentTypeColumn
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -329,7 +316,7 @@ public class InstalledStickerCursor: NSObject {
             return nil
         }
         let value = try InstalledSticker.fromRecord(record)
-        Self.modelReadCaches.installedStickerCache.didReadInstalledSticker(value, transaction: transaction.asAnyRead)
+        SSKEnvironment.shared.modelReadCaches.installedStickerCache.didReadInstalledSticker(value, transaction: transaction.asAnyRead)
         return value
     }
 
@@ -383,11 +370,13 @@ public extension InstalledSticker {
         assert(uniqueId.count > 0)
 
         if !ignoreCache,
-            let cachedCopy = Self.modelReadCaches.installedStickerCache.getInstalledSticker(uniqueId: uniqueId, transaction: transaction) {
+            let cachedCopy = SSKEnvironment.shared.modelReadCaches.installedStickerCache.getInstalledSticker(uniqueId: uniqueId, transaction: transaction) {
             return cachedCopy
         }
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return InstalledSticker.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(InstalledStickerRecord.databaseTableName) WHERE \(installedStickerColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -418,20 +407,28 @@ public extension InstalledSticker {
                             batchSize: UInt,
                             block: @escaping (InstalledSticker, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            InstalledSticker.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? InstalledSticker else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = InstalledSticker.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = InstalledSticker.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -459,6 +456,10 @@ public extension InstalledSticker {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: InstalledSticker.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -490,6 +491,8 @@ public extension InstalledSticker {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: InstalledSticker.collection())
         case .grdbRead(let grdbTransaction):
             return InstalledStickerRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -499,6 +502,8 @@ public extension InstalledSticker {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: InstalledSticker.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try InstalledStickerRecord.deleteAll(grdbTransaction.database)
@@ -518,20 +523,24 @@ public extension InstalledSticker {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -543,6 +552,8 @@ public extension InstalledSticker {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: InstalledSticker.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(InstalledStickerRecord.databaseTableName) WHERE \(installedStickerColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -562,7 +573,7 @@ public extension InstalledSticker {
             let cursor = try InstalledStickerRecord.fetchCursor(transaction.database, sqlRequest)
             return InstalledStickerCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return InstalledStickerCursor(transaction: transaction, cursor: nil)
         }
@@ -580,7 +591,7 @@ public extension InstalledSticker {
             }
 
             let value = try InstalledSticker.fromRecord(record)
-            Self.modelReadCaches.installedStickerCache.didReadInstalledSticker(value, transaction: transaction.asAnyRead)
+            SSKEnvironment.shared.modelReadCaches.installedStickerCache.didReadInstalledSticker(value, transaction: transaction.asAnyRead)
             return value
         } catch {
             owsFailDebug("error: \(error)")
@@ -611,9 +622,8 @@ class InstalledStickerSerializer: SDSSerializer {
         // Properties
         let emojiString: String? = model.emojiString
         let info: Data = requiredArchive(model.info)
-        let contentType: String? = model.contentType
 
-        return InstalledStickerRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, emojiString: emojiString, info: info, contentType: contentType)
+        return InstalledStickerRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, emojiString: emojiString, info: info)
     }
 }
 
@@ -633,3 +643,4 @@ public extension InstalledSticker {
     }
 }
 #endif
+                                                                                                  

@@ -1,29 +1,31 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "FingerprintViewScanController.h"
-#import "Signal-Swift.h"
+#import "OWSQRCodeScanningViewController.h"
+#import "Yoush-Swift.h"
+#import "UIFont+OWS.h"
+#import "UIView+OWS.h"
+#import "UIViewController+Permissions.h"
 #import <SignalMessaging/Environment.h>
 #import <SignalMessaging/OWSContactsManager.h>
+#import <SignalMessaging/UIUtil.h>
 #import <SignalServiceKit/OWSError.h>
 #import <SignalServiceKit/OWSFingerprint.h>
 #import <SignalServiceKit/OWSFingerprintBuilder.h>
 #import <SignalServiceKit/OWSIdentityManager.h>
-#import <SignalUI/UIFont+OWS.h>
-#import <SignalUI/UIUtil.h>
-#import <SignalUI/UIView+SignalUI.h>
-#import <SignalUI/UIViewController+Permissions.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface FingerprintViewScanController () <QRCodeScanDelegate>
+@interface FingerprintViewScanController () <OWSQRScannerDelegate>
 
+@property (nonatomic) TSAccountManager *accountManager;
 @property (nonatomic) SignalServiceAddress *recipientAddress;
 @property (nonatomic) NSData *identityKey;
 @property (nonatomic) OWSFingerprint *fingerprint;
 @property (nonatomic) NSString *contactName;
-@property (nonatomic) QRCodeScanViewController *qrCodeScanViewController;
+@property (nonatomic) OWSQRCodeScanningViewController *qrScanningController;
 
 @end
 
@@ -36,19 +38,20 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertDebug(address.isValid);
 
     self.recipientAddress = address;
+    self.accountManager = [TSAccountManager sharedInstance];
 
     OWSContactsManager *contactsManager = Environment.shared.contactsManager;
     self.contactName = [contactsManager displayNameForAddress:address];
 
     OWSRecipientIdentity *_Nullable recipientIdentity =
-        [[OWSIdentityManager shared] recipientIdentityForAddress:address];
+        [[OWSIdentityManager sharedManager] recipientIdentityForAddress:address];
     OWSAssertDebug(recipientIdentity);
     // By capturing the identity key when we enter these views, we prevent the edge case
     // where the user verifies a key that we learned about while this view was open.
     self.identityKey = recipientIdentity.identityKey;
 
-    OWSFingerprintBuilder *builder = [[OWSFingerprintBuilder alloc] initWithAccountManager:self.tsAccountManager
-                                                                           contactsManager:contactsManager];
+    OWSFingerprintBuilder *builder =
+        [[OWSFingerprintBuilder alloc] initWithAccountManager:self.accountManager contactsManager:contactsManager];
     self.fingerprint = [builder fingerprintWithTheirSignalAddress:address
                                                  theirIdentityKey:recipientIdentity.identityKey];
 }
@@ -66,20 +69,18 @@ NS_ASSUME_NONNULL_BEGIN
 {
     self.view.backgroundColor = UIColor.blackColor;
 
-    self.qrCodeScanViewController =
-        [[QRCodeScanViewController alloc] initWithAppearance:QRCodeScanViewAppearanceNormal];
-    self.qrCodeScanViewController.delegate = self;
-    [self.view addSubview:self.qrCodeScanViewController.view];
-    [self.qrCodeScanViewController.view autoPinWidthToSuperview];
-    [self.qrCodeScanViewController.view autoPinToTopLayoutGuideOfViewController:self withInset:0];
-    [self addChildViewController:self.qrCodeScanViewController];
+    self.qrScanningController = [OWSQRCodeScanningViewController new];
+    self.qrScanningController.scanDelegate = self;
+    [self.view addSubview:self.qrScanningController.view];
+    [self.qrScanningController.view autoPinWidthToSuperview];
+    [self.qrScanningController.view autoPinToTopLayoutGuideOfViewController:self withInset:0];
 
     UIView *footer = [UIView new];
     footer.backgroundColor = [UIColor colorWithWhite:0.25f alpha:1.f];
     [self.view addSubview:footer];
     [footer autoPinWidthToSuperview];
     [footer autoPinEdgeToSuperviewEdge:ALEdgeBottom];
-    [footer autoPinEdge:ALEdgeTop toEdge:ALEdgeBottom ofView:self.qrCodeScanViewController.view];
+    [footer autoPinEdge:ALEdgeTop toEdge:ALEdgeBottom ofView:self.qrScanningController.view];
 
     UILabel *cameraInstructionLabel = [UILabel new];
     cameraInstructionLabel.text
@@ -96,36 +97,36 @@ NS_ASSUME_NONNULL_BEGIN
     [cameraInstructionLabel autoPinEdgeToSuperviewEdge:ALEdgeTop withInset:instructionsVMargin];
 }
 
-#pragma mark - QRCodeScanDelegate
+#pragma mark - Action
 
-- (void)qrCodeScanViewDismiss:(QRCodeScanViewController *)qrCodeScanViewController
+- (void)viewDidAppear:(BOOL)animated
 {
-    OWSAssertIsOnMainThread();
+    [super viewDidAppear:animated];
 
-    [self.navigationController popViewControllerAnimated:YES];
+    [self ows_askForCameraPermissions:^(BOOL granted) {
+        if (granted) {
+            // Camera stops capturing when "sharing" while in capture mode.
+            // Also, it's less obvious whats being "shared" at this point,
+            // so just disable sharing when in capture mode.
+
+            OWSLogInfo(@"Showing Scanner");
+
+            [self.qrScanningController startCapture];
+        } else {
+            [self.navigationController popViewControllerAnimated:YES];
+        }
+    }];
 }
 
-- (QRCodeScanOutcome)qrCodeScanViewScanned:(QRCodeScanViewController *)qrCodeScanViewController
-                                qrCodeData:(nullable NSData *)qrCodeData
-                              qrCodeString:(nullable NSString *)qrCodeString
+#pragma mark - OWSQRScannerDelegate
+
+- (void)controller:(OWSQRCodeScanningViewController *)controller didDetectQRCodeWithData:(NSData *)data
 {
-    OWSAssertIsOnMainThread();
-
-    if (qrCodeData == nil) {
-        // Only accept QR codes with a valid data (not string) payload.
-        return QRCodeScanOutcomeContinueScanning;
-    }
-
-    [self verifyCombinedFingerprintData:qrCodeData];
-
-    // Stop scanning even if verification failed.
-    return QRCodeScanOutcomeStopScanning;
+    [self verifyCombinedFingerprintData:data];
 }
 
 - (void)verifyCombinedFingerprintData:(NSData *)combinedFingerprintData
 {
-    OWSAssertIsOnMainThread();
-    
     NSError *error;
     if ([self.fingerprint matchesLogicalFingerprintsData:combinedFingerprintData error:&error]) {
         [self showVerificationSucceeded];
@@ -136,8 +137,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)showVerificationSucceeded
 {
-    OWSAssertIsOnMainThread();
-    
     [self.class showVerificationSucceeded:self
                               identityKey:self.identityKey
                          recipientAddress:self.recipientAddress
@@ -147,12 +146,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)showVerificationFailedWithError:(NSError *)error
 {
-    OWSAssertIsOnMainThread();
-    
+
     [self.class showVerificationFailedWithError:error
         viewController:self
-        retryBlock:^{ [self.qrCodeScanViewController tryToStartScanning]; }
-        cancelBlock:^{ [self.navigationController popViewControllerAnimated:YES]; }
+        retryBlock:^{
+            [self.qrScanningController startCapture];
+        }
+        cancelBlock:^{
+            [self.navigationController popViewControllerAnimated:YES];
+        }
         tag:self.logTag];
 }
 
@@ -162,7 +164,6 @@ NS_ASSUME_NONNULL_BEGIN
                       contactName:(NSString *)contactName
                               tag:(NSString *)tag
 {
-    OWSAssertIsOnMainThread();    
     OWSAssertDebug(viewController);
     OWSAssertDebug(identityKey.length > 0);
     OWSAssertDebug(address.isValid);
@@ -182,10 +183,10 @@ NS_ASSUME_NONNULL_BEGIN
                                            @"Button that marks user as verified after a successful fingerprint scan.")
                                  style:ActionSheetActionStyleDefault
                                handler:^(ActionSheetAction *action) {
-                                   [OWSIdentityManager.shared setVerificationState:OWSVerificationStateVerified
-                                                                       identityKey:identityKey
-                                                                           address:address
-                                                             isUserInitiatedChange:YES];
+                                   [OWSIdentityManager.sharedManager setVerificationState:OWSVerificationStateVerified
+                                                                              identityKey:identityKey
+                                                                                  address:address
+                                                                    isUserInitiatedChange:YES];
                                    [viewController dismissViewControllerAnimated:true completion:nil];
                                }]];
     ActionSheetAction *dismissAction =
@@ -217,7 +218,7 @@ NS_ASSUME_NONNULL_BEGIN
     } // else no title. We don't want to show a big scary "VERIFICATION FAILED" when it's just user error.
 
     ActionSheetController *alert = [[ActionSheetController alloc] initWithTitle:failureTitle
-                                                                        message:error.userErrorDescription];
+                                                                        message:error.localizedDescription];
 
     if (retryBlock) {
         [alert addAction:[[ActionSheetAction alloc] initWithTitle:[CommonStrings retryButton]
@@ -236,7 +237,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)dismissViewControllerAnimated:(BOOL)animated completion:(nullable void (^)(void))completion
 {
-    self.qrCodeScanViewController.view.hidden = YES;
+    self.qrScanningController.view.hidden = YES;
 
     [super dismissViewControllerAnimated:animated completion:completion];
 }

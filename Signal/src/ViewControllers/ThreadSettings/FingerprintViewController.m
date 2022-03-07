@@ -1,23 +1,24 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "FingerprintViewController.h"
 #import "FingerprintViewScanController.h"
 #import "OWSBezierPathView.h"
-#import "Signal-Swift.h"
+#import "Yoush-Swift.h"
+#import "UIFont+OWS.h"
+#import "UIView+OWS.h"
 #import <SignalCoreKit/NSDate+OWS.h>
 #import <SignalMessaging/Environment.h>
 #import <SignalMessaging/OWSContactsManager.h>
+#import <SignalMessaging/UIUtil.h>
 #import <SignalServiceKit/OWSError.h>
 #import <SignalServiceKit/OWSFingerprint.h>
 #import <SignalServiceKit/OWSFingerprintBuilder.h>
 #import <SignalServiceKit/OWSIdentityManager.h>
+#import <SignalServiceKit/SSKSessionStore.h>
 #import <SignalServiceKit/TSAccountManager.h>
 #import <SignalServiceKit/TSInfoMessage.h>
-#import <SignalUI/UIFont+OWS.h>
-#import <SignalUI/UIUtil.h>
-#import <SignalUI/UIView+SignalUI.h>
 
 @import SafariServices;
 
@@ -89,24 +90,22 @@ typedef void (^CustomLayoutBlock)(void);
 
 @implementation FingerprintViewController
 
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
 + (void)presentFromViewController:(UIViewController *)viewController address:(SignalServiceAddress *)address
 {
     OWSAssertDebug(address.isValid);
 
-    BOOL canRenderSafetyNumber;
-    if (RemoteConfig.uuidSafetyNumbers) {
-        canRenderSafetyNumber = address.uuid != nil;
-    } else {
-        canRenderSafetyNumber = address.phoneNumber != nil;
-    }
-
     OWSRecipientIdentity *_Nullable recipientIdentity =
-        [[OWSIdentityManager shared] recipientIdentityForAddress:address];
+        [[OWSIdentityManager sharedManager] recipientIdentityForAddress:address];
     if (!recipientIdentity) {
-        canRenderSafetyNumber = NO;
-    }
-
-    if (!canRenderSafetyNumber) {
         [OWSActionSheets showActionSheetWithTitle:NSLocalizedString(@"CANT_VERIFY_IDENTITY_ALERT_TITLE",
                                                       @"Title for alert explaining that a user cannot be verified.")
                                           message:NSLocalizedString(@"CANT_VERIFY_IDENTITY_ALERT_MESSAGE",
@@ -129,7 +128,7 @@ typedef void (^CustomLayoutBlock)(void);
         return self;
     }
 
-    _accountManager = [TSAccountManager shared];
+    _accountManager = [TSAccountManager sharedInstance];
 
     [self observeNotifications];
 
@@ -159,7 +158,7 @@ typedef void (^CustomLayoutBlock)(void);
     self.contactName = [contactsManager displayNameForAddress:address];
 
     OWSRecipientIdentity *_Nullable recipientIdentity =
-        [[OWSIdentityManager shared] recipientIdentityForAddress:address];
+        [[OWSIdentityManager sharedManager] recipientIdentityForAddress:address];
     OWSAssertDebug(recipientIdentity);
     // By capturing the identity key when we enter these views, we prevent the edge case
     // where the user verifies a key that we learned about while this view was open.
@@ -263,11 +262,13 @@ typedef void (^CustomLayoutBlock)(void);
     [instructionsLabel autoPinEdge:ALEdgeBottom toEdge:ALEdgeTop ofView:learnMoreButton withOffset:0];
 
     // Fingerprint Label
+    //Hide fingerprintLabel makes qrcode view strecth so just set the textColor to clear
     UILabel *fingerprintLabel = [UILabel new];
     fingerprintLabel.text = self.fingerprint.displayableText;
     fingerprintLabel.font = [UIFont fontWithName:@"Menlo-Regular" size:ScaleFromIPhone5To7Plus(20.f, 23.f)];
     fingerprintLabel.textAlignment = NSTextAlignmentCenter;
-    fingerprintLabel.textColor = Theme.secondaryTextAndIconColor;
+//    fingerprintLabel.textColor = Theme.secondaryTextAndIconColor;
+    fingerprintLabel.textColor = UIColor.clearColor;
     fingerprintLabel.numberOfLines = 3;
     fingerprintLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     fingerprintLabel.adjustsFontSizeToFitWidth = YES;
@@ -361,7 +362,7 @@ typedef void (^CustomLayoutBlock)(void);
     OWSAssertDebug(self.address.isValid);
 
     BOOL isVerified =
-        [[OWSIdentityManager shared] verificationStateForAddress:self.address] == OWSVerificationStateVerified;
+        [[OWSIdentityManager sharedManager] verificationStateForAddress:self.address] == OWSVerificationStateVerified;
 
     if (isVerified) {
         NSMutableAttributedString *labelText = [NSMutableAttributedString new];
@@ -397,14 +398,17 @@ typedef void (^CustomLayoutBlock)(void);
 
         NSMutableAttributedString *buttonText = [NSMutableAttributedString new];
         // Show a "checkmark" if this user is not verified.
-        [buttonText append:LocalizationNotNeeded(@"\uf00c  ")
+        [buttonText
+            appendAttributedString:[[NSAttributedString alloc]
+                                       initWithString:LocalizationNotNeeded(@"\uf00c  ")
                                            attributes:@{
                                                NSFontAttributeName : [UIFont
                                                    ows_fontAwesomeFont:self.verifyUnverifyButtonLabel.font.pointSize],
-                                           }];
-        [buttonText append:NSLocalizedString(@"PRIVACY_VERIFY_BUTTON",
-                                               @"Button that lets user mark another user's identity as verified.")
-                attributes:@{}];
+                                           }]];
+        [buttonText appendAttributedString:
+                        [[NSAttributedString alloc]
+                            initWithString:NSLocalizedString(@"PRIVACY_VERIFY_BUTTON",
+                                               @"Button that lets user mark another user's identity as verified.")]];
         self.verifyUnverifyButtonLabel.attributedText = buttonText;
     }
 
@@ -508,7 +512,7 @@ typedef void (^CustomLayoutBlock)(void);
 - (void)learnMoreButtonTapped:(UIGestureRecognizer *)gestureRecognizer
 {
     if (gestureRecognizer.state == UIGestureRecognizerStateRecognized) {
-        NSString *learnMoreURL = @"https://support.signal.org/hc/articles/213134107";
+        NSString *learnMoreURL = @"https://support.tapofthink.com/hc/articles/213134107";
 
         SFSafariViewController *safariVC =
             [[SFSafariViewController alloc] initWithURL:[NSURL URLWithString:learnMoreURL]];
@@ -534,17 +538,17 @@ typedef void (^CustomLayoutBlock)(void);
 {
     if (gestureRecognizer.state == UIGestureRecognizerStateRecognized) {
         DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            BOOL isVerified = [[OWSIdentityManager shared] verificationStateForAddress:self.address
-                                                                           transaction:transaction]
+            BOOL isVerified =
+                [[OWSIdentityManager sharedManager] verificationStateForAddress:self.address transaction:transaction]
                 == OWSVerificationStateVerified;
 
             OWSVerificationState newVerificationState
                 = (isVerified ? OWSVerificationStateDefault : OWSVerificationStateVerified);
-            [[OWSIdentityManager shared] setVerificationState:newVerificationState
-                                                  identityKey:self.identityKey
-                                                      address:self.address
-                                        isUserInitiatedChange:YES
-                                                  transaction:transaction];
+            [[OWSIdentityManager sharedManager] setVerificationState:newVerificationState
+                                                         identityKey:self.identityKey
+                                                             address:self.address
+                                               isUserInitiatedChange:YES
+                                                         transaction:transaction];
         });
 
         [self dismissViewControllerAnimated:YES completion:nil];

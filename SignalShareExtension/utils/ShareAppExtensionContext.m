@@ -1,12 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "ShareAppExtensionContext.h"
-#import <SignalMessaging/DebugLogger.h>
+#import <SignalMessaging/UIViewController+OWS.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 #import <SignalServiceKit/TSConstants.h>
-#import <SignalUI/UIViewController+OWS.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -25,6 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 @synthesize mainWindow = _mainWindow;
 @synthesize appLaunchTime = _appLaunchTime;
 @synthesize buildTime = _buildTime;
+@synthesize hideConversationPinCode = _hideConversationPinCode;
 
 - (instancetype)initWithRootViewController:(UIViewController *)rootViewController
 {
@@ -94,7 +94,7 @@ NS_ASSUME_NONNULL_BEGIN
     self.reportedApplicationState = UIApplicationStateInactive;
 
     OWSLogInfo(@"");
-    OWSLogFlush();
+    [DDLog flushLog];
 
     [BenchManager benchWithTitle:@"Slow post WillResignActive"
                  logIfLongerThan:0.01
@@ -111,7 +111,7 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertIsOnMainThread();
 
     OWSLogInfo(@"");
-    OWSLogFlush();
+    [DDLog flushLog];
 
     self.reportedApplicationState = UIApplicationStateBackground;
 
@@ -151,11 +151,6 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (BOOL)isMainAppAndActive
-{
-    return NO;
-}
-
-- (BOOL)isNSE
 {
     return NO;
 }
@@ -229,9 +224,9 @@ NS_ASSUME_NONNULL_BEGIN
     return [self.rootViewController findFrontmostViewController:YES];
 }
 
-- (void)openSystemSettings
+- (nullable ActionSheetAction *)openSystemSettingsActionWithCompletion:(void (^_Nullable)(void))completion
 {
-    return;
+    return nil;
 }
 
 - (BOOL)isRunningTests
@@ -247,7 +242,7 @@ NS_ASSUME_NONNULL_BEGIN
 
         if (buildTimestamp == 0) {
             // Production builds should _always_ expire, ensure that here.
-            OWSAssert(OWSIsTestableBuild());
+            OWSAssert(OWSIsDebugBuild());
 
             OWSLogDebug(@"No build timestamp, assuming app never expires.");
             _buildTime = [NSDate distantFuture];
@@ -327,16 +322,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)didLastLaunchNotTerminate
 {
     return NO;
-}
-
-- (BOOL)hasActiveCall
-{
-    return NO;
-}
-
-- (NSString *)debugLogsDirPath
-{
-    return DebugLogger.shareExtensionDebugLogsDirPath;
 }
 
 @end

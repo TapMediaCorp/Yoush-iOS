@@ -1,22 +1,32 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/TSGroupModel.h>
-#import <SignalServiceKit/TSThread.h>
+#import "TSGroupModel.h"
+#import "TSThread.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class MessageBodyRanges;
 @class SDSAnyReadTransaction;
 @class SDSAnyWriteTransaction;
 @class TSAttachmentStream;
-@class TSGroupModelV2;
 
 extern NSString *const TSGroupThreadAvatarChangedNotification;
 extern NSString *const TSGroupThread_NotificationKey_UniqueId;
 
 @interface TSGroupThread : TSThread
+
+- (instancetype)initWithGrdbId:(int64_t)grdbId
+                      uniqueId:(NSString *)uniqueId
+         conversationColorName:(ConversationColorName)conversationColorName
+                  creationDate:(nullable NSDate *)creationDate
+                    isArchived:(BOOL)isArchived
+//                        isHided:(BOOL)isHided
+          lastInteractionRowId:(int64_t)lastInteractionRowId
+                  messageDraft:(nullable NSString *)messageDraft
+                mutedUntilDate:(nullable NSDate *)mutedUntilDate
+         shouldThreadBeVisible:(BOOL)shouldThreadBeVisible NS_UNAVAILABLE;
+                      
 
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
@@ -25,8 +35,11 @@ extern NSString *const TSGroupThread_NotificationKey_UniqueId;
 - (nullable instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
 
 // This method should only be called by GroupManager.
-- (instancetype)initWithGroupModelPrivate:(TSGroupModel *)groupModel
-                              transaction:(SDSAnyReadTransaction *)transaction NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithGroupModelPrivate:(TSGroupModel *)groupModel NS_DESIGNATED_INITIALIZER;
+
+@property (nonatomic) BOOL hasCallInProgress;
+
+@property (nonatomic, strong) NSString* callIdInProgress;
 
 // --- CODE GENERATION MARKER
 
@@ -36,21 +49,21 @@ extern NSString *const TSGroupThread_NotificationKey_UniqueId;
 
 - (instancetype)initWithGrdbId:(int64_t)grdbId
                       uniqueId:(NSString *)uniqueId
-   conversationColorNameObsolete:(NSString *)conversationColorNameObsolete
+           conversationColorName:(ConversationColorName)conversationColorName
                     creationDate:(nullable NSDate *)creationDate
-              isArchivedObsolete:(BOOL)isArchivedObsolete
-          isMarkedUnreadObsolete:(BOOL)isMarkedUnreadObsolete
+                      isArchived:(BOOL)isArchived
+                         isHided:(BOOL)isHided
+                  isMarkedUnread:(BOOL)isMarkedUnread
             lastInteractionRowId:(int64_t)lastInteractionRowId
-       lastVisibleSortIdObsolete:(uint64_t)lastVisibleSortIdObsolete
-lastVisibleSortIdOnScreenPercentageObsolete:(double)lastVisibleSortIdOnScreenPercentageObsolete
-         mentionNotificationMode:(TSThreadMentionNotificationMode)mentionNotificationMode
+               lastVisibleSortId:(uint64_t)lastVisibleSortId
+lastVisibleSortIdOnScreenPercentage:(double)lastVisibleSortIdOnScreenPercentage
                     messageDraft:(nullable NSString *)messageDraft
-          messageDraftBodyRanges:(nullable MessageBodyRanges *)messageDraftBodyRanges
-          mutedUntilDateObsolete:(nullable NSDate *)mutedUntilDateObsolete
-     mutedUntilTimestampObsolete:(uint64_t)mutedUntilTimestampObsolete
+                  mutedUntilDate:(nullable NSDate *)mutedUntilDate
            shouldThreadBeVisible:(BOOL)shouldThreadBeVisible
+                callIdInProgress:(NSString *)callIdInProgress
                       groupModel:(TSGroupModel *)groupModel
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:conversationColorNameObsolete:creationDate:isArchivedObsolete:isMarkedUnreadObsolete:lastInteractionRowId:lastVisibleSortIdObsolete:lastVisibleSortIdOnScreenPercentageObsolete:mentionNotificationMode:messageDraft:messageDraftBodyRanges:mutedUntilDateObsolete:mutedUntilTimestampObsolete:shouldThreadBeVisible:groupModel:));
+               hasCallInProgress:(BOOL)hasCallInProgress
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:conversationColorName:creationDate:isArchived:isHided:isMarkedUnread:lastInteractionRowId:lastVisibleSortId:lastVisibleSortIdOnScreenPercentage:messageDraft:mutedUntilDate:shouldThreadBeVisible:callIdInProgress:groupModel:hasCallInProgress:));
 
 // clang-format on
 
@@ -62,13 +75,23 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:conversationColorNa
                               transaction:(SDSAnyReadTransaction *)transaction
     NS_SWIFT_NAME(fetch(groupId:transaction:));
 
++ (NSString *)threadIdFromGroupId:(NSData *)groupId;
+
 @property (nonatomic, readonly) NSString *groupNameOrDefault;
 @property (nonatomic, readonly, class) NSString *defaultGroupName;
+
+// all group threads containing recipient as a member
++ (NSArray<TSGroupThread *> *)groupThreadsWithAddress:(SignalServiceAddress *)address
+                                          transaction:(SDSAnyReadTransaction *)transaction;
 
 #pragma mark - Update With...
 
 // This method should only be called by GroupManager.
 - (void)updateWithGroupModel:(TSGroupModel *)groupModel transaction:(SDSAnyWriteTransaction *)transaction;
+
+#pragma mark -
+
++ (ConversationColorName)defaultConversationColorNameForGroupId:(NSData *)groupId;
 
 @end
 

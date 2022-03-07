@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,11 +8,11 @@ import Contacts
 import ContactsUI
 import SignalServiceKit
 import SignalMessaging
-import SignalUI
 
 @objc
 public class OWSAddToContactViewController: OWSViewController {
 
+    private var contactsViewHelper: ContactsViewHelper!
     private let address: SignalServiceAddress
     private var tableView: UITableView!
 
@@ -20,10 +20,14 @@ public class OWSAddToContactViewController: OWSViewController {
 
     fileprivate let contactCellReuseIdentifier = "contactCellReuseIdentifier"
 
+    var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
     @objc public init(address: SignalServiceAddress) {
         self.address = address
         super.init()
-        contactsViewHelper.addObserver(self)
+        self.contactsViewHelper = ContactsViewHelper(delegate: self)
     }
 
     public override func loadView() {
@@ -71,7 +75,7 @@ public class OWSAddToContactViewController: OWSViewController {
     }
 
     fileprivate func presentContactViewController(forContact contact: Contact) {
-        if !contactsManagerImpl.supportsContactEditing {
+        if !contactsManager.supportsContactEditing {
             return
         }
 
@@ -81,20 +85,19 @@ public class OWSAddToContactViewController: OWSViewController {
         }
 
         contactViewController.delegate = self
-        navigationController?.pushViewController(contactViewController, animated: true)
+        let nav = OWSNavigationController(rootViewController: contactViewController)
+        present(nav, animated: true, completion: nil)
     }
 
     private func updateData() {
-        contacts = databaseStorage.read { transaction in
-            contactsManagerImpl.allSortedContacts(transaction: transaction)
-        }
+        contacts = contactsManager.allContacts
     }
 }
 
 extension OWSAddToContactViewController: UITableViewDelegate {
 
     public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        presentContactViewController(forContact: contacts[indexPath.row])
+        presentContactViewController(forContact: contactsManager.allContacts[indexPath.row])
     }
 }
 
@@ -115,14 +118,14 @@ extension OWSAddToContactViewController: UITableViewDataSource {
             return cell
         }
 
-        cell.configure(contact: contact, subtitleType: .none, showsWhenSelected: false)
+        cell.configure(contact: contact, subtitleType: .none, showsWhenSelected: false, contactsManager: contactsManager)
 
         return cell
     }
 
 }
 
-extension OWSAddToContactViewController: ContactsViewHelperObserver {
+extension OWSAddToContactViewController: ContactsViewHelperDelegate {
     public func contactsViewHelperDidUpdateContacts() {
         updateData()
         tableView.reloadData()
@@ -132,10 +135,11 @@ extension OWSAddToContactViewController: ContactsViewHelperObserver {
 extension OWSAddToContactViewController: CNContactViewControllerDelegate {
 
     public func contactViewController(_ viewController: CNContactViewController, didCompleteWith contact: CNContact?) {
-        guard let index = navigationController?.viewControllers.firstIndex(of: self), index > 0,
-            let previousVC = (navigationController?.viewControllers[index - 1]) else { return }
-
-        navigationController?.popToViewController(previousVC, animated: true)
+        viewController.dismiss(animated: true, completion: nil)
+        
+        guard let index = self.navigationController?.viewControllers.firstIndex(of: self), index > 0,
+              let previousVC = (self.navigationController?.viewControllers[index - 1]) else { return }
+        self.navigationController?.popToViewController(previousVC, animated: true)
     }
 
 }

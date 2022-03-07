@@ -1,13 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
 class ComposeViewController: OWSViewController {
     let recipientPicker = RecipientPickerViewController()
-
+    var showDeviceContact = false
     override func viewDidLoad() {
         super.viewDidLoad()
 
@@ -18,7 +19,7 @@ class ComposeViewController: OWSViewController {
         recipientPicker.allowsSelectingUnregisteredPhoneNumbers = false
         recipientPicker.shouldShowInvites = true
         recipientPicker.shouldShowNewGroup = true
-        recipientPicker.shouldHideLocalRecipient = false
+        recipientPicker.showDeviceContact = showDeviceContact
         recipientPicker.delegate = self
         addChild(recipientPicker)
         view.addSubview(recipientPicker.view)
@@ -27,17 +28,7 @@ class ComposeViewController: OWSViewController {
         recipientPicker.view.autoPinEdge(toSuperviewEdge: .trailing)
         recipientPicker.view.autoPinEdge(toSuperviewEdge: .bottom)
 
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(dismissPressed))
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        recipientPicker.applyTheme(to: self)
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        recipientPicker.removeTheme(from: self)
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .stop, target: self, action: #selector(dismissPressed))
     }
 
     @objc func dismissPressed() {
@@ -49,14 +40,9 @@ class ComposeViewController: OWSViewController {
     }
 
     func newConversation(address: SignalServiceAddress) {
-        AssertIsOnMainThread()
-        owsAssertDebug(address.isValid)
-
-        let thread = Self.databaseStorage.write { transaction in
-            TSContactThread.getOrCreateThread(withContactAddress: address,
-                                              transaction: transaction)
-        }
-        self.newConversation(thread: thread)
+        assert(address.isValid)
+        let thread = TSContactThread.getOrCreateThread(contactAddress: address)
+        newConversation(thread: thread)
     }
 
     func newConversation(thread: TSThread) {
@@ -70,7 +56,6 @@ class ComposeViewController: OWSViewController {
 }
 
 extension ComposeViewController: RecipientPickerDelegate {
-
     func recipientPicker(
         _ recipientPickerViewController: RecipientPickerViewController,
         canSelectRecipient recipient: PickedRecipient
@@ -113,34 +98,15 @@ extension ComposeViewController: RecipientPickerDelegate {
 
     func recipientPicker(
         _ recipientPickerViewController: RecipientPickerViewController,
-        accessoryMessageForRecipient recipient: PickedRecipient,
-        transaction: SDSAnyReadTransaction
+        accessoryMessageForRecipient recipient: PickedRecipient
     ) -> String? {
         switch recipient.identifier {
         case .address(let address):
-            guard contactsViewHelper.isSignalServiceAddressBlocked(address) else { return nil }
+            guard recipientPicker.contactsViewHelper.isSignalServiceAddressBlocked(address) else { return nil }
             return MessageStrings.conversationIsBlocked
         case .group(let thread):
-            guard contactsViewHelper.isThreadBlocked(thread) else { return nil }
+            guard recipientPicker.contactsViewHelper.isThreadBlocked(thread) else { return nil }
             return MessageStrings.conversationIsBlocked
-        }
-    }
-
-    func recipientPicker(_ recipientPickerViewController: RecipientPickerViewController,
-                         attributedSubtitleForRecipient recipient: PickedRecipient,
-                         transaction: SDSAnyReadTransaction) -> NSAttributedString? {
-        switch recipient.identifier {
-        case .address(let address):
-            guard !address.isLocalAddress else {
-                return nil
-            }
-            if let bioForDisplay = Self.profileManagerImpl.profileBioForDisplay(for: address,
-                                                                                transaction: transaction) {
-                return NSAttributedString(string: bioForDisplay)
-            }
-            return nil
-        case .group:
-            return nil
         }
     }
 

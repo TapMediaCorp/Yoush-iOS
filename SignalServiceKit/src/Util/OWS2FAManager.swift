@@ -1,10 +1,18 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 extension OWS2FAManager {
+    var networkManager: TSNetworkManager {
+        return .shared()
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return .shared
+    }
 
     public static var isRegistrationLockV2EnabledKey = "isRegistrationLockV2Enabled"
 
@@ -40,11 +48,11 @@ extension OWS2FAManager {
     }
 
     public func requestEnable2FA(withPin pin: String, mode: OWS2FAMode, rotateMasterKey: Bool = false) -> Promise<Void> {
-        return Promise { future in
+        return Promise { resolver in
             requestEnable2FA(withPin: pin, mode: mode, rotateMasterKey: rotateMasterKey, success: {
-                future.resolve()
+                resolver.fulfill(())
             }) { error in
-                future.reject(error)
+                resolver.reject(error)
             }
         }
     }
@@ -61,7 +69,7 @@ extension OWS2FAManager {
                 throw OWSAssertionError("Cannot enable registration lock without an existing PIN")
             }
             return token
-        }.then { token -> Promise<HTTPResponse> in
+        }.then { token -> Promise<TSNetworkManager.Response> in
             let request = OWSRequestFactory.enableRegistrationLockV2Request(withToken: token)
             return self.networkManager.makePromise(request: request)
         }.done { _ in
@@ -73,7 +81,7 @@ extension OWS2FAManager {
                 )
             }
             firstly {
-                TSAccountManager.shared.updateAccountAttributes()
+                TSAccountManager.sharedInstance().updateAccountAttributes()
             }.catch { error in
                 Logger.error("Error: \(error)")
             }
@@ -81,7 +89,7 @@ extension OWS2FAManager {
     }
 
     public func markRegistrationLockV2Enabled(transaction: SDSAnyWriteTransaction) {
-        guard !TSAccountManager.shared.isRegistered else {
+        guard !TSAccountManager.sharedInstance().isRegistered else {
             return owsFailDebug("Unexpectedly attempted to mark reglock as enabled after registration")
         }
 
@@ -99,7 +107,7 @@ extension OWS2FAManager {
     }
 
     public func disableRegistrationLockV2() -> Promise<Void> {
-        return firstly { () -> Promise<HTTPResponse> in
+        return firstly { () -> Promise<TSNetworkManager.Response> in
             let request = OWSRequestFactory.disableRegistrationLockV2Request()
             return self.networkManager.makePromise(request: request)
         }.done { _ in
@@ -110,7 +118,7 @@ extension OWS2FAManager {
                 )
             }
             firstly {
-                TSAccountManager.shared.updateAccountAttributes()
+                TSAccountManager.sharedInstance().updateAccountAttributes()
             }.catch { error in
                 Logger.error("Error: \(error)")
             }
@@ -118,7 +126,7 @@ extension OWS2FAManager {
     }
 
     public func markRegistrationLockV2Disabled(transaction: SDSAnyWriteTransaction) {
-        guard !TSAccountManager.shared.isRegistered else {
+        guard !TSAccountManager.sharedInstance().isRegistered else {
             return owsFailDebug("Unexpectedly attempted to mark reglock as disabled after registration")
         }
 
@@ -143,43 +151,6 @@ extension OWS2FAManager {
             return requestEnable2FA(withPin: pinCode, mode: .V2)
         }.then {
             return self.enableRegistrationLockV2()
-        }
-    }
-
-    @objc
-    public func enable2FAV1(pin: String,
-                            success: (() -> Void)?,
-                            failure: ((Error) -> Void)?) {
-        // Convert the pin to arabic numerals, we never want to
-        // operate with pins in other numbering systems.
-        let request = OWSRequestFactory.enable2FARequest(withPin: pin.ensureArabicNumerals)
-        firstly {
-            Self.networkManager.makePromise(request: request)
-        }.done(on: .main) { _ in
-            Self.databaseStorage.write { transaction in
-                self.markEnabled(pin: pin, transaction: transaction)
-            }
-            success?()
-        }.catch(on: .main) { error in
-            owsFailDebugUnlessNetworkFailure(error)
-            failure?(error)
-        }
-    }
-
-    @objc
-    public func disable2FAV1(success: OWS2FASuccess?,
-                             failure: OWS2FAFailure?) {
-        let request = OWSRequestFactory.disable2FARequest()
-        firstly {
-            Self.networkManager.makePromise(request: request)
-        }.done(on: .main) { _ in
-            Self.databaseStorage.write { transaction in
-                self.markDisabled(transaction: transaction)
-            }
-            success?()
-        }.catch(on: .main) { error in
-            owsFailDebugUnlessNetworkFailure(error)
-            failure?(error)
         }
     }
 }

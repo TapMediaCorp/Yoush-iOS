@@ -1,13 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSScreenLockUI.h"
 #import "OWSWindowManager.h"
-#import "Signal-Swift.h"
+#import "Yoush-Swift.h"
+#import <SignalMessaging/ScreenLockViewController.h>
 #import <SignalMessaging/SignalMessaging-Swift.h>
-#import <SignalUI/ScreenLockViewController.h>
-#import <SignalUI/UIView+SignalUI.h>
+#import <SignalMessaging/UIView+OWS.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -57,7 +57,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation OWSScreenLockUI
 
-+ (instancetype)shared
++ (instancetype)sharedManager
 {
     static OWSScreenLockUI *instance = nil;
     static dispatch_once_t onceToken;
@@ -138,11 +138,11 @@ NS_ASSUME_NONNULL_BEGIN
     //
     // It's not safe to access OWSScreenLock.isScreenLockEnabled
     // until the app is ready.
-    AppReadinessRunNowOrWhenAppWillBecomeReady(^{
-        self.isScreenLockLocked = OWSScreenLock.shared.isScreenLockEnabled;
-
+    [AppReadiness runNowOrWhenAppWillBecomeReady:^{
+        self.isScreenLockLocked = OWSScreenLock.sharedManager.isScreenLockEnabled;
+        
         [self ensureUI];
-    });
+    }];
 }
 
 #pragma mark - Methods
@@ -161,7 +161,7 @@ NS_ASSUME_NONNULL_BEGIN
         OWSLogVerbose(@"tryToActivateScreenLockUponBecomingActive NO 0");
         return;
     }
-    if (!OWSScreenLock.shared.isScreenLockEnabled) {
+    if (!OWSScreenLock.sharedManager.isScreenLockEnabled) {
         // Screen lock is not enabled.
         OWSLogVerbose(@"tryToActivateScreenLockUponBecomingActive NO 1");
         return;
@@ -178,7 +178,7 @@ NS_ASSUME_NONNULL_BEGIN
     }
     NSTimeInterval countdownInterval = fabs([self.screenLockCountdownDate timeIntervalSinceNow]);
     OWSAssertDebug(countdownInterval >= 0);
-    NSTimeInterval screenLockTimeout = OWSScreenLock.shared.screenLockTimeout;
+    NSTimeInterval screenLockTimeout = OWSScreenLock.sharedManager.screenLockTimeout;
     OWSAssertDebug(screenLockTimeout >= 0);
     if (countdownInterval >= screenLockTimeout) {
         self.isScreenLockLocked = YES;
@@ -251,7 +251,9 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertIsOnMainThread();
 
     if (!AppReadiness.isAppReady) {
-        AppReadinessRunNowOrWhenAppWillBecomeReady(^{ [self ensureUI]; });
+        [AppReadiness runNowOrWhenAppWillBecomeReady:^{
+            [self ensureUI];
+        }];
         return;
     }
 
@@ -284,7 +286,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     self.isShowingScreenLockUI = YES;
 
-    [OWSScreenLock.shared
+    [OWSScreenLock.sharedManager
         tryToUnlockScreenLockWithSuccess:^{
             OWSLogInfo(@"unlock screen lock succeeded.");
 
@@ -301,7 +303,7 @@ NS_ASSUME_NONNULL_BEGIN
 
             self.didLastUnlockAttemptFail = YES;
 
-            [self showScreenLockFailureAlertWithMessage:error.userErrorDescription];
+            [self showScreenLockFailureAlertWithMessage:error.localizedDescription];
         }
         unexpectedFailure:^(NSError *error) {
             OWSLogInfo(@"unlock screen lock unexpectedly failed.");
@@ -332,25 +334,25 @@ NS_ASSUME_NONNULL_BEGIN
 {
     if (self.isScreenLockLocked) {
         if (self.appIsInactiveOrBackground) {
-            OWSLogVerbose(@"desiredUIState: screen protection 1.");
+            OWSLogVerbose(@"3-flash-screen");
             return ScreenLockUIStateScreenProtection;
         } else {
-            OWSLogVerbose(@"desiredUIState: screen lock 2.");
+            OWSLogVerbose(@"3-flash-screen");
             return ScreenLockUIStateScreenLock;
         }
     }
 
     if (!self.appIsInactiveOrBackground) {
         // App is inactive or background.
-        OWSLogVerbose(@"desiredUIState: none 3.");
+        OWSLogVerbose(@"3-flash-screen");
         return ScreenLockUIStateNone;
     }
 
     if (Environment.shared.preferences.screenSecurityIsEnabled) {
-        OWSLogVerbose(@"desiredUIState: screen protection 4.");
+        OWSLogVerbose(@"3-flash-screen");
         return ScreenLockUIStateScreenProtection;
     } else {
-        OWSLogVerbose(@"desiredUIState: none 5.");
+        OWSLogVerbose(@"3-flash-screen");
         return ScreenLockUIStateNone;
     }
 }
@@ -406,7 +408,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     BOOL shouldShowBlockWindow = desiredUIState != ScreenLockUIStateNone;
 
-    [OWSWindowManager.shared setIsScreenBlockActive:shouldShowBlockWindow];
+    [OWSWindowManager.sharedManager setIsScreenBlockActive:shouldShowBlockWindow];
 
     [self.screenBlockingViewController updateUIWithState:desiredUIState
                                              isLogoAtTop:self.isShowingScreenLockUI
@@ -472,7 +474,7 @@ NS_ASSUME_NONNULL_BEGIN
         OWSLogVerbose(@"clockDidChange 0");
         return;
     }
-    self.isScreenLockLocked = OWSScreenLock.shared.isScreenLockEnabled;
+    self.isScreenLockLocked = OWSScreenLock.sharedManager.isScreenLockEnabled;
 
     // NOTE: this notifications fires _before_ applicationDidBecomeActive,
     // which is desirable.  Don't assume that though; call ensureUI

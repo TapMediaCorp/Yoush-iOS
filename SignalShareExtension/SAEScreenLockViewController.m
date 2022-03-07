@@ -1,13 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "SAEScreenLockViewController.h"
 #import <SignalMessaging/SignalMessaging-Swift.h>
+#import <SignalMessaging/Theme.h>
 #import <SignalServiceKit/AppContext.h>
-#import <SignalServiceKit/SignalServiceKit-Swift.h>
-#import <SignalUI/SignalUI-Swift.h>
-#import <SignalUI/Theme.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -92,16 +90,15 @@ NS_ASSUME_NONNULL_BEGIN
 
     self.isShowingAuthUI = YES;
 
-    [OWSScreenLock.shared
-        tryToUnlockScreenLockWithSuccess:^{
-            OWSAssertIsOnMainThread();
+    [OWSScreenLock.sharedManager tryToUnlockScreenLockWithSuccess:^{
+        OWSAssertIsOnMainThread();
 
-            OWSLogInfo(@"unlock screen lock succeeded.");
+        OWSLogInfo(@"unlock screen lock succeeded.");
 
-            self.isShowingAuthUI = NO;
+        self.isShowingAuthUI = NO;
 
-            [self.shareViewDelegate shareViewWasUnlocked];
-        }
+        [self.shareViewDelegate shareViewWasUnlocked];
+    }
         failure:^(NSError *error) {
             OWSAssertIsOnMainThread();
 
@@ -111,7 +108,7 @@ NS_ASSUME_NONNULL_BEGIN
 
             [self ensureUI];
 
-            [self showScreenLockFailureAlertWithMessage:error.userErrorDescription];
+            [self showScreenLockFailureAlertWithMessage:error.localizedDescription];
         }
         unexpectedFailure:^(NSError *error) {
             OWSAssertIsOnMainThread();

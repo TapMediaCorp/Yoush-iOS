@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <Mantle/MTLModel.h>
@@ -8,6 +8,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class CNContact;
+@class OWSAttachmentInfo;
 @class SDSAnyReadTransaction;
 @class SDSAnyWriteTransaction;
 @class SSKProtoDataMessage;
@@ -105,7 +106,6 @@ NSString *NSStringForContactAddressType(OWSContactAddressType value);
 @property (nonatomic, nullable) NSString *nameSuffix;
 @property (nonatomic, nullable) NSString *namePrefix;
 @property (nonatomic, nullable) NSString *middleName;
-@property (nonatomic, nullable) NSString *nickname;
 
 @property (nonatomic, nullable) NSString *organizationName;
 
@@ -152,10 +152,10 @@ NSString *NSStringForContactAddressType(OWSContactAddressType value);
 
 #pragma mark - Phone Numbers and Recipient IDs
 
-- (NSArray<NSString *> *)systemContactsWithSignalAccountPhoneNumbers;
-- (NSArray<NSString *> *)systemContactsWithSignalAccountPhoneNumbersWithTransaction:
-    (SDSAnyReadTransaction *)transaction;
-- (NSArray<NSString *> *)systemContactPhoneNumbersWithTransaction:(SDSAnyReadTransaction *)transaction;
+- (NSArray<NSString *> *)systemContactsWithSignalAccountPhoneNumbers:(id<ContactsManagerProtocol>)contactsManager
+    NS_SWIFT_NAME(systemContactsWithSignalAccountPhoneNumbers(_:));
+- (NSArray<NSString *> *)systemContactPhoneNumbers:(id<ContactsManagerProtocol>)contactsManager
+    NS_SWIFT_NAME(systemContactPhoneNumbers(_:));
 - (NSArray<NSString *> *)e164PhoneNumbers NS_SWIFT_NAME(e164PhoneNumbers());
 
 @end

@@ -1,17 +1,29 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import UIKit
 
-protocol ReplaceAdminViewControllerDelegate: AnyObject {
+protocol ReplaceAdminViewControllerDelegate: class {
     func replaceAdmin(uuid: UUID)
 }
 
 // MARK: -
 
-class ReplaceAdminViewController: OWSTableViewController2 {
+class ReplaceAdminViewController: OWSTableViewController {
+
+    // MARK: - Dependencies
+
+    private var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    // MARK: -
 
     weak var replaceAdminViewControllerDelegate: ReplaceAdminViewControllerDelegate?
 
@@ -36,7 +48,8 @@ class ReplaceAdminViewController: OWSTableViewController2 {
         title = NSLocalizedString("REPLACE_ADMIN_VIEW_TITLE",
                                   comment: "The title for the 'replace group admin' view.")
 
-        tableView.register(ContactTableViewCell.self, forCellReuseIdentifier: ContactTableViewCell.reuseIdentifier)
+        self.useThemeBackgroundColors = true
+        tableView.separatorColor = .clear
 
         updateTableContents()
     }
@@ -46,27 +59,22 @@ class ReplaceAdminViewController: OWSTableViewController2 {
 
         let section = OWSTableSection()
 
-        let sortedCandidates = databaseStorage.read { transaction in
-            self.contactsManagerImpl.sortSignalServiceAddresses(Array(self.candidates), transaction: transaction)
+        let sortedCandidates = databaseStorage.uiRead { transaction in
+            self.contactsManager.sortSignalServiceAddresses(Array(self.candidates), transaction: transaction)
         }
         for address in sortedCandidates {
-            section.add(OWSTableItem(dequeueCellBlock: { tableView in
-                guard let cell = tableView.dequeueReusableCell(withIdentifier: ContactTableViewCell.reuseIdentifier) as? ContactTableViewCell else {
-                    owsFailDebug("Missing cell.")
-                    return UITableViewCell()
-                }
+            section.add(OWSTableItem(customCellBlock: {
+                let cell = ContactTableViewCell()
 
-                Self.databaseStorage.read { transaction in
-                    let configuration = ContactCellConfiguration(address: address, localUserDisplayMode: .asUser)
-                    let imageView = CVImageView()
-                    imageView.setTemplateImageName("empty-circle-outline-24", tintColor: .ows_gray25)
-                    configuration.accessoryView = ContactCellAccessoryView(accessoryView: imageView, size: .square(24))
+                let imageView = UIImageView()
+                imageView.setTemplateImageName("empty-circle-outline-24", tintColor: .ows_gray25)
+                cell.ows_setAccessoryView(imageView)
 
-                    cell.configure(configuration: configuration, transaction: transaction)
-                }
+                cell.configure(withRecipientAddress: address)
 
                 return cell
                 },
+                                     customRowHeight: UITableView.automaticDimension,
                                      actionBlock: { [weak self] in
                                         self?.candidateWasSelected(candidate: address)
                 }

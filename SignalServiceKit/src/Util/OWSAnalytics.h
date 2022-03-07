@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/OWSAnalyticsEvents.h>
+#import "OWSAnalyticsEvents.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -58,7 +58,7 @@ typedef NSDictionary<NSString *, id> *_Nonnull (^OWSProdAssertParametersBlock)(v
     {                                                                                                                  \
         if (!(BOOL)(__value)) {                                                                                        \
             NSDictionary<NSString *, id> *__eventParameters = (__parametersBlock ? __parametersBlock() : nil);         \
-            OWSLogFlush();                                                                                          \
+            [DDLog flushLog];                                                                                          \
             [OWSAnalytics logEvent:__eventName                                                                         \
                           severity:OWSAnalyticsSeverityError                                                           \
                         parameters:__eventParameters                                                                   \

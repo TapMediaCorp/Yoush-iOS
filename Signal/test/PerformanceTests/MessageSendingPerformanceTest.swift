@@ -1,5 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
+//
+
+import XCTest
+//
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
@@ -10,7 +15,7 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
 
     // MARK: -
 
-    let stubbableNetworkManager = StubbableNetworkManager()
+    let stubbableNetworkManager = StubbableNetworkManager(default: ())
 
     var dbObserverBlock: (() -> Void)?
     private var dbObserver: BlockObserver?
@@ -21,24 +26,30 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
     let localClient = LocalSignalClient()
     let runner = TestProtocolRunner()
 
+    // MARK: - Dependencies
+
+    var tsAccountManager: TSAccountManager {
+        return SSKEnvironment.shared.tsAccountManager
+    }
+
+    var identityManager: OWSIdentityManager {
+        return SSKEnvironment.shared.identityManager
+    }
+
     // MARK: - Hooks
 
     override func setUp() {
         super.setUp()
-
-        let sskEnvironment = SSKEnvironment.shared as! MockSSKEnvironment
-        sskEnvironment.networkManagerRef = self.stubbableNetworkManager
+        MockSSKEnvironment.shared.networkManager = self.stubbableNetworkManager
 
         // use the *real* message sender to measure it's perf
-        sskEnvironment.messageSenderRef = MessageSender()
-        Self.messageSenderJobQueue.setup()
-
-        try! databaseStorage.grdbStorage.setup()
+        MockSSKEnvironment.shared.messageSender = MessageSender()
+        MockSSKEnvironment.shared.messageSenderJobQueue.setup()
 
         // Observe DB changes so we can know when all the async processing is done
         let dbObserver = BlockObserver(block: { self.dbObserverBlock?() })
         self.dbObserver = dbObserver
-        databaseStorage.appendDatabaseChangeDelegate(dbObserver)
+        databaseStorage.appendUIDatabaseSnapshotDelegate(dbObserver)
     }
 
     override func tearDown() {
@@ -48,22 +59,38 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
 
     // MARK: -
 
-    func testPerf_messageSending_contactThread() {
-        // This is an example of a performance test case.
-        try! databaseStorage.grdbStorage.setupDatabaseChangeObserver()
+    func testYapDBPerf_messageSending_contactThread() {
+        storageCoordinator.useYDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             sendMessages_contactThread()
         }
-        databaseStorage.grdbStorage.testing_tearDownDatabaseChangeObserver()
     }
 
-    func testPerf_messageSending_groupThread() {
+    func testGRDBPerf_messageSending_contactThread() {
         // This is an example of a performance test case.
-        try! databaseStorage.grdbStorage.setupDatabaseChangeObserver()
+        storageCoordinator.useGRDBForTests()
+        try! databaseStorage.grdbStorage.setupUIDatabase()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            sendMessages_contactThread()
+        }
+        databaseStorage.grdbStorage.testing_tearDownUIDatabase()
+    }
+
+    func testYapDBPerf_messageSending_groupThread() {
+        storageCoordinator.useYDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             sendMessages_groupThread()
         }
-        databaseStorage.grdbStorage.testing_tearDownDatabaseChangeObserver()
+    }
+
+    func testGRDBPerf_messageSending_groupThread() {
+        // This is an example of a performance test case.
+        storageCoordinator.useGRDBForTests()
+        try! databaseStorage.grdbStorage.setupUIDatabase()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            sendMessages_groupThread()
+        }
+        databaseStorage.grdbStorage.testing_tearDownUIDatabase()
     }
 
     func sendMessages_groupThread() {
@@ -123,11 +150,12 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
     }
 
     func sendMessages(thread: TSThread) {
-        let totalNumberToSend = DebugFlags.fastPerfTests ? 5 : 50
+        let totalNumberToSend = 50
         let expectMessagesSent = expectation(description: "messages sent")
-        let hasFulfilled = AtomicBool(false)
+        var hasFulfilled = false
         let fulfillOnce = {
-            if hasFulfilled.tryToSetFlag() {
+            if !hasFulfilled {
+                hasFulfilled = true
                 expectMessagesSent.fulfill()
             }
         }
@@ -150,9 +178,7 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
             // Each is intentionally in a separate transaction, to be closer to the app experience
             // of sending each message
             self.read { transaction in
-                let messageBody = MessageBody(text: CommonGenerator.paragraph,
-                                              ranges: MessageBodyRanges.empty)
-                ThreadUtil.enqueueMessage(body: messageBody,
+                ThreadUtil.enqueueMessage(withText: CommonGenerator.paragraph,
                                           thread: thread,
                                           quotedReplyModel: nil,
                                           linkPreviewDraft: nil,
@@ -178,59 +204,45 @@ class MessageSendingPerformanceTest: PerformanceBaseTest {
     }
 }
 
-private class BlockObserver: DatabaseChangeDelegate {
+private class BlockObserver: UIDatabaseSnapshotDelegate {
     let block: () -> Void
     init(block: @escaping () -> Void) {
         self.block = block
     }
 
-    func databaseChangesDidUpdate(databaseChanges: DatabaseChanges) {
+    func uiDatabaseSnapshotWillUpdate() {
+        AssertIsOnMainThread()
+    }
+
+    func uiDatabaseSnapshotDidUpdate(databaseChanges: UIDatabaseChanges) {
         block()
     }
 
-    func databaseChangesDidUpdateExternally() {
+    func uiDatabaseSnapshotDidUpdateExternally() {
         block()
     }
 
-    func databaseChangesDidReset() {
+    func uiDatabaseSnapshotDidReset() {
         block()
     }
 }
 
-class StubbableNetworkManager: NetworkManager {
-    typealias NetworkManagerSuccess = (HTTPResponse) -> Void
-    typealias NetworkManagerFailure = (Error) -> Void
-
-    var block: (TSRequest, NetworkManagerSuccess, NetworkManagerFailure) -> Void = { request, success, _ in
+class StubbableNetworkManager: TSNetworkManager {
+    var block: (TSRequest, TSNetworkManagerSuccess, TSNetworkManagerFailure) -> Void = { request, success, failure in
+        let fakeTask = URLSessionDataTask()
         Logger.info("faking success for request: \(request)")
-        let response = HTTPResponseImpl(requestUrl: request.url!,
-                                        status: 200,
-                                        headers: OWSHttpHeaders(),
-                                        bodyData: nil)
-        success(response)
+        success(fakeTask, nil)
     }
 
-    public override func makePromise(request: TSRequest,
-                                     websocketSupportsRequest: Bool = false,
-                                     remainingRetryCount: Int = 0) -> Promise<HTTPResponse> {
-        Logger.info("Ignoring request: \(request)")
+    override func makeRequest(_ request: TSRequest, completionQueue: DispatchQueue, success: @escaping TSNetworkManagerSuccess, failure: @escaping TSNetworkManagerFailure) {
 
         // This latency is optimistic because I didn't want to slow
         // the tests down too much. But I did want to introduce some
         // non-trivial latency to make any interactions with the various
         // async's a little more realistic.
         let fakeNetworkLatency = DispatchTimeInterval.milliseconds(25)
-        let block = self.block
-        let (promise, future) = Promise<HTTPResponse>.pending()
-        DispatchQueue.global().asyncAfter(deadline: .now() + fakeNetworkLatency) {
-            let success = { response in
-                future.resolve(response)
-            }
-            let failure = { error in
-                future.reject(error)
-            }
-            block(request, success, failure)
+        completionQueue.asyncAfter(deadline: .now() + fakeNetworkLatency) {
+            self.block(request, success, failure)
         }
-        return promise
     }
 }

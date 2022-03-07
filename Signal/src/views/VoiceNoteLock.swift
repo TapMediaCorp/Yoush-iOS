@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -9,8 +9,8 @@ public class VoiceMemoLockView: UIView {
 
     private var offsetConstraint: NSLayoutConstraint!
 
-    private let offsetFromToolbar: CGFloat = 42
-    private let backgroundViewInitialHeight: CGFloat = 72
+    private let offsetFromToolbar: CGFloat = 40
+    private let backgroundViewInitialHeight: CGFloat = 80
     private var chevronTravel: CGFloat {
         return -1 * (backgroundViewInitialHeight - 50)
     }
@@ -29,7 +29,7 @@ public class VoiceMemoLockView: UIView {
         // we anchor the top so that the bottom "slides up" to meet it as the user slides the lock
         backgroundView.autoPinEdge(.top, to: .bottom, of: self, withOffset: -offsetFromToolbar - backgroundViewInitialHeight)
 
-        backgroundView.layoutMargins = UIEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+        backgroundView.layoutMargins = UIEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
 
         lockIconView.autoPinEdges(toSuperviewMarginsExcludingEdge: .bottom)
         chevronView.autoPinEdges(toSuperviewMarginsExcludingEdge: .top)
@@ -49,9 +49,9 @@ public class VoiceMemoLockView: UIView {
     // MARK: - Subviews
 
     private lazy var lockIconView: UIImageView = {
-        let imageTemplate = #imageLiteral(resourceName: "lock-solid-24").withRenderingMode(.alwaysTemplate)
+        let imageTemplate = #imageLiteral(resourceName: "ic_lock_outline").withRenderingMode(.alwaysTemplate)
         let imageView = UIImageView(image: imageTemplate)
-        imageView.tintColor = Theme.isDarkThemeEnabled ? .ows_gray15 : .ows_gray75
+        imageView.tintColor = .ows_accentRed
         imageView.autoSetDimensions(to: CGSize(square: 24))
         return imageView
     }()
@@ -59,7 +59,7 @@ public class VoiceMemoLockView: UIView {
     private lazy var chevronView: UIView = {
         let label = UILabel()
         label.text = "\u{2303}"
-        label.textColor = Theme.ternaryTextColor
+        label.textColor = .ows_accentRed
         label.textAlignment = .center
         return label
     }()
@@ -67,17 +67,12 @@ public class VoiceMemoLockView: UIView {
     private lazy var backgroundView: UIView = {
         let view = UIView()
 
-        let width: CGFloat = 40
+        let width: CGFloat = 36
         view.autoSetDimension(.width, toSize: width)
-        view.backgroundColor = Theme.isDarkThemeEnabled ? .ows_gray65 : .ows_gray02
+        view.backgroundColor = Theme.scrollButtonBackgroundColor
         view.layer.cornerRadius = width / 2
         view.layer.borderColor = Theme.washColor.cgColor
         view.layer.borderWidth = CGHairlineWidth()
-
-        view.layer.shadowOffset = CGSize(width: 0, height: 4)
-        view.layer.shadowRadius = 12
-        view.layer.shadowOpacity = 0.3
-        view.layer.shadowColor = UIColor.black.cgColor
 
         return view
     }()

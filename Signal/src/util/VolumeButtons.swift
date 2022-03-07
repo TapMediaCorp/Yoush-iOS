@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol VolumeButtonObserver: AnyObject {
+protocol VolumeButtonObserver: class {
     func didPressVolumeButton(with identifier: VolumeButtons.Identifier)
     func didReleaseVolumeButton(with identifier: VolumeButtons.Identifier)
 

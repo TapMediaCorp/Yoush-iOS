@@ -1,11 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import MultipeerConnectivity
 
 public class OnboardingTransferQRCodeViewController: OnboardingBaseViewController {
+
+    var deviceTransferService: DeviceTransferService { .shared }
 
     private let qrCodeView = QRCodeView()
 
@@ -16,7 +18,7 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
 
         view.backgroundColor = Theme.backgroundColor
 
-        let titleLabel = self.createTitleLabel(
+        let titleLabel = self.titleLabel(
             text: NSLocalizedString("DEVICE_TRANSFER_QRCODE_TITLE",
                                     comment: "The title for the device transfer qr code view")
         )
@@ -24,7 +26,7 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
         titleLabel.accessibilityIdentifier = "onboarding.transferQRCode.titleLabel"
         titleLabel.setContentHuggingHigh()
 
-        let explanationLabel = self.createExplanationLabel(
+        let explanationLabel = self.explanationLabel(
             explanationText: NSLocalizedString("DEVICE_TRANSFER_QRCODE_EXPLANATION",
                                                comment: "The explanation for the device transfer qr code view")
         )
@@ -33,22 +35,11 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
 
         qrCodeView.setContentHuggingVerticalLow()
 
-        let explanationLabel2 = self.createExplanationLabel(
+        let explanationLabel2 = self.explanationLabel(
             explanationText: NSLocalizedString("DEVICE_TRANSFER_QRCODE_EXPLANATION2",
             comment: "The second explanation for the device transfer qr code view")
         )
         explanationLabel2.setContentHuggingHigh()
-
-        let helpButton = self.linkButton(
-            title: NSLocalizedString(
-                "DEVICE_TRANSFER_QRCODE_NOT_SEEING",
-                comment: "A prompt to provide further explanation if the user is not seeing the transfer on both devices."
-            ),
-            selector: #selector(didTapHelp)
-        )
-        helpButton.button.titleLabel?.textAlignment = .center
-        helpButton.button.titleLabel?.numberOfLines = 0
-        helpButton.button.titleLabel?.lineBreakMode = .byWordWrapping
 
         let cancelButton = self.linkButton(title: CommonStrings.cancelButton, selector: #selector(didTapCancel))
 
@@ -58,7 +49,6 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
             qrCodeView,
             explanationLabel2,
             UIView.vStretchingSpacer(),
-            helpButton,
             cancelButton
         ])
         stackView.axis = .vertical
@@ -92,58 +82,6 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
 
     // MARK: - Events
 
-    weak var permissionActionSheetController: ActionSheetController?
-
-    @objc
-    func didTapHelp() {
-        let turnOnView = TurnOnPermissionView(
-            title: NSLocalizedString(
-                "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_TITLE",
-                comment: "Title for local network permission action sheet"
-            ),
-            message: NSLocalizedString(
-                "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_BODY",
-                comment: "Body for local network permission action sheet"
-            ),
-            steps: [
-                .init(
-                    icon: #imageLiteral(resourceName: "settings-app-icon-32"),
-                    text: NSLocalizedString(
-                        "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_STEP_ONE",
-                        comment: "First step for local network permission action sheet"
-                    )
-                ),
-                .init(
-                    icon: #imageLiteral(resourceName: "AppIcon"),
-                    text: NSLocalizedString(
-                        "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_STEP_TWO",
-                        comment: "Second step for local network permission action sheet"
-                    )
-                ),
-                .init(
-                    icon: #imageLiteral(resourceName: "toggle-32"),
-                    text: NSLocalizedString(
-                        "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_STEP_THREE",
-                        comment: "Third step for local network permission action sheet"
-                    )
-                )
-            ],
-            button: primaryButton(
-                title: NSLocalizedString(
-                    "LOCAL_NETWORK_PERMISSION_ACTION_SHEET_NEED_HELP",
-                    comment: "A button asking the user if they need further help getting their transfer working."
-                ),
-                selector: #selector(didTapContactSupport)
-            )
-        )
-
-        let actionSheetController = ActionSheetController()
-        permissionActionSheetController = actionSheetController
-        actionSheetController.customHeader = turnOnView
-        actionSheetController.isCancelable = true
-        presentActionSheet(actionSheetController)
-    }
-
     @objc
     func didTapCancel() {
         Logger.info("")
@@ -153,19 +91,6 @@ public class OnboardingTransferQRCodeViewController: OnboardingBaseViewControlle
         }
 
         onboardingController.pushStartDeviceRegistrationView(onto: navigationController)
-    }
-
-    @objc
-    func didTapContactSupport() {
-        Logger.info("")
-
-        permissionActionSheetController?.dismiss(animated: true)
-        permissionActionSheetController = nil
-
-        ContactSupportAlert.presentStep2(
-            emailSupportFilter: "Signal iOS Transfer",
-            fromViewController: self
-        )
     }
 
     override func shouldShowBackButton() -> Bool {

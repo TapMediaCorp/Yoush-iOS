@@ -1,17 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/OWSOutgoingSyncMessage.h>
+#import "OWSOutgoingSyncMessage.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef NS_CLOSED_ENUM(NSUInteger, OWSSyncFetchType) {
-    OWSSyncFetchType_Unknown,
-    OWSSyncFetchType_LocalProfile,
-    OWSSyncFetchType_StorageManifest,
-    OWSSyncFetchType_SubscriptionStatus
-};
+typedef NS_CLOSED_ENUM(NSUInteger,
+    OWSSyncFetchType) { OWSSyncFetchType_Unknown, OWSSyncFetchType_LocalProfile, OWSSyncFetchType_StorageManifest };
 
 @interface OWSSyncFetchLatestMessage : OWSOutgoingSyncMessage
 

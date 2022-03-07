@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSCall.h"
@@ -46,7 +46,6 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 @property (nonatomic, readonly) NSUInteger callSchemaVersion;
 
 @property (nonatomic) RPRecentCallType callType;
-@property (nonatomic) TSRecentCallOfferType offerType;
 
 @end
 
@@ -55,7 +54,6 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 @implementation TSCall
 
 - (instancetype)initWithCallType:(RPRecentCallType)callType
-                       offerType:(TSRecentCallOfferType)offerType
                           thread:(TSContactThread *)thread
                  sentAtTimestamp:(uint64_t)sentAtTimestamp
 {
@@ -67,7 +65,6 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 
     _callSchemaVersion = TSCallCurrentSchemaVersion;
     _callType = callType;
-    _offerType = offerType;
 
     // Ensure users are notified of missed calls.
     BOOL isIncomingMissed = (_callType == RPRecentCallTypeIncomingMissed
@@ -94,7 +91,6 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
                        timestamp:(uint64_t)timestamp
                   uniqueThreadId:(NSString *)uniqueThreadId
                         callType:(RPRecentCallType)callType
-                       offerType:(TSRecentCallOfferType)offerType
                             read:(BOOL)read
 {
     self = [super initWithGrdbId:grdbId
@@ -109,7 +105,6 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
     }
 
     _callType = callType;
-    _offerType = offerType;
     _read = read;
 
     return self;
@@ -143,34 +138,36 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 
 - (NSString *)previewTextWithTransaction:(SDSAnyReadTransaction *)transaction
 {
-    TSThread *thread = [self threadWithTransaction:transaction];
-    OWSAssertDebug([thread isKindOfClass:[TSContactThread class]]);
-    TSContactThread *contactThread = (TSContactThread *)thread;
-    NSString *shortName = [SSKEnvironment.shared.contactsManager shortDisplayNameForAddress:contactThread.contactAddress
-                                                                                transaction:transaction];
-
     // We don't actually use the `transaction` but other sibling classes do.
     switch (_callType) {
         case RPRecentCallTypeIncoming:
-        case RPRecentCallTypeIncomingIncomplete:
-        case RPRecentCallTypeIncomingAnsweredElsewhere: {
-            NSString *format = NSLocalizedString(
-                @"INCOMING_CALL_FORMAT", @"info message text in conversation view. {embeds callee name}");
-            return [NSString stringWithFormat:format, shortName];
-        }
+            return NSLocalizedString(@"INCOMING_CALL_ANSWERED", @"info message text in conversation view");
         case RPRecentCallTypeOutgoing:
-        case RPRecentCallTypeOutgoingIncomplete:
-        case RPRecentCallTypeOutgoingMissed: {
-            NSString *format = NSLocalizedString(
-                @"OUTGOING_CALL_FORMAT", @"info message text in conversation view. {embeds callee name}");
-            return [NSString stringWithFormat:format, shortName];
-        }
+            return NSLocalizedString(@"OUTGOING_CALL", @"info message text in conversation view");
         case RPRecentCallTypeIncomingMissed:
-        case RPRecentCallTypeIncomingMissedBecauseOfChangedIdentity:
-        case RPRecentCallTypeIncomingBusyElsewhere:
-        case RPRecentCallTypeIncomingDeclined:
-        case RPRecentCallTypeIncomingDeclinedElsewhere:
             return NSLocalizedString(@"MISSED_CALL", @"info message text in conversation view");
+        case RPRecentCallTypeOutgoingIncomplete:
+            return NSLocalizedString(@"OUTGOING_INCOMPLETE_CALL", @"info message text in conversation view");
+        case RPRecentCallTypeIncomingIncomplete:
+            return NSLocalizedString(@"INCOMING_INCOMPLETE_CALL", @"info message text in conversation view");
+        case RPRecentCallTypeIncomingMissedBecauseOfChangedIdentity:
+            return NSLocalizedString(@"INFO_MESSAGE_MISSED_CALL_DUE_TO_CHANGED_IDENITY", @"info message text shown in conversation view");
+        case RPRecentCallTypeIncomingDeclined:
+            return NSLocalizedString(@"INCOMING_DECLINED_CALL",
+                                     @"info message recorded in conversation history when local user declined a call");
+        case RPRecentCallTypeOutgoingMissed:
+            return NSLocalizedString(@"OUTGOING_MISSED_CALL",
+                @"info message recorded in conversation history when local user tries and fails to call another user.");
+        case RPRecentCallTypeIncomingAnsweredElsewhere:
+            return NSLocalizedString(@"INCOMING_CALL_ANSWERED_ELSEWHERE",
+                @"info message recorded in conversation history when a call was answered from another device");
+        case RPRecentCallTypeIncomingDeclinedElsewhere:
+            return NSLocalizedString(@"INCOMING_CALL_DECLINED_ELSEWHERE",
+                @"info message recorded in conversation history when a call was declined from another device");
+        case RPRecentCallTypeIncomingBusyElsewhere:
+            return NSLocalizedString(@"INCOMING_CALL_BUSY_ELSEWHERE",
+                @"info message recorded in conversation history when a call was missed due to an active call on "
+                @"another device");
     }
 }
 
@@ -188,7 +185,7 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 
 - (void)markAsReadAtTimestamp:(uint64_t)readTimestamp
                        thread:(TSThread *)thread
-                 circumstance:(OWSReceiptCircumstance)circumstance
+                 circumstance:(OWSReadCircumstance)circumstance
                   transaction:(SDSAnyWriteTransaction *)transaction
 {
 
@@ -212,7 +209,7 @@ NSUInteger TSCallCurrentSchemaVersion = 1;
 
 - (void)updateCallType:(RPRecentCallType)callType
 {
-    DatabaseStorageAsyncWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+    DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
         [self updateCallType:callType transaction:transaction];
     });
 }

@@ -1,12 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
-@objc
-class TypingIndicatorView: ManualStackView {
+@objc class TypingIndicatorView: UIStackView {
     // This represents the spacing between the dots
     // _at their max size_.
-    private static let kDotMaxHSpacing: CGFloat = 3
+    private let kDotMaxHSpacing: CGFloat = 3
 
     @objc
     public static let kMinRadiusPt: CGFloat = 6
@@ -17,21 +16,37 @@ class TypingIndicatorView: ManualStackView {
     private let dot2 = DotView(dotType: .dotType2)
     private let dot3 = DotView(dotType: .dotType3)
 
-    private var cachedMeasurement: ManualStackView.Measurement?
-
-    @objc
-    public init() {
-        super.init(name: "TypingIndicatorView")
-    }
-
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init(coder aDecoder: NSCoder) {
         notImplemented()
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
-    required init(name: String, arrangedSubviews: [UIView] = []) {
+    @available(*, unavailable, message:"use other constructor instead.")
+    override init(frame: CGRect) {
         notImplemented()
+    }
+
+    @objc
+    public init() {
+        super.init(frame: .zero)
+
+        // init(arrangedSubviews:...) is not a designated initializer.
+        for dot in dots() {
+            addArrangedSubview(dot)
+        }
+
+        self.axis = .horizontal
+        self.spacing = kDotMaxHSpacing
+        self.alignment = .center
+
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(didBecomeActive),
+                                               name: .OWSApplicationDidBecomeActive,
+                                               object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Notifications
@@ -49,75 +64,8 @@ class TypingIndicatorView: ManualStackView {
     // MARK: -
 
     @objc
-    func configureForHomeView() {
-        if let measurement = self.cachedMeasurement {
-            self.configureForReuse(config: Self.stackConfig,
-                                   measurement: measurement)
-        } else {
-            let measurement = Self.measurement()
-            self.cachedMeasurement = measurement
-            self.configure(config: Self.stackConfig,
-                           measurement: measurement,
-                           subviews: [ dot1, dot2, dot3 ])
-        }
-
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(didBecomeActive),
-                                               name: .OWSApplicationDidBecomeActive,
-                                               object: nil)
-    }
-
-    func configureForConversationView(cellMeasurement: CVCellMeasurement) {
-        self.configure(config: Self.stackConfig,
-                       cellMeasurement: cellMeasurement,
-                       measurementKey: Self.measurementKey_stack,
-                       subviews: [ dot1, dot2, dot3 ])
-
-        NotificationCenter.default.addObserver(self,
-                                               selector: #selector(didBecomeActive),
-                                               name: .OWSApplicationDidBecomeActive,
-                                               object: nil)
-    }
-
-    private static var stackConfig: CVStackViewConfig {
-        CVStackViewConfig(axis: .horizontal,
-                          alignment: .center,
-                          spacing: kDotMaxHSpacing,
-                          layoutMargins: .zero)
-    }
-
-    private static let measurementKey_stack = "TypingIndicatorView.measurementKey_stack"
-
-    static func measurement() -> ManualStackView.Measurement {
-        let dotSize = CGSize.square(kMaxRadiusPt)
-        let subviewInfos = [
-            dotSize.asManualSubviewInfo(hasFixedSize: true),
-            dotSize.asManualSubviewInfo(hasFixedSize: true),
-            dotSize.asManualSubviewInfo(hasFixedSize: true)
-        ]
-        return ManualStackView.measure(config: stackConfig, subviewInfos: subviewInfos)
-    }
-
-    static func measure(measurementBuilder: CVCellMeasurement.Builder) -> CGSize {
-        let measurement = Self.measurement()
-        measurementBuilder.setMeasurement(key: Self.measurementKey_stack, value: measurement)
-        return measurement.measuredSize
-    }
-
-    override func reset() {
-        super.reset()
-
-        self.cachedMeasurement = nil
-
-        stopAnimation()
-
-        NotificationCenter.default.removeObserver(self)
-    }
-
-    func resetForReuse() {
-        stopAnimation()
-
-        NotificationCenter.default.removeObserver(self)
+    public override func sizeThatFits(_ size: CGSize) -> CGSize {
+        return CGSize(width: TypingIndicatorView.kMaxRadiusPt * 3 + kDotMaxHSpacing * 2, height: TypingIndicatorView.kMaxRadiusPt)
     }
 
     private func dots() -> [DotView] {
@@ -155,12 +103,12 @@ class TypingIndicatorView: ManualStackView {
 
         private let shapeLayer = CAShapeLayer()
 
-        @available(*, unavailable, message: "use other constructor instead.")
+        @available(*, unavailable, message:"use other constructor instead.")
         required init?(coder aDecoder: NSCoder) {
             notImplemented()
         }
 
-        @available(*, unavailable, message: "use other constructor instead.")
+        @available(*, unavailable, message:"use other constructor instead.")
         override init(frame: CGRect) {
             notImplemented()
         }
@@ -170,6 +118,9 @@ class TypingIndicatorView: ManualStackView {
 
             super.init(frame: .zero)
 
+            autoSetDimension(.width, toSize: kMaxRadiusPt)
+            autoSetDimension(.height, toSize: kMaxRadiusPt)
+
             layer.addSublayer(shapeLayer)
         }
 
@@ -177,8 +128,8 @@ class TypingIndicatorView: ManualStackView {
             stopAnimation()
 
             let baseColor = (Theme.isDarkThemeEnabled
-                                ? UIColor(rgbHex: 0xBBBDBE)
-                                : UIColor(rgbHex: 0x636467))
+            ? UIColor(rgbHex: 0xBBBDBE)
+            : UIColor(rgbHex: 0x636467))
             let timeIncrement: CFTimeInterval = 0.15
             var colorValues = [CGColor]()
             var pathValues = [CGPath]()

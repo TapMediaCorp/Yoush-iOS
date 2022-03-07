@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -69,7 +69,7 @@ class ContactsFrameworkContactStoreAdaptee: NSObject, ContactStoreAdaptee {
 
     @objc
     func didBecomeActive() {
-        AppReadiness.runNowOrWhenAppDidBecomeReadyAsync {
+        AppReadiness.runNowOrWhenAppDidBecomeReadyPolite {
             let currentSortOrder = CNContactsUserDefaults.shared().sortOrder
 
             guard currentSortOrder != self.lastSortOrder else {
@@ -97,14 +97,12 @@ class ContactsFrameworkContactStoreAdaptee: NSObject, ContactStoreAdaptee {
     }
 
     func fetchContacts() -> Result<[Contact], Error> {
-        var contacts = [Contact]()
+        var systemContacts = [CNContact]()
         do {
             let contactFetchRequest = CNContactFetchRequest(keysToFetch: ContactsFrameworkContactStoreAdaptee.allowedContactKeys)
             contactFetchRequest.sortOrder = .userDefault
-            try autoreleasepool {
-                try contactStoreForLargeRequests.enumerateContacts(with: contactFetchRequest) { (systemContact, _) -> Void in
-                    contacts.append(Contact(systemContact: systemContact))
-                }
+            try contactStoreForLargeRequests.enumerateContacts(with: contactFetchRequest) { (contact, _) -> Void in
+                systemContacts.append(contact)
             }
         } catch let error as NSError {
             if error.domain == CNErrorDomain, error.code == CNError.Code.communicationError.rawValue {
@@ -116,6 +114,7 @@ class ContactsFrameworkContactStoreAdaptee: NSObject, ContactStoreAdaptee {
             return .error(error)
         }
 
+        let contacts = systemContacts.map { Contact(systemContact: $0) }
         return .success(contacts)
     }
 
@@ -155,7 +154,7 @@ public enum ContactStoreAuthorizationStatus: UInt {
          authorized
 }
 
-@objc public protocol SystemContactsFetcherDelegate: AnyObject {
+@objc public protocol SystemContactsFetcherDelegate: class {
     func systemContactsFetcher(_ systemContactsFetcher: SystemContactsFetcher, updatedContacts contacts: [Contact], isUserRequested: Bool)
     func systemContactsFetcher(_ systemContactsFetcher: SystemContactsFetcher, hasAuthorizationStatus authorizationStatus: ContactStoreAuthorizationStatus)
 }
@@ -195,8 +194,7 @@ public class SystemContactsFetcher: NSObject {
     public private(set) var systemContactsHaveBeenRequestedAtLeastOnce = false
     private var hasSetupObservation = false
 
-    @objc
-    public override init() {
+    override init() {
         self.contactStoreAdapter = ContactsFrameworkContactStoreAdaptee()
 
         super.init()
@@ -239,11 +237,7 @@ public class SystemContactsFetcher: NSObject {
                 completionParam?(error)
             })
         }
-        guard !CurrentAppContext().isNSE else {
-            let error = OWSAssertionError("Skipping contacts fetch in NSE.")
-            completion(error)
-            return
-        }
+
         guard !systemContactsHaveBeenRequestedAtLeastOnce else {
             completion(nil)
             return
@@ -287,11 +281,6 @@ public class SystemContactsFetcher: NSObject {
     @objc
     public func fetchOnceIfAlreadyAuthorized() {
         AssertIsOnMainThread()
-
-        guard !CurrentAppContext().isNSE else {
-            Logger.info("Skipping contacts fetch in NSE.")
-            return
-        }
         guard authorizationStatus == .authorized else {
             self.delegate?.systemContactsFetcher(self, hasAuthorizationStatus: authorizationStatus)
             return
@@ -307,11 +296,6 @@ public class SystemContactsFetcher: NSObject {
     public func userRequestedRefresh(completion: @escaping (Error?) -> Void) {
         AssertIsOnMainThread()
 
-        guard !CurrentAppContext().isNSE else {
-            let error = OWSAssertionError("Skipping contacts fetch in NSE.")
-            completion(error)
-            return
-        }
         guard authorizationStatus == .authorized else {
             owsFailDebug("should have already requested contact access")
             self.delegate?.systemContactsFetcher(self, hasAuthorizationStatus: authorizationStatus)
@@ -326,10 +310,6 @@ public class SystemContactsFetcher: NSObject {
     public func refreshAfterContactsChange() {
         AssertIsOnMainThread()
 
-        guard !CurrentAppContext().isNSE else {
-            Logger.info("Skipping contacts fetch in NSE.")
-            return
-        }
         guard authorizationStatus == .authorized else {
             Logger.info("ignoring contacts change; no access.")
             self.delegate?.systemContactsFetcher(self, hasAuthorizationStatus: authorizationStatus)
@@ -341,14 +321,6 @@ public class SystemContactsFetcher: NSObject {
 
     private func updateContacts(completion completionParam: ((Error?) -> Void)?, isUserRequested: Bool = false) {
         AssertIsOnMainThread()
-
-        guard !CurrentAppContext().isNSE else {
-            let error = OWSAssertionError("Skipping contacts fetch in NSE.")
-            DispatchMainThreadSafe({
-                completionParam?(error)
-            })
-            return
-        }
 
         var backgroundTask: OWSBackgroundTask? = OWSBackgroundTask(label: "\(#function)", completionBlock: { [weak self] status in
             AssertIsOnMainThread()
@@ -395,10 +367,9 @@ public class SystemContactsFetcher: NSObject {
                 return
             }
 
-            var contactsHash = 0
-            for contact in contacts {
-                contactsHash = contactsHash ^ contact.hash
-            }
+            Logger.info("fetched \(contacts.count) contacts.")
+
+            let contactsHash = contacts.hashValue
 
             DispatchQueue.main.async {
                 var shouldNotifyDelegate = false

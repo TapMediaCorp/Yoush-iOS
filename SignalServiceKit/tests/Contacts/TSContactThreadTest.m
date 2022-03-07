@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "MockSSKEnvironment.h"
@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
     [super setUp];
 
     self.contactThread = [TSContactThread
-        getOrCreateThreadWithContactAddress:[[SignalServiceAddress alloc] initWithPhoneNumber:@"+12223334444"]];
+        getOrCreateThreadWithContactAddress:[[SignalServiceAddress alloc] initWithPhoneNumber:@"fake-contact-id"]];
 }
 
 - (void)testHasSafetyNumbersWithoutRemoteIdentity
@@ -33,8 +33,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)testHasSafetyNumbersWithRemoteIdentity
 {
-    [[OWSIdentityManager shared] saveRemoteIdentity:[[NSMutableData alloc] initWithLength:kStoredIdentityKeyLength]
-                                            address:self.contactThread.contactAddress];
+    [[OWSIdentityManager sharedManager]
+        saveRemoteIdentity:[[NSMutableData alloc] initWithLength:kStoredIdentityKeyLength]
+                   address:self.contactThread.contactAddress];
     XCTAssert(self.contactThread.hasSafetyNumbers);
 }
 

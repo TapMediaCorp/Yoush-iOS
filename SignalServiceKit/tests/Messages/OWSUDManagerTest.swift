@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
@@ -7,13 +7,22 @@ import Foundation
 import Curve25519Kit
 import SignalCoreKit
 import SignalMetadataKit
-import SignalClient
 @testable import SignalServiceKit
 
 class OWSUDManagerTest: SSKBaseTestSwift {
 
-    private var udManagerImpl: OWSUDManagerImpl {
+    // MARK: - Dependencies
+
+    private var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
+    private var udManager: OWSUDManagerImpl {
         return SSKEnvironment.shared.udManager as! OWSUDManagerImpl
+    }
+
+    private var profileManager: OWSFakeProfileManager {
+        return SSKEnvironment.shared.profileManager as! OWSFakeProfileManager
     }
 
     // MARK: - Setup/Teardown
@@ -21,8 +30,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
     let aliceE164 = "+13213214321"
     let aliceUuid = UUID()
     lazy var aliceAddress = SignalServiceAddress(uuid: aliceUuid, phoneNumber: aliceE164)
-    lazy var defaultSenderCert = try! SenderCertificate(buildSenderCertificateProto(uuidOnly: false).serializedData())
-    lazy var uuidOnlySenderCert = try! SenderCertificate(buildSenderCertificateProto(uuidOnly: true).serializedData())
+    lazy var senderCertificate = try! SMKSenderCertificate(serializedData: buildSenderCertificateProto().serializedData())
 
     override func setUp() {
         super.setUp()
@@ -33,13 +41,12 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         self.write { transaction in
             self.profileManager.setProfileKeyData(OWSAES256Key.generateRandom().keyData,
                                                   for: self.aliceAddress,
-                                                  userProfileWriter: .tests,
+                                                  wasLocallyInitiated: true,
                                                   transaction: transaction)
         }
 
-        udManagerImpl.certificateValidator = MockCertificateValidator()
-        udManagerImpl.setSenderCertificate(uuidOnly: true, certificateData: Data(uuidOnlySenderCert.serialize()))
-        udManagerImpl.setSenderCertificate(uuidOnly: false, certificateData: Data(defaultSenderCert.serialize()))
+        udManager.certificateValidator = MockCertificateValidator()
+        udManager.setSenderCertificate(certificateData: senderCertificate.serializedData)
     }
 
     override func tearDown() {
@@ -50,7 +57,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
     // MARK: - Tests
 
     func testMode_self() {
-        XCTAssert(udManagerImpl.hasSenderCertificates())
+        XCTAssert(udManager.hasSenderCertificate())
 
         XCTAssert(tsAccountManager.isRegistered)
         guard let localAddress = tsAccountManager.localAddress else {
@@ -60,37 +67,47 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         XCTAssert(localAddress.isValid)
 
         do {
-            let udAccess = udManagerImpl.udAccess(forAddress: localAddress, requireSyncAccess: false)!
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: localAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.enabled, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.unknown, address: aliceAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: localAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unknown, address: aliceAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: localAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unknown, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.disabled, address: aliceAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: localAddress, requireSyncAccess: false)
+            udManager.setUnidentifiedAccessMode(.disabled, address: aliceAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: localAddress, requireSyncAccess: false, transaction: $0)
+            }
             XCTAssertNil(udAccess)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.enabled, address: aliceAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: localAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.enabled, address: aliceAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: localAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.enabled, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.unrestricted, address: aliceAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: localAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unrestricted, address: aliceAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: localAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unrestricted, udAccess.udAccessMode)
             XCTAssert(udAccess.isRandomKey)
@@ -98,7 +115,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
     }
 
     func testMode_noProfileKey() {
-        XCTAssert(udManagerImpl.hasSenderCertificates())
+        XCTAssert(udManager.hasSenderCertificate())
 
         XCTAssert(tsAccountManager.isRegistered)
         guard let localAddress = tsAccountManager.localAddress else {
@@ -108,7 +125,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         XCTAssert(localAddress.isValid)
 
         // Ensure UD is enabled by setting our own access level to enabled.
-        udManagerImpl.setUnidentifiedAccessMode(.enabled, address: localAddress)
+        udManager.setUnidentifiedAccessMode(.enabled, address: localAddress)
 
         let bobRecipientAddress = SignalServiceAddress(phoneNumber: "+13213214322")
         XCTAssertFalse(bobRecipientAddress.isLocalAddress)
@@ -117,36 +134,46 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         }
 
         do {
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unknown, udAccess.udAccessMode)
             XCTAssert(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.unknown, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unknown, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unknown, udAccess.udAccessMode)
             XCTAssert(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.disabled, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)
+            udManager.setUnidentifiedAccessMode(.disabled, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)
+            }
             XCTAssertNil(udAccess)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.enabled, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)
+            udManager.setUnidentifiedAccessMode(.enabled, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)
+            }
             XCTAssertNil(udAccess)
         }
 
         do {
             // Bob should work in unrestricted mode, even if he doesn't have a profile key.
-            udManagerImpl.setUnidentifiedAccessMode(.unrestricted, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unrestricted, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unrestricted, udAccess.udAccessMode)
             XCTAssert(udAccess.isRandomKey)
@@ -154,7 +181,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
     }
 
     func testMode_withProfileKey() {
-        XCTAssert(udManagerImpl.hasSenderCertificates())
+        XCTAssert(udManager.hasSenderCertificate())
 
         XCTAssert(tsAccountManager.isRegistered)
         guard let localAddress = tsAccountManager.localAddress else {
@@ -164,27 +191,31 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         XCTAssert(localAddress.isValid)
 
         // Ensure UD is enabled by setting our own access level to enabled.
-        udManagerImpl.setUnidentifiedAccessMode(.enabled, address: localAddress)
+        udManager.setUnidentifiedAccessMode(.enabled, address: localAddress)
 
         let bobRecipientAddress = SignalServiceAddress(phoneNumber: "+13213214322")
         XCTAssertFalse(bobRecipientAddress.isLocalAddress)
         self.write { transaction in
             self.profileManager.setProfileKeyData(OWSAES256Key.generateRandom().keyData,
                                                   for: bobRecipientAddress,
-                                                  userProfileWriter: .tests,
+                                                  wasLocallyInitiated: true,
                                                   transaction: transaction)
         }
 
         do {
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unknown, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.unknown, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unknown, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unknown, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
@@ -192,22 +223,28 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.disabled, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)
+            udManager.setUnidentifiedAccessMode(.disabled, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)
+            }
             XCTAssertNil(udAccess)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.enabled, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.enabled, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.enabled, udAccess.udAccessMode)
             XCTAssertFalse(udAccess.isRandomKey)
         }
 
         do {
-            udManagerImpl.setUnidentifiedAccessMode(.unrestricted, address: bobRecipientAddress)
-            let udAccess = udManagerImpl.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false)!
+            udManager.setUnidentifiedAccessMode(.unrestricted, address: bobRecipientAddress)
+            let udAccess = write {
+                return self.udManager.udAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, transaction: $0)!
+            }
             XCTAssertNotNil(udAccess)
             XCTAssertEqual(.unrestricted, udAccess.udAccessMode)
             XCTAssert(udAccess.isRandomKey)
@@ -215,7 +252,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
     }
 
     func test_senderAccess() {
-        XCTAssert(udManagerImpl.hasSenderCertificates())
+        XCTAssert(udManager.hasSenderCertificate())
 
         XCTAssert(tsAccountManager.isRegistered)
         guard let localAddress = tsAccountManager.localAddress else {
@@ -225,29 +262,26 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         XCTAssert(localAddress.isValid)
 
         // Ensure UD is enabled by setting our own access level to enabled.
-        udManagerImpl.setUnidentifiedAccessMode(.enabled, address: localAddress)
+        udManager.setUnidentifiedAccessMode(.enabled, address: localAddress)
 
         let bobRecipientAddress = SignalServiceAddress(phoneNumber: "+13213214322")
         XCTAssertFalse(bobRecipientAddress.isLocalAddress)
         write { transaction in
             self.profileManager.setProfileKeyData(OWSAES256Key.generateRandom().keyData,
                                                   for: bobRecipientAddress,
-                                                  userProfileWriter: .tests,
+                                                  wasLocallyInitiated: true,
                                                   transaction: transaction)
         }
 
         let completed = self.expectation(description: "completed")
-        firstly {
-            udManagerImpl.ensureSenderCertificates(certificateExpirationPolicy: .strict)
-        }.done { senderCertificates in
+        udManager.ensureSenderCertificate(certificateExpirationPolicy: .strict).done { senderCertificate in
             do {
-                let sendingAccess = self.udManagerImpl.udSendingAccess(forAddress: bobRecipientAddress,
-                                                                       requireSyncAccess: false,
-                                                                       senderCertificates: senderCertificates)!
+                let sendingAccess = self.write {
+                    return self.udManager.udSendingAccess(forAddress: bobRecipientAddress, requireSyncAccess: false, senderCertificate: senderCertificate, transaction: $0)!
+                }
                 XCTAssertEqual(.unknown, sendingAccess.udAccess.udAccessMode)
                 XCTAssertFalse(sendingAccess.udAccess.isRandomKey)
-                XCTAssertEqual(sendingAccess.senderCertificate.serialize(),
-                               self.defaultSenderCert.serialize())
+                XCTAssertEqual(sendingAccess.senderCertificate.serializedData, self.senderCertificate.serializedData)
             }
         }.done {
             completed.fulfill()
@@ -269,7 +303,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
         return try! wrapperProto.build()
     }
 
-    func buildSenderCertificateProto(uuidOnly: Bool) -> SMKProtoSenderCertificate {
+    func buildSenderCertificateProto() -> SMKProtoSenderCertificate {
         let expires = NSDate.ows_millisecondTimeStamp() + kWeekInMs
         let identityKey = try! Curve25519.generateKeyPair().ecPublicKey().serialized
         let signer = buildServerCertificateProto()
@@ -277,7 +311,7 @@ class OWSUDManagerTest: SSKBaseTestSwift {
                                                                               expires: expires,
                                                                               identityKey: identityKey,
                                                                               signer: signer)
-        if !uuidOnly { certificateBuilder.setSenderE164(aliceE164) }
+        certificateBuilder.setSenderE164(aliceE164)
         certificateBuilder.setSenderUuid(aliceUuid.uuidString)
         let certificateData = try! certificateBuilder.buildSerializedData()
 
@@ -293,11 +327,11 @@ class OWSUDManagerTest: SSKBaseTestSwift {
 // MARK: -
 
 class MockCertificateValidator: NSObject, SMKCertificateValidator {
-    public func throwswrapped_validate(senderCertificate: SenderCertificate, validationTime: UInt64) throws {
+    @objc public func throwswrapped_validate(senderCertificate: SMKSenderCertificate, validationTime: UInt64) throws {
         // Do not throw
     }
 
-    public func throwswrapped_validate(serverCertificate: ServerCertificate) throws {
+    @objc public func throwswrapped_validate(serverCertificate: SMKServerCertificate) throws {
         // Do not throw
     }
 }

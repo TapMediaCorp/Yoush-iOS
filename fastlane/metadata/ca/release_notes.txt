@@ -1,2 +1,0 @@
-• Hem millorat una mica la llista de converses per fer que els missatges no llegits siguin més clars.
-• S'han solucionat alguns problemes amb la cerca i el zoom a les fotos.

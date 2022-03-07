@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSMessageHandler.h"
@@ -15,7 +15,7 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
 
 @implementation OWSMessageHandler
 
-+ (NSString *)descriptionForEnvelopeType:(SSKProtoEnvelope *)envelope
+- (NSString *)descriptionForEnvelopeType:(SSKProtoEnvelope *)envelope
 {
     OWSAssertDebug(envelope != nil);
 
@@ -24,6 +24,8 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
         return @"Missing Type.";
     }
     switch (envelope.unwrappedType) {
+        case SSKProtoEnvelopeTypeReceipt:
+            return @"DeliveryReceipt";
         case SSKProtoEnvelopeTypeUnknown:
             // Shouldn't happen
             OWSProdFail([OWSAnalyticsEvents messageManagerErrorEnvelopeTypeUnknown]);
@@ -36,14 +38,8 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
             return @"KeyExchange";
         case SSKProtoEnvelopeTypePrekeyBundle:
             return @"PreKeyEncryptedMessage";
-        case SSKProtoEnvelopeTypeReceipt:
-            return @"DeliveryReceipt";
         case SSKProtoEnvelopeTypeUnidentifiedSender:
             return @"UnidentifiedSender";
-        case SSKProtoEnvelopeTypeSenderkeyMessage:
-            return @"SenderKey";
-        case SSKProtoEnvelopeTypePlaintextContent:
-            return @"PlaintextContent";
         default:
             // Shouldn't happen
             OWSProdFail([OWSAnalyticsEvents messageManagerErrorEnvelopeTypeOther]);
@@ -51,25 +47,16 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
     }
 }
 
-+ (NSString *)descriptionForEnvelope:(SSKProtoEnvelope *)envelope
+- (NSString *)descriptionForEnvelope:(SSKProtoEnvelope *)envelope
 {
     OWSAssertDebug(envelope != nil);
 
-    return [NSString stringWithFormat:@"<Envelope type: %@, source: %@, timestamp: %llu, serverTimestamp: %llu, "
-                                      @"serverGuid: %@, content.length: %lu />",
+    return [NSString stringWithFormat:@"<Envelope type: %@, source: %@, timestamp: %llu content.length: %lu />",
                      [self descriptionForEnvelopeType:envelope],
                      envelopeAddress(envelope),
                      envelope.timestamp,
-                     envelope.serverTimestamp,
-                     envelope.serverGuid,
                      (unsigned long)envelope.content.length];
 }
-
-- (NSString *)descriptionForEnvelope:(SSKProtoEnvelope *)envelope
-{
-    return [[self class] descriptionForEnvelope:envelope];
-}
-
 
 /**
  * We don't want to just log `content.description` because we'd potentially log message bodies for dataMesssages and
@@ -77,33 +64,19 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
  */
 - (NSString *)descriptionForContent:(SSKProtoContent *)content
 {
-    NSMutableString *message = [[NSMutableString alloc] init];
     if (content.syncMessage) {
-        [message appendFormat:@"<SyncMessage: %@ />", [self descriptionForSyncMessage:content.syncMessage]];
+        return [NSString stringWithFormat:@"<SyncMessage: %@ />", [self descriptionForSyncMessage:content.syncMessage]];
     } else if (content.dataMessage) {
-        [message appendFormat:@"<DataMessage: %@ />", [self descriptionForDataMessage:content.dataMessage]];
+        return [NSString stringWithFormat:@"<DataMessage: %@ />", [self descriptionForDataMessage:content.dataMessage]];
     } else if (content.callMessage) {
-        [message appendFormat:@"<CallMessage %@ />", [self descriptionForCallMessage:content.callMessage]];
+        NSString *callMessageDescription = [self descriptionForCallMessage:content.callMessage];
+        return [NSString stringWithFormat:@"<CallMessage %@ />", callMessageDescription];
     } else if (content.nullMessage) {
-        [message appendFormat:@"<NullMessage: %@ />", content.nullMessage];
+        return [NSString stringWithFormat:@"<NullMessage: %@ />", content.nullMessage];
     } else if (content.receiptMessage) {
-        [message appendFormat:@"<ReceiptMessage: %@ />", content.receiptMessage];
+        return [NSString stringWithFormat:@"<ReceiptMessage: %@ />", content.receiptMessage];
     } else if (content.typingMessage) {
-        [message appendFormat:@"<TypingMessage: %@ />", content.typingMessage];
-    } else if (content.decryptionErrorMessage) {
-        [message appendFormat:@"<DecryptionErrorMessage: %@ />", content.decryptionErrorMessage];
-    }
-
-    // SKDM's are not mutually exclusive with other content types
-    if (content.hasSenderKeyDistributionMessage) {
-        if (message.length > 0) {
-            [message appendString:@" + "];
-        }
-        [message appendString:@"SenderKeyDistributionMessage"];
-    }
-
-    if (message.length > 0) {
-        return message;
+        return [NSString stringWithFormat:@"<TypingMessage: %@ />", content.typingMessage];
     } else {
         // Don't fire an analytics event; if we ever add a new content type, we'd generate a ton of
         // analytics traffic.
@@ -135,13 +108,6 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
     } else if (callMessage.iceUpdate.count > 0) {
         messageType = [NSString stringWithFormat:@"Ice Updates (%lu)", (unsigned long)callMessage.iceUpdate.count];
         callId = callMessage.iceUpdate.firstObject.id;
-    } else if (callMessage.opaque) {
-        messageType = @"Opaque";
-        if (callMessage.opaque.hasUrgency) {
-            messageType = [NSString stringWithFormat:@"Opaque (%@)",
-                                    [self descriptionForCallMessageOpaqueUrgency:callMessage.opaque.unwrappedUrgency]];
-        }
-        callId = 0;
     } else {
         OWSFailDebug(@"failure: unexpected call message type: %@", callMessage);
         messageType = @"Unknown";
@@ -149,18 +115,6 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
     }
 
     return [NSString stringWithFormat:@"type: %@, id: %llu", messageType, callId];
-}
-
-- (NSString *)descriptionForCallMessageOpaqueUrgency:(SSKProtoCallMessageOpaqueUrgency)urgency
-{
-    switch (urgency) {
-        case SSKProtoCallMessageOpaqueUrgencyDroppable:
-            return @"Droppable";
-        case SSKProtoCallMessageOpaqueUrgencyHandleImmediately:
-            return @"HandleImmediately";
-        default:
-            return @"Unknown";
-    }
 }
 
 /**
@@ -250,8 +204,6 @@ NSString *envelopeAddress(SSKProtoEnvelope *envelope)
                 return @"FetchLatest_LocalProfile";
             case SSKProtoSyncMessageFetchLatestTypeStorageManifest:
                 return @"FetchLatest_StorageManifest";
-            case SSKProtoSyncMessageFetchLatestTypeSubscriptionStatus:
-                return @"FetchLatest_SubscriptionStatus";
         }
     } else {
         OWSFailDebug(@"Unknown sync message type");

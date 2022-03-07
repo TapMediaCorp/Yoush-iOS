@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <SignalServiceKit/Contact.h>
@@ -7,30 +7,34 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern NSNotificationName const OWSContactsManagerSignalAccountsDidChangeNotification;
-extern NSNotificationName const OWSContactsManagerContactsDidChangeNotification;
+extern NSString *const OWSContactsManagerSignalAccountsDidChangeNotification;
 
 @class AnyPromise;
+@class ImageCache;
 @class SDSAnyReadTransaction;
 @class SDSKeyValueStore;
 @class SignalAccount;
 @class SignalServiceAddress;
 @class UIFont;
 
-@protocol ContactsManagerCache;
-
 /**
  * Get latest Signal contacts, and be notified when they change.
  */
 @interface OWSContactsManager : NSObject <ContactsManagerProtocol>
 
-@property (nonatomic, readonly) BOOL shouldSortByGivenName;
-
-@property (nonatomic, readonly) id<ContactsManagerCache> contactsManagerCache;
-
 #pragma mark - Accessors
 
 @property (nonatomic, readonly) SDSKeyValueStore *keyValueStore;
+
+@property (nonnull, readonly) ImageCache *avatarCache;
+
+
+@property (atomic, readonly) NSArray<Contact *> *allContacts;
+
+@property (atomic, readonly) NSDictionary<NSString *, Contact *> *allContactsMap;
+
+// order of the signalAccounts array respects the systems contact sorting preference
+@property (atomic, readonly) NSArray<SignalAccount *> *signalAccounts;
 
 // This will return an instance of SignalAccount for _known_ signal accounts.
 - (nullable SignalAccount *)fetchSignalAccountForAddress:(SignalServiceAddress *)address;
@@ -38,11 +42,11 @@ extern NSNotificationName const OWSContactsManagerContactsDidChangeNotification;
 - (nullable SignalAccount *)fetchSignalAccountForAddress:(SignalServiceAddress *)address
                                              transaction:(SDSAnyReadTransaction *)transaction;
 
-- (nullable NSString *)nameFromSystemContactsForAddress:(SignalServiceAddress *)address
-                                            transaction:(SDSAnyReadTransaction *)transaction;
+- (nullable NSString *)nameFromSystemContactsForAddress:(SignalServiceAddress *)address;
 
 // This will always return an instance of SignalAccount.
 - (SignalAccount *)fetchOrBuildSignalAccountForAddress:(SignalServiceAddress *)address;
+- (BOOL)hasSignalAccountForAddress:(SignalServiceAddress *)address;
 
 #pragma mark - System Contact Fetching
 
@@ -57,7 +61,7 @@ extern NSNotificationName const OWSContactsManagerContactsDidChangeNotification;
 
 // Not set until a contact fetch has completed.
 // Set even if no contacts are found.
-@property (nonatomic, readonly) BOOL hasLoadedSystemContacts;
+@property (nonatomic, readonly) BOOL hasLoadedContacts;
 
 // Request systems contacts and start syncing changes. The user will see an alert
 // if they haven't previously.
@@ -75,21 +79,28 @@ extern NSNotificationName const OWSContactsManagerContactsDidChangeNotification;
 
 #pragma mark - Util
 
+- (BOOL)isSystemContactWithPhoneNumber:(NSString *)phoneNumber;
+- (BOOL)isSystemContactWithAddress:(SignalServiceAddress *)address;
+- (BOOL)isSystemContactWithSignalAccount:(NSString *)phoneNumber;
+- (BOOL)hasNameInSystemContactsForAddress:(SignalServiceAddress *)address;
+
 /**
  * Used for sorting, respects system contacts name sort order preference.
  */
+- (NSComparisonResult (^)(SignalAccount *left, SignalAccount *right))signalAccountComparator;
+- (NSString *)comparableNameForSignalAccount:(SignalAccount *)signalAccount;
 - (NSString *)comparableNameForSignalAccount:(SignalAccount *)signalAccount
                                  transaction:(SDSAnyReadTransaction *)transaction;
 - (NSString *)comparableNameForAddress:(SignalServiceAddress *)address transaction:(SDSAnyReadTransaction *)transaction;
 
+- (nullable UIImage *)systemContactOrSyncedImageForAddress:(nullable SignalServiceAddress *)address;
+- (nullable UIImage *)profileImageForAddressWithSneakyTransaction:(nullable SignalServiceAddress *)address;
 - (nullable NSData *)profileImageDataForAddressWithSneakyTransaction:(nullable SignalServiceAddress *)address;
+- (nullable UIImage *)imageForAddress:(nullable SignalServiceAddress *)address
+                          transaction:(SDSAnyReadTransaction *)transaction;
+- (nullable UIImage *)imageForAddressWithSneakyTransaction:(nullable SignalServiceAddress *)address;
 
-- (nullable NSString *)phoneNumberForAddress:(SignalServiceAddress *)address
-                                 transaction:(SDSAnyReadTransaction *)transaction;
-
-- (BOOL)isKnownRegisteredUserWithSneakyTransaction:(SignalServiceAddress *)address
-    NS_SWIFT_NAME(isKnownRegisteredUserWithSneakyTransaction(address:));
-- (BOOL)isKnownRegisteredUser:(SignalServiceAddress *)address transaction:(SDSAnyReadTransaction *)transaction;
+- (void)clearColorNameCache;
 
 @end
 

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -7,6 +7,7 @@ import Foundation
 @objc
 public class AnySignalRecipientFinder: NSObject {
     let grdbAdapter = GRDBSignalRecipientFinder()
+    let yapdbAdapter = YAPDBSignalServiceAddressIndex()
 }
 
 extension AnySignalRecipientFinder {
@@ -15,6 +16,8 @@ extension AnySignalRecipientFinder {
         switch transaction.readTransaction {
         case .grdbRead(let transaction):
             return grdbAdapter.signalRecipientForUUID(uuid, transaction: transaction)
+        case .yapRead(let transaction):
+            return yapdbAdapter.fetchOneForUUID(uuid, transaction: transaction)
         }
     }
 
@@ -23,6 +26,8 @@ extension AnySignalRecipientFinder {
         switch transaction.readTransaction {
         case .grdbRead(let transaction):
             return grdbAdapter.signalRecipientForPhoneNumber(phoneNumber, transaction: transaction)
+        case .yapRead(let transaction):
+            return yapdbAdapter.fetchOneForPhoneNumber(phoneNumber, transaction: transaction)
         }
     }
 
@@ -31,6 +36,8 @@ extension AnySignalRecipientFinder {
         switch transaction.readTransaction {
         case .grdbRead(let transaction):
             return grdbAdapter.signalRecipient(for: address, transaction: transaction)
+        case .yapRead(let transaction):
+            return yapdbAdapter.fetchOne(for: address, transaction: transaction)
         }
     }
 
@@ -38,17 +45,8 @@ extension AnySignalRecipientFinder {
         switch transaction.readTransaction {
         case .grdbRead(let transaction):
             return grdbAdapter.signalRecipients(for: addresses, transaction: transaction)
-        }
-    }
-
-    /// Fetches and returns all registered SignalRecipients that do not have a UUID
-    /// Note: The registered device set is currently represented in an archive blob. So the schema doesn't currently
-    /// allow us to filter on registered recipients. So the underlying query fetches *all* recipients without a UUID,
-    /// then filters where devices.count > 0.
-    public func registeredRecipientsWithoutUUID(transaction: SDSAnyReadTransaction) -> [SignalRecipient] {
-        switch transaction.readTransaction {
-        case .grdbRead(let transaction):
-            return grdbAdapter.registeredRecipientsWithoutUUID(transaction: transaction)
+        case .yapRead:
+            fatalError("yap not supported")
         }
     }
 }
@@ -101,17 +99,5 @@ class GRDBSignalRecipientFinder: NSObject {
         }
 
         return Array(recipients)
-    }
-
-    fileprivate func registeredRecipientsWithoutUUID(transaction: GRDBReadTransaction) -> [SignalRecipient] {
-        let sql = """
-        SELECT * FROM \(SignalRecipientRecord.databaseTableName) WHERE
-        \(signalRecipientColumn: .recipientUUID) IS NULL OR
-        \(signalRecipientColumn: .recipientUUID) IS ""
-        """
-        let cursor = SignalRecipient.grdbFetchCursor(sql: sql, transaction: transaction)
-
-        let allLegacyRecipients = try! cursor.all()
-        return allLegacyRecipients.filter { $0.devices.count > 0 }
     }
 }

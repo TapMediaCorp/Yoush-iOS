@@ -1,52 +1,29 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
-protocol InteractivelyDismissableViewController: UIViewController {
-    func performInteractiveDismissal(animated: Bool)
-}
-
 protocol InteractiveDismissDelegate: AnyObject {
-    func interactiveDismissDidBegin(_ interactiveDismiss: UIPercentDrivenInteractiveTransition)
-    func interactiveDismissUpdate(_ interactiveDismiss: UIPercentDrivenInteractiveTransition, didChangeTouchOffset offset: CGPoint)
-    func interactiveDismissDidFinish(_ interactiveDismiss: UIPercentDrivenInteractiveTransition)
-    func interactiveDismissDidCancel(_ interactiveDismiss: UIPercentDrivenInteractiveTransition)
-}
-
-extension InteractiveDismissDelegate {
-    func interactiveDismissDidBegin(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-
-    }
-    func interactiveDismissUpdate(_ interactiveDismiss: UIPercentDrivenInteractiveTransition, didChangeTouchOffset offset: CGPoint) {
-
-    }
-    func interactiveDismissDidFinish(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-
-    }
-    func interactiveDismissDidCancel(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-
-    }
+    func interactiveDismiss(_ interactiveDismiss: MediaInteractiveDismiss, didChangeTouchOffset offset: CGPoint)
+    func interactiveDismissDidFinish(_ interactiveDismiss: MediaInteractiveDismiss)
 }
 
 class MediaInteractiveDismiss: UIPercentDrivenInteractiveTransition {
     var interactionInProgress = false
 
     weak var interactiveDismissDelegate: InteractiveDismissDelegate?
-    private weak var targetViewController: InteractivelyDismissableViewController?
+    private weak var mediaPageViewController: MediaPageViewController?
 
-    init(targetViewController: InteractivelyDismissableViewController) {
+    init(mediaPageViewController: MediaPageViewController) {
         super.init()
-        self.targetViewController = targetViewController
+        self.mediaPageViewController = mediaPageViewController
     }
 
     public func addGestureRecognizer(to view: UIView) {
         let gesture = DirectionalPanGestureRecognizer(direction: .vertical,
                                                       target: self,
                                                       action: #selector(handleGesture(_:)))
-        // Allow panning with trackpad
-        if #available(iOS 13.4, *) { gesture.allowedScrollTypesMask = .continuous }
         view.addGestureRecognizer(gesture)
     }
 
@@ -86,7 +63,7 @@ class MediaInteractiveDismiss: UIPercentDrivenInteractiveTransition {
         switch gestureRecognizer.state {
         case .began:
             interactionInProgress = true
-            targetViewController?.performInteractiveDismissal(animated: true)
+            mediaPageViewController?.dismissSelf(animated: true)
 
         case .changed:
             let velocity = abs(gestureRecognizer.velocity(in: coordinateSpace).y)
@@ -100,7 +77,7 @@ class MediaInteractiveDismiss: UIPercentDrivenInteractiveTransition {
             farEnoughToCompleteTransition = progress >= 0.5
             update(progress)
 
-            interactiveDismissDelegate?.interactiveDismissUpdate(self, didChangeTouchOffset: offset)
+            interactiveDismissDelegate?.interactiveDismiss(self, didChangeTouchOffset: offset)
 
         case .cancelled:
             interactiveDismissDelegate?.interactiveDismissDidFinish(self)

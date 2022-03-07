@@ -1,14 +1,33 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import SignalServiceKit
 import SignalMessaging
+import PromiseKit
 
 #if DEBUG
 
 class DebugUINotifications: DebugUIPage {
+
+    // MARK: Dependencies
+
+    var notificationPresenter: NotificationPresenter {
+        return AppEnvironment.shared.notificationPresenter
+    }
+
+    var messageSender: MessageSender {
+        return SSKEnvironment.shared.messageSender
+    }
+
+    var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return SSKEnvironment.shared.databaseStorage
+    }
 
     // MARK: Overrides
 
@@ -78,10 +97,10 @@ class DebugUINotifications: DebugUIPage {
         // Notifications won't sound if the app is suspended.
         let taskIdentifier = UIApplication.shared.beginBackgroundTask(expirationHandler: nil)
 
-        return Guarantee.after(seconds: kNotificationDelay).done {
+        return after(seconds: kNotificationDelay).done {
             block()
         }.then {
-            Guarantee.after(seconds: 2.0)
+            after(seconds: 2.0)
         }.done {
             // We don't want to endBackgroundTask until *after* the notifications manager is done,
             // but it dispatches async without a completion handler, so we just wait a while extra.
@@ -90,26 +109,22 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    func delayedNotificationDispatchWithFakeCall(thread: TSContactThread, callBlock: @escaping (IndividualCall) -> Void) -> Guarantee<Void> {
-        let call = SignalCall.incomingIndividualCall(
-            localId: UUID(),
-            remoteAddress: thread.contactAddress,
-            sentAtTimestamp: Date.ows_millisecondTimestamp(),
-            offerMediaType: .audio
-        )
+    func delayedNotificationDispatchWithFakeCall(thread: TSContactThread, callBlock: @escaping (SignalCall) -> Void) -> Guarantee<Void> {
+        let call = SignalCall.incomingCall(localId: UUID(), remoteAddress: thread.contactAddress, sentAtTimestamp: Date.ows_millisecondTimestamp())
 
         return delayedNotificationDispatch {
-            callBlock(call.individualCall)
+            callBlock(call)
         }
     }
 
     // MARK: Notification Methods
 
-    @discardableResult
     func notifyForEverythingInSequence(contactThread: TSContactThread) -> Guarantee<Void> {
         let taskIdentifier = UIApplication.shared.beginBackgroundTask(expirationHandler: nil)
 
-        return self.notifyForIncomingCall(thread: contactThread).then {
+        return firstly {
+            self.notifyForIncomingCall(thread: contactThread)
+        }.then {
             self.notifyForMissedCall(thread: contactThread)
         }.then {
             self.notifyForMissedCallBecauseOfNewIdentity(thread: contactThread)
@@ -128,7 +143,6 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    @discardableResult
     func notifyForIncomingCall(thread: TSContactThread) -> Guarantee<Void> {
         return delayedNotificationDispatchWithFakeCall(thread: thread) { call in
             let callerName = self.contactsManager.displayName(for: thread.contactAddress)
@@ -136,7 +150,6 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    @discardableResult
     func notifyForMissedCall(thread: TSContactThread) -> Guarantee<Void> {
         return delayedNotificationDispatchWithFakeCall(thread: thread) { call in
             let callerName = self.contactsManager.displayName(for: thread.contactAddress)
@@ -144,7 +157,6 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    @discardableResult
     func notifyForMissedCallBecauseOfNewIdentity(thread: TSContactThread) -> Guarantee<Void> {
         return delayedNotificationDispatchWithFakeCall(thread: thread) { call in
             let callerName = self.contactsManager.displayName(for: thread.contactAddress)
@@ -152,7 +164,6 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    @discardableResult
     func notifyForMissedCallBecauseOfNoLongerVerifiedIdentity(thread: TSContactThread) -> Guarantee<Void> {
         return delayedNotificationDispatchWithFakeCall(thread: thread) { call in
             let callerName = self.contactsManager.displayName(for: thread.contactAddress)
@@ -160,7 +171,6 @@ class DebugUINotifications: DebugUIPage {
         }
     }
 
-    @discardableResult
     func notifyForIncomingMessage(thread: TSThread) -> Guarantee<Void> {
         return delayedNotificationDispatch {
             self.databaseStorage.write { transaction in
@@ -168,37 +178,34 @@ class DebugUINotifications: DebugUIPage {
                 factory.threadCreator = { _ in return thread }
                 let incomingMessage = factory.create(transaction: transaction)
 
-                self.notificationPresenter.notifyUser(forIncomingMessage: incomingMessage,
+                self.notificationPresenter.notifyUser(for: incomingMessage,
                                                       thread: thread,
                                                       transaction: transaction)
             }
         }
     }
 
-    @discardableResult
     func notifyForErrorMessage(thread: TSThread) -> Guarantee<Void> {
         return delayedNotificationDispatch {
-            let builder = TSErrorMessageBuilder(thread: thread, errorType: .invalidMessage)
-            let errorMessage = TSErrorMessage(errorMessageWithBuilder: builder)
+            let errorMessage = TSErrorMessage(thread: thread,
+                                              failedMessageType: TSErrorMessageType.invalidMessage)
 
             self.databaseStorage.write { transaction in
-                self.notificationPresenter.notifyUser(forErrorMessage: errorMessage, thread: thread, transaction: transaction)
+                self.notificationPresenter.notifyUser(for: errorMessage, thread: thread, transaction: transaction)
             }
         }
     }
 
-    @discardableResult
     func notifyUserForThreadlessErrorMessage() -> Guarantee<Void> {
         return delayedNotificationDispatch {
             self.databaseStorage.write { transaction in
                 let errorMessage = ThreadlessErrorMessage.corruptedMessageInUnknownThread()
-                self.notificationPresenter.notifyUser(forThreadlessErrorMessage: errorMessage,
+                self.notificationPresenter.notifyUser(for: errorMessage,
                                                       transaction: transaction)
             }
         }
     }
 
-    @discardableResult
     func notifyOfNewUsers() -> Guarantee<Void> {
         return delayedNotificationDispatch {
             let recipients: Set<SignalRecipient> = self.databaseStorage.read { transaction in

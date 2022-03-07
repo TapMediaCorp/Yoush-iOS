@@ -1,22 +1,22 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Photos
+import PromiseKit
 
 @objc
 protocol SendMediaNavDelegate: AnyObject {
     func sendMediaNavDidCancel(_ sendMediaNavigationController: SendMediaNavigationController)
-    func sendMediaNav(_ sendMediaNavigationController: SendMediaNavigationController, didApproveAttachments attachments: [SignalAttachment], messageBody: MessageBody?)
+    func sendMediaNav(_ sendMediaNavigationController: SendMediaNavigationController, didApproveAttachments attachments: [SignalAttachment], messageText: String?)
 
-    func sendMediaNavInitialMessageBody(_ sendMediaNavigationController: SendMediaNavigationController) -> MessageBody?
-    func sendMediaNav(_ sendMediaNavigationController: SendMediaNavigationController, didChangeMessageBody newMessageBody: MessageBody?)
+    func sendMediaNavInitialMessageText(_ sendMediaNavigationController: SendMediaNavigationController) -> String?
+    func sendMediaNav(_ sendMediaNavigationController: SendMediaNavigationController, didChangeMessageText newMessageText: String?)
     var sendMediaNavApprovalButtonImageName: String { get }
     var sendMediaNavCanSaveAttachments: Bool { get }
     var sendMediaNavTextInputContextIdentifier: String? { get }
     var sendMediaNavRecipientNames: [String] { get }
-    var sendMediaNavMentionableAddresses: [SignalServiceAddress] { get }
 }
 
 @objc
@@ -63,7 +63,7 @@ class SendMediaNavigationController: OWSNavigationController {
     // MARK: - Overrides
 
     override var prefersStatusBarHidden: Bool {
-        guard !CurrentAppContext().hasActiveCall else {
+        guard !OWSWindowManager.shared.hasCall else {
             return false
         }
 
@@ -146,8 +146,11 @@ class SendMediaNavigationController: OWSNavigationController {
     public weak var sendMediaNavDelegate: SendMediaNavDelegate?
 
     @objc
-    public class func showingCameraFirst() -> SendMediaNavigationController {
+    public class func showingCameraFirst(photoCapture: PhotoCapture?) -> SendMediaNavigationController {
         let navController = SendMediaNavigationController()
+        if let photoCapture = photoCapture {
+            navController.captureViewController.photoCapture = photoCapture
+        }
         navController.setViewControllers([navController.captureViewController], animated: false)
         return navController
     }
@@ -181,6 +184,15 @@ class SendMediaNavigationController: OWSNavigationController {
             animated: false
         )
 
+        return navController
+    }
+
+    private(set) var isPickingAsDocument = false
+    @objc
+    public class func asMediaDocumentPicker() -> SendMediaNavigationController {
+        let navController = SendMediaNavigationController()
+        navController.isPickingAsDocument = true
+        navController.setViewControllers([navController.mediaLibraryViewController], animated: false)
         return navController
     }
 
@@ -275,8 +287,6 @@ class SendMediaNavigationController: OWSNavigationController {
     }
 
     func fadeTo(viewControllers: [UIViewController], duration: CFTimeInterval) {
-        AssertIsOnMainThread()
-
         let transition: CATransition = CATransition()
         transition.duration = duration
         transition.type = CATransitionType.fade
@@ -288,7 +298,7 @@ class SendMediaNavigationController: OWSNavigationController {
 
     private func didTapBatchModeButton() {
         isInBatchSelectMode = !isInBatchSelectMode
-        owsAssertDebug(isInBatchSelectMode || attachmentCount <= 1)
+        assert(isInBatchSelectMode || attachmentCount <= 1)
     }
 
     private func didTapCameraModeButton() {
@@ -327,7 +337,7 @@ class SendMediaNavigationController: OWSNavigationController {
                                      block: { [weak self] in self?.didTapBatchModeButton() })
     }()
 
-    private lazy var cameraModeButton: SendMediaBottomButton = {
+    lazy var cameraModeButton: SendMediaBottomButton = {
         return SendMediaBottomButton(imageName: "camera-outline-28",
                                      tintColor: .ows_white,
                                      diameter: type(of: self).bottomButtonWidth,
@@ -379,7 +389,7 @@ class SendMediaNavigationController: OWSNavigationController {
                                                                       sendButtonImageName: sendMediaNavDelegate.sendMediaNavApprovalButtonImageName,
                                                                       attachmentApprovalItems: attachmentApprovalItems)
         approvalViewController.approvalDelegate = self
-        approvalViewController.messageBody = sendMediaNavDelegate.sendMediaNavInitialMessageBody(self)
+        approvalViewController.messageText = sendMediaNavDelegate.sendMediaNavInitialMessageText(self)
 
         if animated {
             fadeTo(viewControllers: viewControllers + [approvalViewController], duration: 0.3)
@@ -465,7 +475,7 @@ extension SendMediaNavigationController: UINavigationControllerDelegate {
                 setNavigationBarHidden(true, animated: animated)
             }
         case is AttachmentApprovalViewController:
-            showNavbar(.alwaysDarkAndClear)
+            showNavbar(.clear)
         case is ImagePickerGridController:
             showNavbar(.alwaysDark)
         case is ConversationPickerViewController:
@@ -523,14 +533,15 @@ extension SendMediaNavigationController: PhotoCaptureViewControllerDelegate {
     }
 
     func discardDraft() {
-        owsAssertDebug(attachmentDraftCollection.attachmentDrafts.count <= 1)
+        assert(attachmentDraftCollection.attachmentDrafts.count <= 1)
         if let lastAttachmentDraft = attachmentDraftCollection.attachmentDrafts.last {
             attachmentDraftCollection.remove(lastAttachmentDraft)
         }
-        owsAssertDebug(attachmentDraftCollection.attachmentDrafts.count == 0)
+        assert(attachmentDraftCollection.attachmentDrafts.count == 0)
     }
 
     func photoCaptureViewController(_ photoCaptureViewController: PhotoCaptureViewController, isRecordingMovie: Bool) {
+        assert(self.isRecordingMovie != isRecordingMovie)
         self.isRecordingMovie = isRecordingMovie
         updateViewState(topViewController: photoCaptureViewController, animated: true)
     }
@@ -549,25 +560,10 @@ extension SendMediaNavigationController: ImagePickerGridControllerDelegate {
 
     func showApprovalAfterProcessingAnyMediaLibrarySelections() {
         let backgroundBlock: (ModalActivityIndicatorViewController) -> Void = { modal in
-            let approvalItemsPromise: Promise<[AttachmentApprovalItem]> = Promise.when(fulfilled: self.attachmentDraftCollection.attachmentApprovalItemPromises)
-            firstly { () -> Promise<Swift.Result<[AttachmentApprovalItem], Error>> in
-                return Promise.race(
-                    approvalItemsPromise.map { attachmentApprovalItems -> Swift.Result<[AttachmentApprovalItem], Error> in
-                        Swift.Result.success(attachmentApprovalItems)
-                    },
-                    modal.wasCancelledPromise.map { _ -> Swift.Result<[AttachmentApprovalItem], Error> in
-                        Swift.Result.failure(OWSGenericError("Modal was cancelled."))
-                    })
-            }.map { (result: Swift.Result<[AttachmentApprovalItem], Error>) in
+            when(fulfilled: self.attachmentDraftCollection.attachmentApprovalItemPromises).map { attachmentApprovalItems in
+                Logger.debug("built all attachments")
                 modal.dismiss {
-                    switch result {
-                    case .success(let attachmentApprovalItems):
-                        Logger.debug("built all attachments")
-                        self.pushApprovalViewController(attachmentApprovalItems: attachmentApprovalItems, animated: true)
-                    case .failure:
-                        // Do nothing.
-                        break
-                    }
+                    self.pushApprovalViewController(attachmentApprovalItems: attachmentApprovalItems, animated: true)
                 }
             }.catch { error in
                 Logger.error("failed to prepare attachments. error: \(error)")
@@ -578,7 +574,7 @@ extension SendMediaNavigationController: ImagePickerGridControllerDelegate {
         }
 
         ModalActivityIndicatorViewController.present(fromViewController: self,
-                                                     canCancel: true,
+                                                     canCancel: false,
                                                      backgroundBlock: backgroundBlock)
     }
 
@@ -628,8 +624,8 @@ extension SendMediaNavigationController: AttachmentApprovalViewControllerDelegat
         updateViewState(topViewController: attachmentApproval, animated: true)
     }
 
-    func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController, didChangeMessageBody newMessageBody: MessageBody?) {
-        sendMediaNavDelegate?.sendMediaNav(self, didChangeMessageBody: newMessageBody)
+    func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController, didChangeMessageText newMessageText: String?) {
+        sendMediaNavDelegate?.sendMediaNav(self, didChangeMessageText: newMessageText)
     }
 
     func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController, didRemoveAttachment attachment: SignalAttachment) {
@@ -641,8 +637,8 @@ extension SendMediaNavigationController: AttachmentApprovalViewControllerDelegat
         attachmentDraftCollection.remove(removedDraft)
     }
 
-    func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController, didApproveAttachments attachments: [SignalAttachment], messageBody: MessageBody?) {
-        sendMediaNavDelegate?.sendMediaNav(self, didApproveAttachments: attachments, messageBody: messageBody)
+    func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController, didApproveAttachments attachments: [SignalAttachment], messageText: String?) {
+        sendMediaNavDelegate?.sendMediaNav(self, didApproveAttachments: attachments, messageText: messageText)
     }
 
     func attachmentApprovalDidCancel(_ attachmentApproval: AttachmentApprovalViewController) {
@@ -651,7 +647,7 @@ extension SendMediaNavigationController: AttachmentApprovalViewControllerDelegat
 
     func attachmentApprovalDidTapAddMore(_ attachmentApproval: AttachmentApprovalViewController) {
         // Current design dicates we'll go "back" to the single thing before us.
-        owsAssertDebug(viewControllers.count == 2)
+        assert(viewControllers.count == 2)
 
         // regardless of which VC we're going "back" to, we're in "batch" mode at this point.
         isInBatchSelectMode = true
@@ -665,10 +661,6 @@ extension SendMediaNavigationController: AttachmentApprovalViewControllerDelegat
 
     var attachmentApprovalRecipientNames: [String] {
         return sendMediaNavDelegate?.sendMediaNavRecipientNames ?? []
-    }
-
-    var attachmentApprovalMentionableAddresses: [SignalServiceAddress] {
-        return sendMediaNavDelegate?.sendMediaNavMentionableAddresses ?? []
     }
 }
 
@@ -803,7 +795,7 @@ extension SendMediaNavigationController: DoneButtonDelegate {
     }
 
     fileprivate func doneButtonWasTapped(_ doneButton: DoneButton) {
-        owsAssertDebug(attachmentDraftCollection.count > 0)
+        assert(attachmentDraftCollection.count > 0)
         showApprovalAfterProcessingAnyMediaLibrarySelections()
     }
 }
@@ -866,7 +858,7 @@ private class DoneButton: UIView {
     private lazy var badgeLabel: UILabel = {
         let label = UILabel()
         label.textColor = .ows_white
-        label.font = UIFont.ows_dynamicTypeSubheadline.ows_monospaced
+        label.font = UIFont.ows_dynamicTypeSubheadline.ows_monospaced()
         label.textAlignment = .center
         return label
     }()

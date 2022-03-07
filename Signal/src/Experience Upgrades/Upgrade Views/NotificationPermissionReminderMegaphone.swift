@@ -87,7 +87,7 @@ class TurnOnPermissionView: UIStackView {
         let text: String
     }
 
-    init(title: String, message: String, steps: [Step], button: OWSFlatButton? = nil) {
+    init(title: String, message: String, steps: [Step]) {
         super.init(frame: .zero)
 
         addBackgroundView(withBackgroundColor: Theme.actionSheetBackgroundColor)
@@ -105,12 +105,10 @@ class TurnOnPermissionView: UIStackView {
             addStepStack(step: step, number: index + 1)
         }
 
-        let button = button ?? self.button(title: NSLocalizedString(
+        addArrangedSubview(button(title: NSLocalizedString(
             "GO_TO_SETTINGS_BUTTON",
             comment: "Turn on permission view 'go to settings' button"
-        ), selector: #selector(goToSettings))
-
-        addArrangedSubview(button)
+        ), selector: #selector(goToSettings)))
     }
 
     @objc
@@ -122,7 +120,7 @@ class TurnOnPermissionView: UIStackView {
         let titleLabel = UILabel()
         titleLabel.text = text
         titleLabel.textColor = Theme.primaryTextColor
-        titleLabel.font = UIFont.ows_dynamicTypeTitle2.ows_semibold
+        titleLabel.font = UIFont.ows_dynamicTypeTitle2.ows_semibold()
         titleLabel.numberOfLines = 0
         titleLabel.lineBreakMode = .byWordWrapping
         titleLabel.textAlignment = .center
@@ -145,7 +143,7 @@ class TurnOnPermissionView: UIStackView {
     }
 
     func button(title: String, selector: Selector) -> OWSFlatButton {
-        let font = UIFont.ows_dynamicTypeBodyClamped.ows_semibold
+        let font = UIFont.ows_dynamicTypeBodyClamped.ows_semibold()
         let buttonHeight = OWSFlatButton.heightForFont(font)
         let button = OWSFlatButton.button(title: title,
                                           font: font,

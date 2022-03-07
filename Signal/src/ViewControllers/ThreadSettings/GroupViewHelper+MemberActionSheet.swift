@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 extension GroupViewHelper {
 
@@ -23,7 +24,7 @@ extension GroupViewHelper {
         let actionBlock = {
             GroupViewUtils.updateGroupWithActivityIndicator(fromViewController: fromViewController,
                                                             updatePromiseBlock: updatePromiseBlock,
-                                                            completion: { [weak self] _ in
+                                                            completion: { [weak self] in
                                                                 self?.delegate?.groupViewHelperDidUpdateGroup()
             })
         }
@@ -49,10 +50,10 @@ extension GroupViewHelper {
             owsFailDebug("Missing localAddress.")
             return false
         }
-        let isLocalUserAdmin = groupThread.groupModel.groupMembership.isFullMemberAndAdministrator(localAddress)
+        let isLocalUserAdmin = groupThread.groupModel.groupMembership.isAdministrator(localAddress)
         let groupMembership = groupThread.groupModel.groupMembership
-        let canBecomeAdmin = (groupMembership.isFullMember(address) &&
-            !groupMembership.isFullMemberAndAdministrator(address))
+        let canBecomeAdmin = (groupMembership.isNonPendingMember(address) &&
+            !groupMembership.isAdministrator(address))
         return (canEditConversationMembership && isLocalUserAdmin && canBecomeAdmin)
     }
 
@@ -72,7 +73,7 @@ extension GroupViewHelper {
         guard let oldGroupModel = delegate?.currentGroupModel as? TSGroupModelV2 else {
             return Promise(error: OWSAssertionError("Missing group model."))
         }
-        guard oldGroupModel.groupMembership.isMemberOfAnyKind(address) else {
+        guard oldGroupModel.groupMembership.isPendingOrNonPendingMember(address) else {
             return Promise(error: OWSAssertionError("Not a group member."))
         }
         guard let uuid = address.uuid else {
@@ -97,9 +98,10 @@ extension GroupViewHelper {
             owsFailDebug("Missing localAddress.")
             return false
         }
+        let isLocalUserAdmin = groupThread.groupModel.groupMembership.isAdministrator(localAddress)
         let groupMembership = groupThread.groupModel.groupMembership
-        let isLocalUserAdmin = groupMembership.isFullMemberAndAdministrator(localAddress)
-        let canRevokeAdmin = groupMembership.isFullMemberAndAdministrator(address)
+        let canRevokeAdmin = (groupMembership.isNonPendingMember(address) &&
+            groupMembership.isAdministrator(address))
         return (canEditConversationMembership && isLocalUserAdmin && canRevokeAdmin)
     }
 
@@ -119,7 +121,7 @@ extension GroupViewHelper {
         guard let oldGroupModel = delegate?.currentGroupModel as? TSGroupModelV2 else {
             return Promise(error: OWSAssertionError("Missing group model."))
         }
-        guard oldGroupModel.groupMembership.isMemberOfAnyKind(address) else {
+        guard oldGroupModel.groupMembership.isPendingOrNonPendingMember(address) else {
             return Promise(error: OWSAssertionError("Not a group member."))
         }
         guard let uuid = address.uuid else {
@@ -136,7 +138,7 @@ extension GroupViewHelper {
     // MARK: - Remove From Group
 
     // This action can be used to remove members _or_ revoke invites.
-    func canRemoveFromGroup(address: SignalServiceAddress) -> Bool {
+    func memberActionSheetCanRemoveFromGroup(address: SignalServiceAddress) -> Bool {
         guard let groupThread = thread as? TSGroupThread,
             groupThread.isGroupV2Thread else {
                 return false
@@ -146,14 +148,13 @@ extension GroupViewHelper {
             return false
         }
         // Only admins can kick out other members.
+        let isLocalUserAdmin = groupThread.groupModel.groupMembership.isAdministrator(localAddress)
         let groupMembership = groupThread.groupModel.groupMembership
-        let isLocalUserAdmin = groupMembership.isFullMemberAndAdministrator(localAddress)
-        let isAddressInGroup = groupMembership.isMemberOfAnyKind(address)
-        let isRemovalTargetLocalAdress = address.isLocalAddress
-        return canEditConversationMembership && isLocalUserAdmin && isAddressInGroup && !isRemovalTargetLocalAdress
+        let isAddressInGroup = groupMembership.isPendingOrNonPendingMember(address)
+        return canEditConversationMembership && isLocalUserAdmin && isAddressInGroup
     }
 
-    func presentRemoveFromGroupActionSheet(address: SignalServiceAddress) {
+    func memberActionSheetRemoveFromGroupWasSelected(address: SignalServiceAddress) {
         let titleFormat = NSLocalizedString("CONVERSATION_SETTINGS_REMOVE_FROM_GROUP_TITLE_FORMAT",
                                             comment: "Format for title for 'remove from group' confirmation alert. Embeds {user to remove from the group}.")
         let actionTitle =  NSLocalizedString("CONVERSATION_SETTINGS_REMOVE_FROM_GROUP_BUTTON",
@@ -169,7 +170,7 @@ extension GroupViewHelper {
         guard let oldGroupModel = delegate?.currentGroupModel as? TSGroupModelV2 else {
             return Promise(error: OWSAssertionError("Missing group model."))
         }
-        guard oldGroupModel.groupMembership.isMemberOfAnyKind(address) else {
+        guard oldGroupModel.groupMembership.isPendingOrNonPendingMember(address) else {
             return Promise(error: OWSAssertionError("Not a group member."))
         }
         guard let uuid = address.uuid else {

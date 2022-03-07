@@ -1,11 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
 
 
-typedef NS_CLOSED_ENUM(NSInteger, ImageFormat) {
+typedef NS_ENUM(NSInteger, ImageFormat) {
     ImageFormat_Unknown,
     ImageFormat_Png,
     ImageFormat_Gif,
@@ -15,16 +15,13 @@ typedef NS_CLOSED_ENUM(NSInteger, ImageFormat) {
     ImageFormat_Webp,
     ImageFormat_Heic,
     ImageFormat_Heif,
-    ImageFormat_LottieSticker,
 };
 
 NSString *NSStringForImageFormat(ImageFormat value);
 
-NSString *_Nullable MIMETypeForImageFormat(ImageFormat value);
-
 #pragma mark -
 
-@interface ImageMetadata : NSObject
+@interface ImageData : NSObject
 
 @property (nonatomic, readonly) BOOL isValid;
 
@@ -32,10 +29,6 @@ NSString *_Nullable MIMETypeForImageFormat(ImageFormat value);
 @property (nonatomic, readonly) ImageFormat imageFormat;
 @property (nonatomic, readonly) CGSize pixelSize;
 @property (nonatomic, readonly) BOOL hasAlpha;
-@property (nonatomic, readonly) BOOL isAnimated;
-
-@property (nonatomic, readonly, nullable) NSString *mimeType;
-@property (nonatomic, readonly, nullable) NSString *fileExtension;
 
 @end
 
@@ -64,25 +57,15 @@ NSString *_Nullable MIMETypeForImageFormat(ImageFormat value);
 + (BOOL)ows_hasStickerLikePropertiesWithPath:(NSString *)filePath;
 - (BOOL)ows_hasStickerLikeProperties;
 
-#pragma mark - Image Metadata
+#pragma mark - Image Data
 
 // declaredMimeType is optional.
 // If present, it is used to validate the file format contents.
-+ (ImageMetadata *)imageMetadataWithPath:(NSString *)filePath mimeType:(nullable NSString *)declaredMimeType;
-
-+ (ImageMetadata *)imageMetadataWithPath:(NSString *)filePath
-                                mimeType:(nullable NSString *)declaredMimeType
-                          ignoreFileSize:(BOOL)ignoreFileSize;
++ (ImageData *)imageDataWithPath:(NSString *)filePath mimeType:(nullable NSString *)declaredMimeType;
 
 // filePath and declaredMimeType are optional.
 // If present, they are used to validate the file format contents.
-// Returns nil if file size > OWSMediaUtils.kMaxFileSizeImage or animated file size >
-// OWSMediaUtils.kMaxFileSizeAnimatedImage
-- (ImageMetadata *)imageMetadataWithPath:(nullable NSString *)filePath mimeType:(nullable NSString *)declaredMimeType;
-
-- (ImageMetadata *)imageMetadataWithPath:(nullable NSString *)filePath
-                                mimeType:(nullable NSString *)declaredMimeType
-                          ignoreFileSize:(BOOL)ignoreFileSize;
+- (ImageData *)imageDataWithPath:(nullable NSString *)filePath mimeType:(nullable NSString *)declaredMimeType;
 
 @end
 

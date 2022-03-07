@@ -4,7 +4,7 @@
 
 import Foundation
 
-protocol DismissInputBarDelegate: AnyObject {
+protocol DismissInputBarDelegate: class {
     func dismissInputBarDidTapDismiss(_ dismissInputBar: DismissInputBar)
 }
 

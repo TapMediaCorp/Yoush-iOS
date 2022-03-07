@@ -168,7 +168,7 @@ def sort_include_block(text, filepath, filename, file_extension):
     return '\n'.join(blocks) + '\n'
 
 
-def sort_forward_decl_statement_block(text, filepath, filename, file_extension):
+def sort_class_statement_block(text, filepath, filename, file_extension):
     lines = text.split('\n')
     lines = [line.strip() for line in lines if line.strip()]
     lines = list(set(lines))
@@ -260,18 +260,11 @@ def sort_matching_blocks(sort_name, filepath, filename, file_extension, text, ma
     return processed
 
 
-def find_forward_class_statement_section(text):
-    def is_forward_class_statement(line):
+def find_class_statement_section(text):
+    def is_class_statement(line):
         return line.strip().startswith('@class ')
 
-    return find_matching_section(text, is_forward_class_statement)
-
-
-def find_forward_protocol_statement_section(text):
-    def is_forward_protocol_statement(line):
-        return line.strip().startswith('@protocol ')
-
-    return find_matching_section(text, is_forward_protocol_statement)
+    return find_matching_section(text, is_class_statement)
 
 
 def find_include_section(text):
@@ -289,18 +282,11 @@ def sort_includes(filepath, filename, file_extension, text):
     return sort_matching_blocks('sort_includes', filepath, filename, file_extension, text, find_include_section, sort_include_block)
 
 
-def sort_forward_class_statements(filepath, filename, file_extension, text):
+def sort_class_statements(filepath, filename, file_extension, text):
     # print 'sort_class_statements', filepath
     if file_extension not in ('.h', '.m', '.mm'):
         return text
-    return sort_matching_blocks('sort_class_statements', filepath, filename, file_extension, text, find_forward_class_statement_section, sort_forward_decl_statement_block)
-
-
-def sort_forward_protocol_statements(filepath, filename, file_extension, text):
-    # print 'sort_class_statements', filepath
-    if file_extension not in ('.h', '.m', '.mm'):
-        return text
-    return sort_matching_blocks('sort_forward_protocol_statements', filepath, filename, file_extension, text, find_forward_protocol_statement_section, sort_forward_decl_statement_block)
+    return sort_matching_blocks('sort_class_statements', filepath, filename, file_extension, text, find_class_statement_section, sort_class_statement_block)
 
 
 def splitall(path):
@@ -333,10 +319,7 @@ def process(filepath):
         env_copy = os.environ.copy()
         env_copy["SCRIPT_INPUT_FILE_COUNT"] = "1"
         env_copy["SCRIPT_INPUT_FILE_0"] = '%s' % ( short_filepath, )
-        try:
-            lint_output = subprocess.check_output(['swiftlint', '--fix', '--use-script-input-files'], env=env_copy)
-        except subprocess.CalledProcessError, e:
-            lint_output = e.output
+        lint_output = subprocess.check_output(['swiftlint', 'autocorrect', '--use-script-input-files'], env=env_copy)
         print lint_output
         try:
             lint_output = subprocess.check_output(['swiftlint', 'lint', '--use-script-input-files'], env=env_copy)
@@ -350,16 +333,9 @@ def process(filepath):
     original_text = text
 
     text = sort_includes(filepath, filename, file_ext, text)
-    text = sort_forward_class_statements(filepath, filename, file_ext, text)
-    text = sort_forward_protocol_statements(filepath, filename, file_ext, text)
+    text = sort_class_statements(filepath, filename, file_ext, text)
 
     lines = text.split('\n')
-
-    shebang = ""
-    if lines[0].startswith('#!'):
-        shebang = lines[0] + '\n'
-        lines = lines[1:]
-
     while lines and lines[0].startswith('//'):
         lines = lines[1:]
     text = '\n'.join(lines)
@@ -372,7 +348,7 @@ def process(filepath):
 ''' % (
     datetime.datetime.now().year,
     )
-    text = shebang + header + text + '\n'
+    text = header + text + '\n'
 
     if original_text == text:
         return
@@ -513,5 +489,5 @@ if __name__ == "__main__":
     print 'git clang-format...'
     # we don't want to format .proto files, so we specify every other supported extension
     print commands.getoutput('git clang-format --extensions "c,h,m,mm,cc,cp,cpp,c++,cxx,hh,hxx,cu,java,js,ts,cs" --commit %s' % clang_format_commit)
- 
+
     check_diff_for_keywords()

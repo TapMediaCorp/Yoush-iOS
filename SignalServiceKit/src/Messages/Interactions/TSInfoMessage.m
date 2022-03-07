@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSInfoMessage.h"
@@ -19,6 +19,16 @@ const InfoMessageUserInfoKey InfoMessageUserInfoKeyNewDisappearingMessageToken
 const InfoMessageUserInfoKey InfoMessageUserInfoKeyGroupUpdateSourceAddress
     = @"InfoMessageUserInfoKeyGroupUpdateSourceAddress";
 const InfoMessageUserInfoKey InfoMessageUserInfoKeyProfileChanges = @"InfoMessageUserInfoKeyProfileChanges";
+
+//HoangHo: For pin message, This value should be as short as possible to reduce size of out coming message
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageGroupId = @"pinMessage_groupId";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageId = @"pinMessage_messageId";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageTimestamp = @"pinMessage_messageTimestamp";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageAction = @"pinMessage_action";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageSequence = @"pinMessage_sequence";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageAuthor = @"pinMessage_author";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageUserAction = @"pinMessage_userAction";
+const InfoMessageUserInfoKey InfoMessageUserInfoPinMessageReorder = @"pinMessage_reorderMessages";
 
 NSUInteger TSInfoMessageSchemaVersion = 2;
 
@@ -61,6 +71,10 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
     return self;
 }
 
+- (void)changeInfoMessage:(id)anyValue {
+    self.infoMessageUserInfo = anyValue;
+}
+
 - (instancetype)initWithThread:(TSThread *)thread messageType:(TSInfoMessageType)infoMessage
 {
     self = [super initMessageWithBuilder:[TSMessageBuilder messageBuilderWithThread:thread messageBody:nil]];
@@ -72,10 +86,6 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
     _infoMessageSchemaVersion = TSInfoMessageSchemaVersion;
 
     if (self.isDynamicInteraction) {
-        self.read = YES;
-    }
-
-    if (_messageType == TSInfoMessageTypeGroupQuit) {
         self.read = YES;
     }
 
@@ -132,7 +142,6 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
                   uniqueThreadId:(NSString *)uniqueThreadId
                    attachmentIds:(NSArray<NSString *> *)attachmentIds
                             body:(nullable NSString *)body
-                      bodyRanges:(nullable MessageBodyRanges *)bodyRanges
                     contactShare:(nullable OWSContact *)contactShare
                  expireStartedAt:(uint64_t)expireStartedAt
                        expiresAt:(uint64_t)expiresAt
@@ -158,7 +167,6 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
                     uniqueThreadId:uniqueThreadId
                      attachmentIds:attachmentIds
                               body:body
-                        bodyRanges:bodyRanges
                       contactShare:contactShare
                    expireStartedAt:expireStartedAt
                          expiresAt:expiresAt
@@ -187,6 +195,15 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
 // clang-format on
 
 // --- CODE GENERATION MARKER
+
+#pragma mark - Dependencies
+
+- (id<ContactsManagerProtocol>)contactsManager
+{
+    return SSKEnvironment.shared.contactsManager;
+}
+
+#pragma mark -
 
 + (instancetype)userNotRegisteredMessageInThread:(TSThread *)thread address:(SignalServiceAddress *)address
 {
@@ -262,8 +279,67 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
         }
         case TSInfoMessageSyncedThread:
             return @"";
+        case TSInfoMessagePinMessage:
+        {
+            return [self pinMessagePreviewTextWithTrans:transaction];
+        }
+        case TSInfoMessageSetWallPaper:
+        {
+            return [self updateWallPaperPreviewTextWithTrans:transaction];
+        }
+        case TSInfoMessageGroupCall:
+        {
+            NSDictionary *userInfo = self.infoMessageUserInfo;
+            NSString *str = @"";
+            if ([userInfo[@"callType"] isKindOfClass:NSNumber.class]) {
+                NSInteger callType = [userInfo[@"callType"] intValue];
+                switch (callType) {
+                    case RPRecentCallTypeIncoming:
+                        str = NSLocalizedString(@"IN_CALL_TERMINATED", nil);
+                        break;
+//                        return @"Finish incoming call";
+                        
+                    case RPRecentCallTypeIncomingMissed:
+                        str = NSLocalizedString(@"MISSED_CALL", nil);
+                        break;
+//                        return @"Miss call";
+                        
+                    case RPRecentCallTypeOutgoing:
+                        str = NSLocalizedString(@"IN_CALL_TERMINATED", nil);
+                        break;
+//                        return @"Finish outgoing call";
+                    
+                    case RPRecentCallTypeOutgoingMissed:
+                        str = NSLocalizedString(@"CALL_SCREEN_STATUS_NO_ANSWER", nil);
+                        break;
+//                        return @"No answer outgoing call";
+                        
+                    default:
+                        break;
+                }
+            }
+            //For testing
+            static NSDateFormatter *df = nil;
+            if (!df) {
+                df = [NSDateFormatter new];
+                df.dateFormat = @"MMM dd HH:mm:ss";
+            }
+            if (self.receivedAtDate) {
+                str = [str stringByAppendingFormat:@" %@", [df stringFromDate:self.receivedAtDate]];
+            }
+            else if (self.timestamp > 0) {
+                NSDate *date = [NSDate dateWithTimeIntervalSinceReferenceDate:self.timestamp];
+                if (date) {
+                    str = [str stringByAppendingFormat:@" %@", [df stringFromDate:date]];
+                }
+            }
+            return str;
+        }
         case TSInfoMessageProfileUpdate:
             return [self profileChangeDescriptionWithTransaction:transaction];
+            
+        default:
+            return @"";
     }
 
     OWSFailDebug(@"Unknown info message type");
@@ -288,11 +364,14 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
         case TSInfoMessageUnknownProtocolVersion:
         case TSInfoMessageSyncedThread:
         case TSInfoMessageProfileUpdate:
+        case TSInfoMessagePinMessage:
             return NO;
         case TSInfoMessageUserJoinedSignal:
             // In the conversation list, we want conversations with an unread "new user" notification to
             // be badged and bolded, like they received a message.
             return YES;
+        default:
+            return NO;
     }
 }
 
@@ -303,7 +382,7 @@ NSUInteger TSInfoMessageSchemaVersion = 2;
 
 - (void)markAsReadAtTimestamp:(uint64_t)readTimestamp
                        thread:(TSThread *)thread
-                 circumstance:(OWSReceiptCircumstance)circumstance
+                 circumstance:(OWSReadCircumstance)circumstance
                   transaction:(SDSAnyWriteTransaction *)transaction
 {
     OWSAssertDebug(transaction);

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -10,7 +10,15 @@ class SDSPerformanceTest: PerformanceBaseTest {
 
     // MARK: - Insert Messages
 
-    func testPerf_insertMessages() {
+    func testYDBPerf_insertMessages() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            insertMessages()
+        }
+    }
+
+    func testGRDBPerf_insertMessages() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             insertMessages()
         }
@@ -24,7 +32,7 @@ class SDSPerformanceTest: PerformanceBaseTest {
             XCTAssertEqual(0, TSInteraction.anyFetchAll(transaction: transaction).count)
         }
 
-        let messageCount = DebugFlags.fastPerfTests ? 5 : 100
+        let messageCount = 100
         var uniqueIds = [String]()
 
         let messageFactory = OutgoingMessageFactory()
@@ -53,14 +61,22 @@ class SDSPerformanceTest: PerformanceBaseTest {
 
     // MARK: - Fetch Messages
 
-    func testPerf_fetchMessages() {
+    func testYDBPerf_fetchMessages() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            fetchMessages()
+        }
+    }
+
+    func testGRDBPerf_fetchMessages() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             fetchMessages()
         }
     }
 
     func fetchMessages() {
-        let messageCount = DebugFlags.fastPerfTests ? 5 : 100
+        let messageCount = 100
         let fetchCount = messageCount * 5
 
         var uniqueIds = [String]()
@@ -91,20 +107,36 @@ class SDSPerformanceTest: PerformanceBaseTest {
 
     // MARK: - Enumerate Messages
 
-    func testPerf_enumerateMessagesUnbatched() {
+    func testYDBPerf_enumerateMessagesUnbatched() {
+        storageCoordinator.useYDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             enumerateMessages(batched: false)
         }
     }
 
-    func testPerf_enumerateMessagesBatched() {
+    func testGRDBPerf_enumerateMessagesUnbatched() {
+        storageCoordinator.useGRDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            enumerateMessages(batched: false)
+        }
+    }
+
+    func testYDBPerf_enumerateMessagesBatched() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            enumerateMessages(batched: true)
+        }
+    }
+
+    func testGRDBPerf_enumerateMessagesBatched() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             enumerateMessages(batched: true)
         }
     }
 
     func enumerateMessages(batched: Bool) {
-        let messageCount = DebugFlags.fastPerfTests ? 5 : 100
+        let messageCount = 100
         let enumerationCount = 10
 
         var uniqueIds = [String]()

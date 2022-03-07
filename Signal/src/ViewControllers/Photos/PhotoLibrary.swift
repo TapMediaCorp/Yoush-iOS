@@ -1,12 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Photos
-import CoreServices
+import PromiseKit
 
-protocol PhotoLibraryDelegate: AnyObject {
+protocol PhotoLibraryDelegate: class {
     func photoLibraryDidChange(_ photoLibrary: PhotoLibrary)
 }
 
@@ -79,7 +79,6 @@ class PhotoCollectionContents {
     enum PhotoLibraryError: Error {
         case assertionError(description: String)
         case unsupportedMediaType
-        case failedToExportAsset(underlyingError: Error?)
     }
 
     init(fetchResult: PHFetchResult<PHAsset>, localizedTitle: String?) {
@@ -141,86 +140,78 @@ class PhotoCollectionContents {
     }
 
     private func requestImageDataSource(for asset: PHAsset) -> Promise<(dataSource: DataSource, dataUTI: String)> {
-        return Promise { future in
+        return Promise { resolver in
 
             let options: PHImageRequestOptions = PHImageRequestOptions()
             options.isNetworkAccessAllowed = true
-            options.version = .current
-            options.deliveryMode = .highQualityFormat
 
             _ = imageManager.requestImageData(for: asset, options: options) { imageData, dataUTI, _, _ in
 
                 guard let imageData = imageData else {
-                    future.reject(PhotoLibraryError.assertionError(description: "imageData was unexpectedly nil"))
+                    resolver.reject(PhotoLibraryError.assertionError(description: "imageData was unexpectedly nil"))
                     return
                 }
 
                 guard let dataUTI = dataUTI else {
-                    future.reject(PhotoLibraryError.assertionError(description: "dataUTI was unexpectedly nil"))
+                    resolver.reject(PhotoLibraryError.assertionError(description: "dataUTI was unexpectedly nil"))
                     return
                 }
 
                 guard let dataSource = DataSourceValue.dataSource(with: imageData, utiType: dataUTI) else {
-                    future.reject(PhotoLibraryError.assertionError(description: "dataSource was unexpectedly nil"))
+                    resolver.reject(PhotoLibraryError.assertionError(description: "dataSource was unexpectedly nil"))
                     return
                 }
 
-                future.resolve((dataSource: dataSource, dataUTI: dataUTI))
+                resolver.fulfill((dataSource: dataSource, dataUTI: dataUTI))
             }
         }
     }
 
-    private func requestVideoDataSource(for asset: PHAsset) -> Promise<SignalAttachment> {
-        return Promise { future in
+    private func requestVideoDataSource(for asset: PHAsset) -> Promise<(dataSource: DataSource, dataUTI: String)> {
+        return Promise { resolver in
 
             let options: PHVideoRequestOptions = PHVideoRequestOptions()
             options.isNetworkAccessAllowed = true
-            options.version = .current
 
-            _ = imageManager.requestAVAsset(forVideo: asset, options: options) { video, _, info in
-                guard let video = video else {
-                    let error = info?[PHImageErrorKey] as! Error?
-                    future.reject(PhotoLibraryError.failedToExportAsset(underlyingError: error))
+            _ = imageManager.requestExportSession(forVideo: asset, options: options, exportPreset: AVAssetExportPresetMediumQuality) { exportSession, _ in
+
+                guard let exportSession = exportSession else {
+                    resolver.reject(PhotoLibraryError.assertionError(description: "exportSession was unexpectedly nil"))
                     return
                 }
 
-                let dataUTI: String
-                let baseFilename: String?
-                if let onDiskVideo = video as? AVURLAsset {
-                    let url = onDiskVideo.url
-                    dataUTI = MIMETypeUtil.utiType(forFileExtension: url.pathExtension) ?? kUTTypeVideo as String
+                exportSession.outputFileType = AVFileType.mp4
+                exportSession.metadataItemFilter = AVMetadataItemFilter.forSharing()
 
-                    if let dataSource = try? DataSourcePath.dataSource(with: url, shouldDeleteOnDeallocation: false) {
-                        if !SignalAttachment.isVideoThatNeedsCompression(dataSource: dataSource, dataUTI: dataUTI) {
-                            future.resolve(SignalAttachment.attachment(dataSource: dataSource, dataUTI: dataUTI))
-                            return
-                        }
+                let exportPath = OWSFileSystem.temporaryFilePath(withFileExtension: "mp4")
+                let exportURL = URL(fileURLWithPath: exportPath)
+                exportSession.outputURL = exportURL
+
+                Logger.debug("starting video export")
+                exportSession.exportAsynchronously {
+                    Logger.debug("Completed video export")
+
+                    do {
+                        let dataSource = try DataSourcePath.dataSource(with: exportURL, shouldDeleteOnDeallocation: true)
+                        resolver.fulfill((dataSource: dataSource, dataUTI: kUTTypeMPEG4 as String))
+                    } catch {
+                        resolver.reject(error)
                     }
-
-                    baseFilename = url.lastPathComponent
-                } else {
-                    dataUTI = kUTTypeVideo as String
-                    baseFilename = nil
                 }
-
-                let (compressPromise, _) = SignalAttachment.compressVideoAsMp4(asset: video,
-                                                                               baseFilename: baseFilename,
-                                                                               dataUTI: dataUTI)
-                compressPromise
-                    .done { future.resolve($0) }
-                    .catch { future.reject($0) }
             }
         }
     }
 
-    func outgoingAttachment(for asset: PHAsset) -> Promise<SignalAttachment> {
+    func outgoingAttachment(for asset: PHAsset, imageQuality: TSImageQuality) -> Promise<SignalAttachment> {
         switch asset.mediaType {
         case .image:
             return requestImageDataSource(for: asset).map(on: .global()) { (dataSource: DataSource, dataUTI: String) in
-                return SignalAttachment.attachment(dataSource: dataSource, dataUTI: dataUTI)
+                return SignalAttachment.attachment(dataSource: dataSource, dataUTI: dataUTI, imageQuality: imageQuality)
             }
         case .video:
-            return requestVideoDataSource(for: asset)
+            return requestVideoDataSource(for: asset).map(on: .global()) { (dataSource: DataSource, dataUTI: String) in
+                return SignalAttachment.attachment(dataSource: dataSource, dataUTI: dataUTI)
+            }
         default:
             return Promise(error: PhotoLibraryError.unsupportedMediaType)
         }

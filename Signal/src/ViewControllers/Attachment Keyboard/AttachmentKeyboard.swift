@@ -1,21 +1,20 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Photos
+import PromiseKit
 
 @objc
 protocol AttachmentKeyboardDelegate {
     func didSelectRecentPhoto(asset: PHAsset, attachment: SignalAttachment)
     func didTapGalleryButton()
-    func didTapCamera()
+    func didTapCamera(withPhotoCapture: PhotoCapture?)
     func didTapGif()
     func didTapFile()
     func didTapContact()
     func didTapLocation()
-    func didTapPayment()
-    var isGroup: Bool { get }
 }
 
 class AttachmentKeyboard: CustomKeyboard {
@@ -46,11 +45,7 @@ class AttachmentKeyboard: CustomKeyboard {
     )
 
     private var mediaLibraryAuthorizationStatus: PHAuthorizationStatus {
-        if #available(iOS 14, *) {
-            return PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        } else {
-            return PHPhotoLibrary.authorizationStatus()
-        }
+        return PHPhotoLibrary.authorizationStatus()
     }
 
     // MARK: -
@@ -159,6 +154,12 @@ class AttachmentKeyboard: CustomKeyboard {
         }
     }
 
+    override func wasDismissed() {
+        super.wasDismissed()
+
+        attachmentFormatPickerView.stopCameraPreview()
+    }
+
     @objc func keyboardFrameDidChange() {
         updateItemSizes()
     }
@@ -183,7 +184,7 @@ class AttachmentKeyboard: CustomKeyboard {
 
     func checkPermissions(completion: @escaping () -> Void) {
         switch mediaLibraryAuthorizationStatus {
-        case .authorized, .limited:
+        case .authorized:
             showRecentPhotos()
         case .denied, .restricted:
             showRecentPhotosError()
@@ -196,22 +197,28 @@ class AttachmentKeyboard: CustomKeyboard {
             break
         }
 
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            attachmentFormatPickerView.startCameraPreview()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                if granted {
+                    DispatchQueue.main.async { self.attachmentFormatPickerView.startCameraPreview() }
+                }
+            }
+        case .denied, .restricted:
+            break
+        @unknown default:
+            break
+        }
+
         completion()
     }
 }
 
 extension AttachmentKeyboard: RecentPhotosDelegate {
     var isMediaLibraryAccessGranted: Bool {
-        if #available(iOS 14, *) {
-            return [.authorized, .limited].contains(mediaLibraryAuthorizationStatus)
-        } else {
-            return mediaLibraryAuthorizationStatus == .authorized
-        }
-    }
-
-    var isMediaLibraryAccessLimited: Bool {
-        guard #available(iOS 14, *) else { return false }
-        return mediaLibraryAuthorizationStatus == .limited
+        return mediaLibraryAuthorizationStatus == .authorized
     }
 
     func didSelectRecentPhoto(asset: PHAsset, attachment: SignalAttachment) {
@@ -220,8 +227,8 @@ extension AttachmentKeyboard: RecentPhotosDelegate {
 }
 
 extension AttachmentKeyboard: AttachmentFormatPickerDelegate {
-    func didTapCamera() {
-        delegate?.didTapCamera()
+    func didTapCamera(withPhotoCapture photoCapture: PhotoCapture?) {
+        delegate?.didTapCamera(withPhotoCapture: photoCapture)
     }
 
     func didTapGif() {
@@ -238,18 +245,6 @@ extension AttachmentKeyboard: AttachmentFormatPickerDelegate {
 
     func didTapLocation() {
         delegate?.didTapLocation()
-    }
-
-    func didTapPayment() {
-        delegate?.didTapPayment()
-    }
-
-    var isGroup: Bool {
-        guard let delegate = delegate else {
-            owsFailDebug("Missing delegate.")
-            return false
-        }
-        return delegate.isGroup
     }
 }
 

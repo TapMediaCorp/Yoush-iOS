@@ -1,15 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "MockEnvironment.h"
+#import "OWSBackup.h"
 #import "OWSWindowManager.h"
-#import <SignalMessaging/OWSOrphanDataCleaner.h>
 #import <SignalMessaging/OWSPreferences.h>
 #import <SignalMessaging/OWSSounds.h>
 #import <SignalMessaging/SignalMessaging-Swift.h>
-#import <SignalUI/ContactsViewHelper.h>
-#import <SignalUI/SignalUI-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -25,25 +23,23 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init
 {
     // TODO: We should probably mock this out.
+    OWSAudioSession *audioSession = [OWSAudioSession new];
     OWSIncomingContactSyncJobQueue *incomingContactSyncJobQueue = [OWSIncomingContactSyncJobQueue new];
     OWSIncomingGroupSyncJobQueue *incomingGroupSyncJobQueue = [OWSIncomingGroupSyncJobQueue new];
     LaunchJobs *launchJobs = [LaunchJobs new];
     OWSPreferences *preferences = [OWSPreferences new];
     OWSSounds *sounds = [OWSSounds new];
     id<OWSProximityMonitoringManager> proximityMonitoringManager = [OWSProximityMonitoringManagerImpl new];
-    BroadcastMediaMessageJobQueue *broadcastMediaMessageJobQueue = [BroadcastMediaMessageJobQueue new];
-    OWSOrphanDataCleaner *orphanDataCleaner = [OWSOrphanDataCleaner new];
-    AvatarBuilder *avatarBuilder = [AvatarBuilder new];
+    OWSWindowManager *windowManager = [[OWSWindowManager alloc] initDefault];
 
-    self = [super initWithIncomingContactSyncJobQueue:incomingContactSyncJobQueue
-                            incomingGroupSyncJobQueue:incomingGroupSyncJobQueue
-                                           launchJobs:launchJobs
-                                          preferences:preferences
-                           proximityMonitoringManager:proximityMonitoringManager
-                                               sounds:sounds
-                        broadcastMediaMessageJobQueue:broadcastMediaMessageJobQueue
-                                    orphanDataCleaner:orphanDataCleaner
-                                        avatarBuilder:avatarBuilder];
+    self = [super initWithAudioSession:audioSession
+           incomingContactSyncJobQueue:incomingContactSyncJobQueue
+             incomingGroupSyncJobQueue:incomingGroupSyncJobQueue
+                            launchJobs:launchJobs
+                           preferences:preferences
+            proximityMonitoringManager:proximityMonitoringManager
+                                sounds:sounds
+                         windowManager:windowManager];
 
     OWSAssertDebug(self);
     return self;

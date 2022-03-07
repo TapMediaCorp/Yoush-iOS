@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 import SignalMetadataKit
 import ZKGroup
@@ -10,14 +11,11 @@ import ZKGroup
 public class VersionedProfileRequestImpl: NSObject, VersionedProfileRequest {
     public let request: TSRequest
     public let requestContext: ProfileKeyCredentialRequestContext?
-    public let profileKey: OWSAES256Key?
 
     public required init(request: TSRequest,
-                         requestContext: ProfileKeyCredentialRequestContext?,
-                         profileKey: OWSAES256Key?) {
+                         requestContext: ProfileKeyCredentialRequestContext?) {
         self.request = request
         self.requestContext = requestContext
-        self.profileKey = profileKey
     }
 }
 
@@ -25,6 +23,26 @@ public class VersionedProfileRequestImpl: NSObject, VersionedProfileRequest {
 
 @objc
 public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
+
+    // MARK: - Dependencies
+
+    private var profileManager: OWSProfileManager {
+        return OWSProfileManager.shared()
+    }
+
+    private var networkManager: TSNetworkManager {
+        return SSKEnvironment.shared.networkManager
+    }
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    private var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    // MARK: -
 
     public static let credentialStore = SDSKeyValueStore(collection: "VersionedProfiles.credentialStore")
 
@@ -36,133 +54,75 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
 
     // MARK: - Update
 
+    @objc
+    public func updateProfileOnService(profileGivenName: String?,
+                                       profileFamilyName: String?,
+                                       profileAvatarData: Data?) {
+        firstly {
+            updateProfilePromise(profileGivenName: profileGivenName,
+                                 profileFamilyName: profileFamilyName,
+                                 profileAvatarData: profileAvatarData)
+        }.done { _ in
+            Logger.verbose("success")
+
+            // TODO: This is temporary for testing.
+            let localAddress = TSAccountManager.sharedInstance().localAddress!
+            firstly {
+                ProfileFetcherJob.fetchProfilePromise(address: localAddress,
+                                                      mainAppOnly: false,
+                                                      ignoreThrottling: true,
+                                                      fetchType: .versioned)
+            }.done { _ in
+                    Logger.verbose("success")
+            }.catch { error in
+                owsFailDebug("error: \(error)")
+            }
+        }.catch { error in
+            owsFailDebug("error: \(error)")
+        }
+    }
+
     public func updateProfilePromise(profileGivenName: String?,
                                      profileFamilyName: String?,
-                                     profileBio: String?,
-                                     profileBioEmoji: String?,
-                                     profileAvatarData: Data?,
-                                     visibleBadgeIds: [String],
-                                     unsavedRotatedProfileKey: OWSAES256Key?) -> Promise<VersionedProfileUpdate> {
+                                     profileAvatarData: Data?) -> Promise<VersionedProfileUpdate> {
 
-        firstly(on: .global()) {
+        return DispatchQueue.global().async(.promise) {
             guard let localUuid = self.tsAccountManager.localUuid else {
                 throw OWSAssertionError("Missing localUuid.")
             }
-
-            if unsavedRotatedProfileKey != nil {
-                Logger.info("Updating local profile with unsaved rotated profile key")
-            }
-
-            let profileKey: OWSAES256Key = unsavedRotatedProfileKey ?? self.profileManager.localProfileKey()
+            let profileKey: OWSAES256Key = self.profileManager.localProfileKey()
             return (localUuid, profileKey)
-        }.then(on: .global()) { (localUuid: UUID, profileKey: OWSAES256Key) -> Promise<HTTPResponse> in
+        }.then(on: DispatchQueue.global()) { (localUuid: UUID, profileKey: OWSAES256Key) -> Promise<TSNetworkManager.Response> in
             let localProfileKey = try self.parseProfileKey(profileKey: profileKey)
             let zkgUuid = try localUuid.asZKGUuid()
             let commitment = try localProfileKey.getCommitment(uuid: zkgUuid)
             let commitmentData = commitment.serialize().asData
             let hasAvatar = profileAvatarData != nil
-
-            func fetchLocalPaymentAddressProtoData() -> Data? {
-                Self.databaseStorage.write { transaction in
-                    Self.paymentsHelper.lastKnownLocalPaymentAddressProtoData(transaction: transaction)
-                }
-            }
-
-            var profilePaymentAddressData: Data?
-            if Self.paymentsHelper.arePaymentsEnabled,
-               !Self.paymentsHelper.isKillSwitchActive,
-               let addressProtoData = fetchLocalPaymentAddressProtoData() {
-
-                var paymentAddressDataWithLength = Data()
-                var littleEndian: UInt32 = CFSwapInt32HostToLittle(UInt32(addressProtoData.count))
-                withUnsafePointer(to: &littleEndian) { pointer in
-                    paymentAddressDataWithLength.append(UnsafeBufferPointer(start: pointer, count: 1))
-                }
-                paymentAddressDataWithLength.append(addressProtoData)
-                profilePaymentAddressData = paymentAddressDataWithLength
-            }
-
-            var nameValue: ProfileValue?
+            var nameData: Data?
             if let profileGivenName = profileGivenName {
                 var nameComponents = PersonNameComponents()
                 nameComponents.givenName = profileGivenName
                 nameComponents.familyName = profileFamilyName
 
-                guard let encryptedValue = OWSUserProfile.encrypt(profileNameComponents: nameComponents,
-                                                                  profileKey: profileKey) else {
-                    throw OWSAssertionError("Could not encrypt profile name.")
+                guard let encryptedPaddedProfileName = self.profileManager.encrypt(profileNameComponents: nameComponents,
+                                                                                   profileKey: profileKey) else {
+                                                                                    throw OWSAssertionError("Could not encrypt profile name.")
                 }
-                nameValue = encryptedValue
+                nameData = encryptedPaddedProfileName
             }
-
-            func encryptOptionalData(_ value: Data?,
-                                     paddedLengths: [Int],
-                                     validBase64Lengths: [Int]) throws -> ProfileValue? {
-                guard let value = value,
-                      !value.isEmpty else {
-                    return nil
-                }
-                guard let encryptedValue = OWSUserProfile.encrypt(data: value,
-                                                                  profileKey: profileKey,
-                                                                  paddedLengths: paddedLengths,
-                                                                  validBase64Lengths: validBase64Lengths) else {
-                    throw OWSAssertionError("Could not encrypt profile value.")
-                }
-                return encryptedValue
-            }
-
-            func encryptOptionalString(_ value: String?,
-                                       paddedLengths: [Int],
-                                       validBase64Lengths: [Int]) throws -> ProfileValue? {
-                guard let value = value,
-                      !value.isEmpty else {
-                    return nil
-                }
-                guard let stringData = value.data(using: .utf8) else {
-                    owsFailDebug("Invalid value.")
-                    return nil
-                }
-                return try encryptOptionalData(stringData,
-                                               paddedLengths: paddedLengths,
-                                               validBase64Lengths: validBase64Lengths)
-            }
-
-            // The Base 64 lengths reflect encryption + Base 64 encoding
-            // of the max-length padded value.
-            let bioValue = try encryptOptionalString(profileBio,
-                                                     paddedLengths: [128, 254, 512 ],
-                                                     validBase64Lengths: [208, 376, 720])
-
-            let bioEmojiValue = try encryptOptionalString(profileBioEmoji,
-                                                          paddedLengths: [32],
-                                                          validBase64Lengths: [80])
-
-            let paymentAddressValue = try encryptOptionalData(profilePaymentAddressData,
-                                                              paddedLengths: [554],
-                                                              validBase64Lengths: [776])
 
             let profileKeyVersion = try localProfileKey.getProfileKeyVersion(uuid: zkgUuid)
             let profileKeyVersionString = try profileKeyVersion.asHexadecimalString()
-            let request = OWSRequestFactory.versionedProfileSetRequest(withName: nameValue,
-                                                                       bio: bioValue,
-                                                                       bioEmoji: bioEmojiValue,
-                                                                       hasAvatar: hasAvatar,
-                                                                       paymentAddress: paymentAddressValue,
-                                                                       visibleBadgeIds: visibleBadgeIds,
-                                                                       version: profileKeyVersionString,
-                                                                       commitment: commitmentData)
+            let request = OWSRequestFactory.versionedProfileSetRequest(withName: nameData, hasAvatar: hasAvatar, version: profileKeyVersionString, commitment: commitmentData)
             return self.networkManager.makePromise(request: request)
-        }.then(on: .global()) { response -> Promise<VersionedProfileUpdate> in
+        }.then(on: DispatchQueue.global()) { (_: URLSessionDataTask, responseObject: Any?) -> Promise<VersionedProfileUpdate> in
             if let profileAvatarData = profileAvatarData {
                 let profileKey: OWSAES256Key = self.profileManager.localProfileKey()
-                guard let encryptedProfileAvatarData = OWSUserProfile.encrypt(profileData: profileAvatarData,
-                                                                              profileKey: profileKey) else {
-                    throw OWSAssertionError("Could not encrypt profile avatar.")
+                guard let encryptedProfileAvatarData = self.profileManager.encrypt(profileData: profileAvatarData,
+                                                                                   profileKey: profileKey) else {
+                                                                                    throw OWSAssertionError("Could not encrypt profile avatar.")
                 }
-                guard let json = response.responseBodyJson else {
-                    throw OWSAssertionError("Missing or invalid JSON")
-                }
-                return self.parseFormAndUpload(formResponseObject: json,
+                return self.parseFormAndUpload(formResponseObject: responseObject,
                                                profileAvatarData: encryptedProfileAvatarData)
             }
             return Promise.value(VersionedProfileUpdate())
@@ -171,16 +131,16 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
 
     private func parseFormAndUpload(formResponseObject: Any?,
                                     profileAvatarData: Data) -> Promise<VersionedProfileUpdate> {
-        return firstly { () throws -> Promise<OWSUploadFormV2> in
+        return firstly { () throws -> Promise<OWSUploadForm> in
             guard let response = formResponseObject as? [AnyHashable: Any] else {
                 throw OWSAssertionError("Unexpected response.")
             }
-            guard let form = OWSUploadFormV2.parseDictionary(response) else {
+            guard let form = OWSUploadForm.parseDictionary(response) else {
                 throw OWSAssertionError("Could not parse response.")
             }
             return Promise.value(form)
-        }.then(on: DispatchQueue.global()) { (uploadForm: OWSUploadFormV2) -> Promise<String> in
-            OWSUpload.uploadV2(data: profileAvatarData, uploadForm: uploadForm, uploadUrlPath: "")
+        }.then(on: DispatchQueue.global()) { (uploadForm: OWSUploadForm) -> Promise<String> in
+            OWSUploadV2.upload(data: profileAvatarData, uploadForm: uploadForm, uploadUrlPath: "")
         }.map(on: DispatchQueue.global()) { (avatarUrlPath: String) -> VersionedProfileUpdate in
             return VersionedProfileUpdate(avatarUrlPath: avatarUrlPath)
         }
@@ -191,22 +151,19 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
     public func versionedProfileRequest(address: SignalServiceAddress,
                                         udAccessKey: SMKUDAccessKey?) throws -> VersionedProfileRequest {
         guard address.isValid,
-              let uuid: UUID = address.uuid else {
-            throw OWSAssertionError("Invalid address: \(address)")
+            let uuid: UUID = address.uuid else {
+                throw OWSAssertionError("Invalid address: \(address)")
         }
         let zkgUuid = try uuid.asZKGUuid()
 
         var requestContext: ProfileKeyCredentialRequestContext?
         var profileKeyVersionArg: String?
         var credentialRequestArg: Data?
-        var profileKeyForRequest: OWSAES256Key?
         try databaseStorage.read { transaction in
             // We try to include the profile key if we have one.
-            guard let profileKeyForAddress: OWSAES256Key = self.profileManager.profileKey(for: address,
-                                                                                          transaction: transaction) else {
+            guard let profileKeyForAddress: OWSAES256Key = self.profileManager.profileKey(for: address, transaction: transaction) else {
                 return
             }
-            profileKeyForRequest = profileKeyForAddress
             let profileKey: ProfileKey = try self.parseProfileKey(profileKey: profileKeyForAddress)
             let profileKeyVersion = try profileKey.getProfileKeyVersion(uuid: zkgUuid)
             profileKeyVersionArg = try profileKeyVersion.asHexadecimalString()
@@ -228,7 +185,7 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
                                                                    credentialRequest: credentialRequestArg,
                                                                    udAccessKey: udAccessKey)
 
-        return VersionedProfileRequestImpl(request: request, requestContext: requestContext, profileKey: profileKeyForRequest)
+        return VersionedProfileRequestImpl(request: request, requestContext: requestContext)
     }
 
     // MARK: -
@@ -252,8 +209,7 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
                 owsFailDebug("Invalid credential response.")
                 return
             }
-            let address = profile.address
-            guard let uuid = address.uuid else {
+            guard let uuid = profile.address.uuid else {
                 owsFailDebug("Missing uuid.")
                 return
             }
@@ -270,26 +226,8 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
                 return
             }
 
-            guard let requestProfileKey = profileRequest.profileKey else {
-                owsFailDebug("Missing profile key for credential from versioned profile fetch.")
-                return
-            }
-
+            Logger.verbose("Updating credential for: \(uuid)")
             databaseStorage.write { transaction in
-                guard let currentProfileKey = profileManager.profileKey(for: address, transaction: transaction) else {
-                    owsFailDebug("Missing profile key in database.")
-                    return
-                }
-                guard requestProfileKey.keyData == currentProfileKey.keyData else {
-                    if DebugFlags.internalLogging {
-                        Logger.info("requestProfileKey: \(requestProfileKey.keyData.hexadecimalString) != currentProfileKey: \(currentProfileKey.keyData.hexadecimalString)")
-                    }
-                    Logger.warn("Profile key for versioned profile fetch does not match current profile key.")
-                    return
-                }
-
-                Logger.verbose("Updating credential for: \(uuid)")
-
                 Self.credentialStore.setData(credentialData, key: uuid.uuidString, transaction: transaction)
             }
         } catch {
@@ -303,10 +241,9 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
     public func profileKeyCredentialData(for address: SignalServiceAddress,
                                          transaction: SDSAnyReadTransaction) throws -> Data? {
         guard address.isValid,
-              let uuid = address.uuid else {
-            throw OWSAssertionError("Invalid address: \(address)")
+            let uuid = address.uuid else {
+                throw OWSAssertionError("Invalid address: \(address)")
         }
-
         return Self.credentialStore.getData(uuid.uuidString, transaction: transaction)
     }
 
@@ -335,5 +272,13 @@ public class VersionedProfilesImpl: NSObject, VersionedProfilesSwift {
 
     public func clearProfileKeyCredentials(transaction: SDSAnyWriteTransaction) {
         Self.credentialStore.removeAll(transaction: transaction)
+    }
+}
+
+// MARK: -
+
+public extension Array where Element == UInt8 {
+    var asData: Data {
+        return Data(self)
     }
 }

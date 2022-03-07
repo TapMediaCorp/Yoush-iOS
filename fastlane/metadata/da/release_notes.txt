@@ -1,2 +1,0 @@
-• Vi har piftet samtalelisten en smule op for at gøre ulæste samtaler mere tydelige at se
-• Løser nogle problemer med søgning og zooming på billeder

@@ -1,10 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSDeviceProvisioningURLParser.h"
+#import <AxolotlKit/NSData+keyVersionByte.h>
 #import <SignalCoreKit/NSData+OWS.h>
-#import <SignalServiceKit/NSData+keyVersionByte.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -26,12 +26,10 @@ NSString *const OWSQueryItemNameEncodedPublicKeyKey = @"pub_key";
             _ephemeralDeviceId = queryItem.value;
         } else if ([queryItem.name isEqualToString:OWSQueryItemNameEncodedPublicKeyKey]) {
             NSString *encodedPublicKey = queryItem.value;
-            NSData *annotatedKey = [NSData dataFromBase64String:encodedPublicKey];
-
-            NSError *_Nullable error = nil;
-            _publicKey = [annotatedKey removeKeyTypeAndReturnError:&error];
-            if (error) {
-                OWSFailDebug(@"failed to strip key type: %@", error);
+            @try {
+                _publicKey = [[NSData dataFromBase64String:encodedPublicKey] throws_removeKeyType];
+            } @catch (NSException *exception) {
+                OWSFailDebug(@"exception: %@", exception);
             }
         } else {
             OWSLogWarn(@"Unknown query item in provisioning string: %@", queryItem.name);

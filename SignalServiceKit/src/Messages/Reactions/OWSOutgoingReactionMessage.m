@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSOutgoingReactionMessage.h"
@@ -58,13 +58,12 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     SSKProtoDataMessageReactionBuilder *reactionBuilder =
-        [SSKProtoDataMessageReaction builderWithEmoji:self.emoji timestamp:message.timestamp];
-    [reactionBuilder setRemove:self.isRemoving];
+        [SSKProtoDataMessageReaction builderWithEmoji:self.emoji remove:self.isRemoving timestamp:message.timestamp];
 
     SignalServiceAddress *_Nullable messageAuthor;
 
     if ([message isKindOfClass:[TSOutgoingMessage class]]) {
-        messageAuthor = TSAccountManager.shared.localAddress;
+        messageAuthor = TSAccountManager.sharedInstance.localAddress;
     } else if ([message isKindOfClass:[TSIncomingMessage class]]) {
         messageAuthor = ((TSIncomingMessage *)message).authorAddress;
     }
@@ -74,14 +73,12 @@ NS_ASSUME_NONNULL_BEGIN
         return nil;
     }
 
-    if (messageAuthor.phoneNumber && !SSKFeatureFlags.phoneNumberSharing) {
+    if (messageAuthor.phoneNumber) {
         reactionBuilder.authorE164 = messageAuthor.phoneNumber;
     }
 
     if (messageAuthor.uuidString) {
         reactionBuilder.authorUuid = messageAuthor.uuidString;
-    } else {
-        OWSAssertDebug(!SSKFeatureFlags.phoneNumberSharing);
     }
 
     NSError *error;
@@ -106,11 +103,11 @@ NS_ASSUME_NONNULL_BEGIN
     // Do nothing if we successfully delivered to anyone. Only cleanup
     // local state if we fail to deliver to anyone.
     if (self.sentRecipientAddresses.count > 0) {
-        OWSLogError(@"Failed to send reaction to some recipients: %@", error.userErrorDescription);
+        OWSLogError(@"Failed to send reaction to some recipients: %@", error.localizedDescription);
         return;
     }
 
-    SignalServiceAddress *_Nullable localAddress = TSAccountManager.shared.localAddress;
+    SignalServiceAddress *_Nullable localAddress = TSAccountManager.sharedInstance.localAddress;
     if (!localAddress) {
         OWSFailDebug(@"unexpectedly missing local address");
         return;
@@ -122,7 +119,7 @@ NS_ASSUME_NONNULL_BEGIN
         return;
     }
 
-    OWSLogError(@"Failed to send reaction to all recipients: %@", error.userErrorDescription);
+    OWSLogError(@"Failed to send reaction to all recipients: %@", error.localizedDescription);
 
     OWSReaction *_Nullable currentReaction = [message reactionForReactor:localAddress transaction:transaction];
 
@@ -140,11 +137,6 @@ NS_ASSUME_NONNULL_BEGIN
     } else {
         [message removeReactionForReactor:localAddress transaction:transaction];
     }
-}
-
-- (NSSet<NSString *> *)relatedUniqueIds
-{
-    return [[super relatedUniqueIds] setByAddingObjectsFromArray:@[ self.messageUniqueId ]];
 }
 
 @end

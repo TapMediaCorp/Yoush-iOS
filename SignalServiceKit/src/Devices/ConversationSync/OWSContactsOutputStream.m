@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSContactsOutputStream.h"
@@ -8,6 +8,7 @@
 #import "MIMETypeUtil.h"
 #import "NSData+Image.h"
 #import "NSData+keyVersionByte.h"
+#import "OWSBlockingManager.h"
 #import "OWSDisappearingMessagesConfiguration.h"
 #import "OWSRecipientIdentity.h"
 #import "SignalAccount.h"
@@ -24,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
                     recipientIdentity:(nullable OWSRecipientIdentity *)recipientIdentity
                        profileKeyData:(nullable NSData *)profileKeyData
                       contactsManager:(id<ContactsManagerProtocol>)contactsManager
+                conversationColorName:(NSString *)conversationColorName
     disappearingMessagesConfiguration:(nullable OWSDisappearingMessagesConfiguration *)disappearingMessagesConfiguration
                            isArchived:(nullable NSNumber *)isArchived
                         inboxPosition:(nullable NSNumber *)inboxPosition
@@ -33,9 +35,10 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertDebug(contactsManager);
 
     SSKProtoContactDetailsBuilder *contactBuilder = [SSKProtoContactDetails builder];
-    [contactBuilder setContactE164:signalAccount.recipientAddress.phoneNumber];
-    [contactBuilder setContactUuid:signalAccount.recipientAddress.uuidString];
+    [contactBuilder setNumber:signalAccount.recipientAddress.phoneNumber];
+    [contactBuilder setUuid:signalAccount.recipientAddress.uuidString];
     [contactBuilder setName:signalAccount.contact.fullName];
+    [contactBuilder setColor:conversationColorName];
 
     if (isArchived != nil) {
         [contactBuilder setArchived:isArchived.boolValue];
@@ -46,12 +49,6 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     if (recipientIdentity != nil) {
-        if (recipientIdentity.verificationState == OWSVerificationStateNoLongerVerified) {
-            // We only sync user's marking as un/verified. Never sync the conflicted state, the sibling device
-            // will figure that out on it's own.
-            return;
-        }
-
         SSKProtoVerified *_Nullable verified = BuildVerifiedProtoWithAddress(signalAccount.recipientAddress,
             [recipientIdentity.identityKey prependKeyType],
             recipientIdentity.verificationState,
@@ -63,7 +60,7 @@ NS_ASSUME_NONNULL_BEGIN
         contactBuilder.verified = verified;
     }
 
-    NSData *_Nullable avatarJpegData = [signalAccount buildContactAvatarJpegData];
+    NSData *_Nullable avatarJpegData = signalAccount.contactAvatarJpegData;
     if (avatarJpegData != nil) {
         SSKProtoContactDetailsAvatarBuilder *avatarBuilder = [SSKProtoContactDetailsAvatar builder];
         [avatarBuilder setContentType:OWSMimeTypeImageJpeg];
@@ -92,7 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
         [contactBuilder setExpireTimer:disappearingMessagesConfiguration.durationSeconds];
     }
 
-    if ([BlockingManager.shared isAddressBlocked:signalAccount.recipientAddress]) {
+    if ([OWSBlockingManager.sharedManager isAddressBlocked:signalAccount.recipientAddress]) {
         [contactBuilder setBlocked:YES];
     }
 

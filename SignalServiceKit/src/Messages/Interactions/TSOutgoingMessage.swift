@@ -1,9 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
-import SignalClient
 
 // Every time we add a new property to TSOutgoingMessage, we should:
 //
@@ -24,7 +23,6 @@ public class TSOutgoingMessageBuilder: TSMessageBuilder {
     public required init(thread: TSThread,
                          timestamp: UInt64? = nil,
                          messageBody: String? = nil,
-                         bodyRanges: MessageBodyRanges? = nil,
                          attachmentIds: [String]? = nil,
                          expiresInSeconds: UInt32 = 0,
                          expireStartedAt: UInt64 = 0,
@@ -41,7 +39,6 @@ public class TSOutgoingMessageBuilder: TSMessageBuilder {
         super.init(thread: thread,
                    timestamp: timestamp,
                    messageBody: messageBody,
-                   bodyRanges: bodyRanges,
                    attachmentIds: attachmentIds,
                    expiresInSeconds: expiresInSeconds,
                    expireStartedAt: expireStartedAt,
@@ -76,7 +73,6 @@ public class TSOutgoingMessageBuilder: TSMessageBuilder {
     public class func builder(thread: TSThread,
                               timestamp: UInt64,
                               messageBody: String?,
-                              bodyRanges: MessageBodyRanges?,
                               attachmentIds: [String]?,
                               expiresInSeconds: UInt32,
                               expireStartedAt: UInt64,
@@ -92,7 +88,6 @@ public class TSOutgoingMessageBuilder: TSMessageBuilder {
         return TSOutgoingMessageBuilder(thread: thread,
                                         timestamp: timestamp,
                                         messageBody: messageBody,
-                                        bodyRanges: bodyRanges,
                                         attachmentIds: attachmentIds,
                                         expiresInSeconds: expiresInSeconds,
                                         expireStartedAt: expireStartedAt,
@@ -120,85 +115,11 @@ public class TSOutgoingMessageBuilder: TSMessageBuilder {
 }
 
 public extension TSOutgoingMessage {
-    @objc func failedRecipientAddresses(errorCode: Int) -> [SignalServiceAddress] {
+    @objc func failedRecipientAddresses(errorCode: OWSErrorCode) -> [SignalServiceAddress] {
         guard let states = recipientAddressStates else { return [] }
 
         return states.filter { _, state in
-            return state.state == .failed && state.errorCode?.intValue == errorCode
+            return state.state == .failed && state.errorCode?.intValue == errorCode.rawValue
         }.map { $0.key }
     }
-
-    @objc
-    var canSendWithSenderKey: Bool {
-        // Sometimes we can fail to send a SenderKey message for an unknown reason. For example,
-        // the server may reject the message because one of our recipients has an invalid access
-        // token, but we don't know which recipient is the culprit. If we ever hit any of these
-        // non-transient failures, we should not send this message with sender key.
-        //
-        // By sending the message with traditional fanout, this *should* put things in order so
-        // that our next SenderKey message will send successfully.
-        guard let states = recipientAddressStates else { return true }
-        return states
-            .compactMap { $0.value.errorCode?.intValue }
-            .allSatisfy { $0 != SenderKeyUnavailableError.errorCode }
-    }
-}
-
-// MARK: Sender Key + Message Send Log
-
-@objc
-enum EncryptionStyle: Int {
-    case whisper
-    case plaintext
-}
-
-extension TSOutgoingMessage {
-
-    /// A collection of message unique IDs related to the outgoing message
-    ///
-    /// Used to help prune the Message Send Log. For example, a properly annotated outgoing reaction
-    /// message will automatically be deleted from the Message Send Log when the reacted message is
-    /// deleted.
-    ///
-    /// Subclasses should override to include any interactionIds their specific subclass relates to. Subclasses
-    /// *probably* want to return a union with the results of their parent class' implementation
-    @objc
-    var relatedUniqueIds: Set<String> {
-        Set([self.uniqueId])
-    }
-
-    /// Returns a content hint appropriate for representing this content
-    ///
-    /// If a message is sent with sealed sender, this will be included inside the envelope. A recipient who's
-    /// able to decrypt the envelope, but unable to decrypt the inner content can use this to infer how to
-    /// handle recovery based on the user-visibility of the content and likelihood of recovery.
-    ///
-    /// See: SealedSenderContentHint
-    @objc
-    var contentHint: SealedSenderContentHint {
-        .resendable
-    }
-
-    /// Returns a groupId relevant to the message. This is included in the envelope, outside the content encryption.
-    ///
-    /// Usually, this will be the groupId of the target thread. However, there's a special case here where message resend
-    /// responses will inherit the groupId of the original message. This probably shouldn't be overriden by anything except
-    /// OWSOutgoingMessageResendResponse
-    @objc
-    func envelopeGroupIdWithTransaction(_ transaction: SDSAnyReadTransaction) -> Data? {
-        (thread(transaction: transaction) as? TSGroupThread)?.groupId
-    }
-
-    /// Indicates whether or not this message's proto should be saved into the MessageSendLog
-    ///
-    /// Anything high volume or time-dependent (typing indicators, calls, etc.) should set this false.
-    /// A non-resendable content hint does not necessarily mean this should be false set false (though
-    /// it is a good indicator)
-    @objc
-    var shouldRecordSendLog: Bool { true }
-
-    /// Used in MessageSender to signal how a message should be encrypted before sending
-    /// Currently only overridden by OWSOutgoingResendRequest (this is asserted in the MessageSender implementation)
-    @objc
-    var encryptionStyle: EncryptionStyle { .whisper }
 }

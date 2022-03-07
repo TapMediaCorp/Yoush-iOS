@@ -1,12 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/TSOutgoingMessage.h>
+#import "TSOutgoingMessage.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-// This interaction type is obsolete.
 @interface OWSGroupInfoRequestMessage : TSOutgoingMessage
 
 - (instancetype)initOutgoingMessageWithBuilder:(TSOutgoingMessageBuilder *)outgoingMessageBuilder NS_UNAVAILABLE;

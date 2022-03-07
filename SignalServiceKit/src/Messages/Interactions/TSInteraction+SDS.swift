@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct InteractionRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        TSInteractionSerializer.table
+        return TSInteractionSerializer.table
     }
 
-    public static var databaseTableName: String {
-        TSInteractionSerializer.table.tableName
-    }
+    public static let databaseTableName: String = TSInteractionSerializer.table.tableName
 
     public var id: Int64?
 
@@ -81,19 +79,6 @@ public struct InteractionRecord: SDSRecord {
     public let wasReceivedByUD: Bool?
     public let infoMessageUserInfo: Data?
     public let wasRemotelyDeleted: Bool?
-    public let bodyRanges: Data?
-    public let offerType: TSRecentCallOfferType?
-    public let serverDeliveryTimestamp: UInt64?
-    public let eraId: String?
-    public let hasEnded: Bool?
-    public let creatorUuid: String?
-    public let joinedMemberUuids: Data?
-    public let wasIdentityVerified: Bool?
-    public let paymentCancellation: Data?
-    public let paymentNotification: Data?
-    public let paymentRequest: Data?
-    public let viewed: Bool?
-    public let serverGuid: String?
 
     public enum CodingKeys: String, CodingKey, ColumnExpression, CaseIterable {
         case id
@@ -150,23 +135,10 @@ public struct InteractionRecord: SDSRecord {
         case wasReceivedByUD
         case infoMessageUserInfo
         case wasRemotelyDeleted
-        case bodyRanges
-        case offerType
-        case serverDeliveryTimestamp
-        case eraId
-        case hasEnded
-        case creatorUuid
-        case joinedMemberUuids
-        case wasIdentityVerified
-        case paymentCancellation
-        case paymentNotification
-        case paymentRequest
-        case viewed
-        case serverGuid
     }
 
     public static func columnName(_ column: InteractionRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -182,7 +154,7 @@ public struct InteractionRecord: SDSRecord {
 
 public extension InteractionRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -240,19 +212,6 @@ public extension InteractionRecord {
         wasReceivedByUD = row[51]
         infoMessageUserInfo = row[52]
         wasRemotelyDeleted = row[53]
-        bodyRanges = row[54]
-        offerType = row[55]
-        serverDeliveryTimestamp = row[56]
-        eraId = row[57]
-        hasEnded = row[58]
-        creatorUuid = row[59]
-        joinedMemberUuids = row[60]
-        wasIdentityVerified = row[61]
-        paymentCancellation = row[62]
-        paymentNotification = row[63]
-        paymentRequest = row[64]
-        viewed = row[65]
-        serverGuid = row[66]
     }
 }
 
@@ -291,8 +250,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -326,7 +283,6 @@ extension TSInteraction {
                                                 uniqueThreadId: uniqueThreadId,
                                                 attachmentIds: attachmentIds,
                                                 body: body,
-                                                bodyRanges: bodyRanges,
                                                 contactShare: contactShare,
                                                 expireStartedAt: expireStartedAt,
                                                 expiresAt: expiresAt,
@@ -354,8 +310,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -389,7 +343,6 @@ extension TSInteraction {
                                                         uniqueThreadId: uniqueThreadId,
                                                         attachmentIds: attachmentIds,
                                                         body: body,
-                                                        bodyRanges: bodyRanges,
                                                         contactShare: contactShare,
                                                         expireStartedAt: expireStartedAt,
                                                         expiresAt: expiresAt,
@@ -417,8 +370,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -456,7 +407,6 @@ extension TSInteraction {
                                                                  uniqueThreadId: uniqueThreadId,
                                                                  attachmentIds: attachmentIds,
                                                                  body: body,
-                                                                 bodyRanges: bodyRanges,
                                                                  contactShare: contactShare,
                                                                  expireStartedAt: expireStartedAt,
                                                                  expiresAt: expiresAt,
@@ -478,182 +428,6 @@ extension TSInteraction {
                                                                  createdByRemoteName: createdByRemoteName,
                                                                  createdInExistingGroup: createdInExistingGroup)
 
-        case .groupCallMessage:
-
-            let uniqueId: String = record.uniqueId
-            let receivedAtTimestamp: UInt64 = record.receivedAtTimestamp
-            let sortId: UInt64 = UInt64(recordId)
-            let timestamp: UInt64 = record.timestamp
-            let uniqueThreadId: String = record.threadUniqueId
-            let creatorUuid: String? = record.creatorUuid
-            let eraId: String? = record.eraId
-            let hasEnded: Bool = try SDSDeserialization.required(record.hasEnded, name: "hasEnded")
-            let joinedMemberUuidsSerialized: Data? = record.joinedMemberUuids
-            let joinedMemberUuids: [String]? = try SDSDeserialization.optionalUnarchive(joinedMemberUuidsSerialized, name: "joinedMemberUuids")
-            let read: Bool = try SDSDeserialization.required(record.read, name: "read")
-
-            return OWSGroupCallMessage(grdbId: recordId,
-                                       uniqueId: uniqueId,
-                                       receivedAtTimestamp: receivedAtTimestamp,
-                                       sortId: sortId,
-                                       timestamp: timestamp,
-                                       uniqueThreadId: uniqueThreadId,
-                                       creatorUuid: creatorUuid,
-                                       eraId: eraId,
-                                       hasEnded: hasEnded,
-                                       joinedMemberUuids: joinedMemberUuids,
-                                       read: read)
-
-        case .outgoingPaymentMessage:
-
-            let uniqueId: String = record.uniqueId
-            let receivedAtTimestamp: UInt64 = record.receivedAtTimestamp
-            let sortId: UInt64 = UInt64(recordId)
-            let timestamp: UInt64 = record.timestamp
-            let uniqueThreadId: String = record.threadUniqueId
-            let attachmentIdsSerialized: Data? = record.attachmentIds
-            let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
-            let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
-            let contactShareSerialized: Data? = record.contactShare
-            let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
-            let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
-            let expiresAt: UInt64 = try SDSDeserialization.required(record.expiresAt, name: "expiresAt")
-            let expiresInSeconds: UInt32 = try SDSDeserialization.required(record.expiresInSeconds, name: "expiresInSeconds")
-            let isViewOnceComplete: Bool = try SDSDeserialization.required(record.isViewOnceComplete, name: "isViewOnceComplete")
-            let isViewOnceMessage: Bool = try SDSDeserialization.required(record.isViewOnceMessage, name: "isViewOnceMessage")
-            let linkPreviewSerialized: Data? = record.linkPreview
-            let linkPreview: OWSLinkPreview? = try SDSDeserialization.optionalUnarchive(linkPreviewSerialized, name: "linkPreview")
-            let messageStickerSerialized: Data? = record.messageSticker
-            let messageSticker: MessageSticker? = try SDSDeserialization.optionalUnarchive(messageStickerSerialized, name: "messageSticker")
-            let quotedMessageSerialized: Data? = record.quotedMessage
-            let quotedMessage: TSQuotedMessage? = try SDSDeserialization.optionalUnarchive(quotedMessageSerialized, name: "quotedMessage")
-            let storedShouldStartExpireTimer: Bool = try SDSDeserialization.required(record.storedShouldStartExpireTimer, name: "storedShouldStartExpireTimer")
-            let wasRemotelyDeleted: Bool = try SDSDeserialization.required(record.wasRemotelyDeleted, name: "wasRemotelyDeleted")
-            let customMessage: String? = record.customMessage
-            guard let groupMetaMessage: TSGroupMetaMessage = record.groupMetaMessage else {
-               throw SDSError.missingRequiredField
-            }
-            let hasLegacyMessageState: Bool = try SDSDeserialization.required(record.hasLegacyMessageState, name: "hasLegacyMessageState")
-            let hasSyncedTranscript: Bool = try SDSDeserialization.required(record.hasSyncedTranscript, name: "hasSyncedTranscript")
-            let isFromLinkedDevice: Bool = try SDSDeserialization.required(record.isFromLinkedDevice, name: "isFromLinkedDevice")
-            let isVoiceMessage: Bool = try SDSDeserialization.required(record.isVoiceMessage, name: "isVoiceMessage")
-            guard let legacyMessageState: TSOutgoingMessageState = record.legacyMessageState else {
-               throw SDSError.missingRequiredField
-            }
-            let legacyWasDelivered: Bool = try SDSDeserialization.required(record.legacyWasDelivered, name: "legacyWasDelivered")
-            let mostRecentFailureText: String? = record.mostRecentFailureText
-            let recipientAddressStatesSerialized: Data? = record.recipientAddressStates
-            let recipientAddressStates: [SignalServiceAddress: TSOutgoingMessageRecipientState]? = try SDSDeserialization.optionalUnarchive(recipientAddressStatesSerialized, name: "recipientAddressStates")
-            guard let storedMessageState: TSOutgoingMessageState = record.storedMessageState else {
-               throw SDSError.missingRequiredField
-            }
-            let paymentCancellationSerialized: Data? = record.paymentCancellation
-            let paymentCancellation: TSPaymentCancellation? = try SDSDeserialization.optionalUnarchive(paymentCancellationSerialized, name: "paymentCancellation")
-            let paymentNotificationSerialized: Data? = record.paymentNotification
-            let paymentNotification: TSPaymentNotification? = try SDSDeserialization.optionalUnarchive(paymentNotificationSerialized, name: "paymentNotification")
-            let paymentRequestSerialized: Data? = record.paymentRequest
-            let paymentRequest: TSPaymentRequest? = try SDSDeserialization.optionalUnarchive(paymentRequestSerialized, name: "paymentRequest")
-
-            return OWSOutgoingPaymentMessage(grdbId: recordId,
-                                             uniqueId: uniqueId,
-                                             receivedAtTimestamp: receivedAtTimestamp,
-                                             sortId: sortId,
-                                             timestamp: timestamp,
-                                             uniqueThreadId: uniqueThreadId,
-                                             attachmentIds: attachmentIds,
-                                             body: body,
-                                             bodyRanges: bodyRanges,
-                                             contactShare: contactShare,
-                                             expireStartedAt: expireStartedAt,
-                                             expiresAt: expiresAt,
-                                             expiresInSeconds: expiresInSeconds,
-                                             isViewOnceComplete: isViewOnceComplete,
-                                             isViewOnceMessage: isViewOnceMessage,
-                                             linkPreview: linkPreview,
-                                             messageSticker: messageSticker,
-                                             quotedMessage: quotedMessage,
-                                             storedShouldStartExpireTimer: storedShouldStartExpireTimer,
-                                             wasRemotelyDeleted: wasRemotelyDeleted,
-                                             customMessage: customMessage,
-                                             groupMetaMessage: groupMetaMessage,
-                                             hasLegacyMessageState: hasLegacyMessageState,
-                                             hasSyncedTranscript: hasSyncedTranscript,
-                                             isFromLinkedDevice: isFromLinkedDevice,
-                                             isVoiceMessage: isVoiceMessage,
-                                             legacyMessageState: legacyMessageState,
-                                             legacyWasDelivered: legacyWasDelivered,
-                                             mostRecentFailureText: mostRecentFailureText,
-                                             recipientAddressStates: recipientAddressStates,
-                                             storedMessageState: storedMessageState,
-                                             paymentCancellation: paymentCancellation,
-                                             paymentNotification: paymentNotification,
-                                             paymentRequest: paymentRequest)
-
-        case .recoverableDecryptionPlaceholder:
-
-            let uniqueId: String = record.uniqueId
-            let receivedAtTimestamp: UInt64 = record.receivedAtTimestamp
-            let sortId: UInt64 = UInt64(recordId)
-            let timestamp: UInt64 = record.timestamp
-            let uniqueThreadId: String = record.threadUniqueId
-            let attachmentIdsSerialized: Data? = record.attachmentIds
-            let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
-            let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
-            let contactShareSerialized: Data? = record.contactShare
-            let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
-            let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
-            let expiresAt: UInt64 = try SDSDeserialization.required(record.expiresAt, name: "expiresAt")
-            let expiresInSeconds: UInt32 = try SDSDeserialization.required(record.expiresInSeconds, name: "expiresInSeconds")
-            let isViewOnceComplete: Bool = try SDSDeserialization.required(record.isViewOnceComplete, name: "isViewOnceComplete")
-            let isViewOnceMessage: Bool = try SDSDeserialization.required(record.isViewOnceMessage, name: "isViewOnceMessage")
-            let linkPreviewSerialized: Data? = record.linkPreview
-            let linkPreview: OWSLinkPreview? = try SDSDeserialization.optionalUnarchive(linkPreviewSerialized, name: "linkPreview")
-            let messageStickerSerialized: Data? = record.messageSticker
-            let messageSticker: MessageSticker? = try SDSDeserialization.optionalUnarchive(messageStickerSerialized, name: "messageSticker")
-            let quotedMessageSerialized: Data? = record.quotedMessage
-            let quotedMessage: TSQuotedMessage? = try SDSDeserialization.optionalUnarchive(quotedMessageSerialized, name: "quotedMessage")
-            let storedShouldStartExpireTimer: Bool = try SDSDeserialization.required(record.storedShouldStartExpireTimer, name: "storedShouldStartExpireTimer")
-            let wasRemotelyDeleted: Bool = try SDSDeserialization.required(record.wasRemotelyDeleted, name: "wasRemotelyDeleted")
-            guard let errorType: TSErrorMessageType = record.errorType else {
-               throw SDSError.missingRequiredField
-            }
-            let read: Bool = try SDSDeserialization.required(record.read, name: "read")
-            let recipientAddressSerialized: Data? = record.recipientAddress
-            let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
-
-            return OWSRecoverableDecryptionPlaceholder(grdbId: recordId,
-                                                       uniqueId: uniqueId,
-                                                       receivedAtTimestamp: receivedAtTimestamp,
-                                                       sortId: sortId,
-                                                       timestamp: timestamp,
-                                                       uniqueThreadId: uniqueThreadId,
-                                                       attachmentIds: attachmentIds,
-                                                       body: body,
-                                                       bodyRanges: bodyRanges,
-                                                       contactShare: contactShare,
-                                                       expireStartedAt: expireStartedAt,
-                                                       expiresAt: expiresAt,
-                                                       expiresInSeconds: expiresInSeconds,
-                                                       isViewOnceComplete: isViewOnceComplete,
-                                                       isViewOnceMessage: isViewOnceMessage,
-                                                       linkPreview: linkPreview,
-                                                       messageSticker: messageSticker,
-                                                       quotedMessage: quotedMessage,
-                                                       storedShouldStartExpireTimer: storedShouldStartExpireTimer,
-                                                       wasRemotelyDeleted: wasRemotelyDeleted,
-                                                       errorType: errorType,
-                                                       read: read,
-                                                       recipientAddress: recipientAddress,
-                                                       sender: sender,
-                                                       wasIdentityVerified: wasIdentityVerified)
-
         case .unknownContactBlockOfferMessage:
 
             let uniqueId: String = record.uniqueId
@@ -664,8 +438,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -687,9 +459,6 @@ extension TSInteraction {
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
             let recipientAddressSerialized: Data? = record.recipientAddress
             let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
 
             return OWSUnknownContactBlockOfferMessage(grdbId: recordId,
                                                       uniqueId: uniqueId,
@@ -699,7 +468,6 @@ extension TSInteraction {
                                                       uniqueThreadId: uniqueThreadId,
                                                       attachmentIds: attachmentIds,
                                                       body: body,
-                                                      bodyRanges: bodyRanges,
                                                       contactShare: contactShare,
                                                       expireStartedAt: expireStartedAt,
                                                       expiresAt: expiresAt,
@@ -713,9 +481,7 @@ extension TSInteraction {
                                                       wasRemotelyDeleted: wasRemotelyDeleted,
                                                       errorType: errorType,
                                                       read: read,
-                                                      recipientAddress: recipientAddress,
-                                                      sender: sender,
-                                                      wasIdentityVerified: wasIdentityVerified)
+                                                      recipientAddress: recipientAddress)
 
         case .unknownProtocolVersionMessage:
 
@@ -727,8 +493,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -765,7 +529,6 @@ extension TSInteraction {
                                                     uniqueThreadId: uniqueThreadId,
                                                     attachmentIds: attachmentIds,
                                                     body: body,
-                                                    bodyRanges: bodyRanges,
                                                     contactShare: contactShare,
                                                     expireStartedAt: expireStartedAt,
                                                     expiresAt: expiresAt,
@@ -795,8 +558,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -836,7 +597,6 @@ extension TSInteraction {
                                                      uniqueThreadId: uniqueThreadId,
                                                      attachmentIds: attachmentIds,
                                                      body: body,
-                                                     bodyRanges: bodyRanges,
                                                      contactShare: contactShare,
                                                      expireStartedAt: expireStartedAt,
                                                      expiresAt: expiresAt,
@@ -867,9 +627,6 @@ extension TSInteraction {
             guard let callType: RPRecentCallType = record.callType else {
                throw SDSError.missingRequiredField
             }
-            guard let offerType: TSRecentCallOfferType = record.offerType else {
-               throw SDSError.missingRequiredField
-            }
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
 
             return TSCall(grdbId: recordId,
@@ -879,7 +636,6 @@ extension TSInteraction {
                           timestamp: timestamp,
                           uniqueThreadId: uniqueThreadId,
                           callType: callType,
-                          offerType: offerType,
                           read: read)
 
         case .errorMessage:
@@ -892,8 +648,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -915,9 +669,6 @@ extension TSInteraction {
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
             let recipientAddressSerialized: Data? = record.recipientAddress
             let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
 
             return TSErrorMessage(grdbId: recordId,
                                   uniqueId: uniqueId,
@@ -927,7 +678,6 @@ extension TSInteraction {
                                   uniqueThreadId: uniqueThreadId,
                                   attachmentIds: attachmentIds,
                                   body: body,
-                                  bodyRanges: bodyRanges,
                                   contactShare: contactShare,
                                   expireStartedAt: expireStartedAt,
                                   expiresAt: expiresAt,
@@ -941,9 +691,7 @@ extension TSInteraction {
                                   wasRemotelyDeleted: wasRemotelyDeleted,
                                   errorType: errorType,
                                   read: read,
-                                  recipientAddress: recipientAddress,
-                                  sender: sender,
-                                  wasIdentityVerified: wasIdentityVerified)
+                                  recipientAddress: recipientAddress)
 
         case .incomingMessage:
 
@@ -955,8 +703,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -975,11 +721,8 @@ extension TSInteraction {
             let authorPhoneNumber: String? = record.authorPhoneNumber
             let authorUUID: String? = record.authorUUID
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
-            let serverDeliveryTimestamp: UInt64 = try SDSDeserialization.required(record.serverDeliveryTimestamp, name: "serverDeliveryTimestamp")
-            let serverGuid: String? = record.serverGuid
             let serverTimestamp: NSNumber? = SDSDeserialization.optionalNumericAsNSNumber(record.serverTimestamp, name: "serverTimestamp", conversion: { NSNumber(value: $0) })
             let sourceDeviceId: UInt32 = try SDSDeserialization.required(record.sourceDeviceId, name: "sourceDeviceId")
-            let viewed: Bool = try SDSDeserialization.required(record.viewed, name: "viewed")
             let wasReceivedByUD: Bool = try SDSDeserialization.required(record.wasReceivedByUD, name: "wasReceivedByUD")
 
             return TSIncomingMessage(grdbId: recordId,
@@ -990,7 +733,6 @@ extension TSInteraction {
                                      uniqueThreadId: uniqueThreadId,
                                      attachmentIds: attachmentIds,
                                      body: body,
-                                     bodyRanges: bodyRanges,
                                      contactShare: contactShare,
                                      expireStartedAt: expireStartedAt,
                                      expiresAt: expiresAt,
@@ -1005,11 +747,8 @@ extension TSInteraction {
                                      authorPhoneNumber: authorPhoneNumber,
                                      authorUUID: authorUUID,
                                      read: read,
-                                     serverDeliveryTimestamp: serverDeliveryTimestamp,
-                                     serverGuid: serverGuid,
                                      serverTimestamp: serverTimestamp,
                                      sourceDeviceId: sourceDeviceId,
-                                     viewed: viewed,
                                      wasReceivedByUD: wasReceivedByUD)
 
         case .infoMessage:
@@ -1022,8 +761,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1057,7 +794,6 @@ extension TSInteraction {
                                  uniqueThreadId: uniqueThreadId,
                                  attachmentIds: attachmentIds,
                                  body: body,
-                                 bodyRanges: bodyRanges,
                                  contactShare: contactShare,
                                  expireStartedAt: expireStartedAt,
                                  expiresAt: expiresAt,
@@ -1100,8 +836,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1123,9 +857,6 @@ extension TSInteraction {
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
             let recipientAddressSerialized: Data? = record.recipientAddress
             let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
 
             return TSInvalidIdentityKeyErrorMessage(grdbId: recordId,
                                                     uniqueId: uniqueId,
@@ -1135,7 +866,6 @@ extension TSInteraction {
                                                     uniqueThreadId: uniqueThreadId,
                                                     attachmentIds: attachmentIds,
                                                     body: body,
-                                                    bodyRanges: bodyRanges,
                                                     contactShare: contactShare,
                                                     expireStartedAt: expireStartedAt,
                                                     expiresAt: expiresAt,
@@ -1149,9 +879,7 @@ extension TSInteraction {
                                                     wasRemotelyDeleted: wasRemotelyDeleted,
                                                     errorType: errorType,
                                                     read: read,
-                                                    recipientAddress: recipientAddress,
-                                                    sender: sender,
-                                                    wasIdentityVerified: wasIdentityVerified)
+                                                    recipientAddress: recipientAddress)
 
         case .invalidIdentityKeyReceivingErrorMessage:
 
@@ -1163,8 +891,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1186,9 +912,6 @@ extension TSInteraction {
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
             let recipientAddressSerialized: Data? = record.recipientAddress
             let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
             let authorId: String = try SDSDeserialization.required(record.authorId, name: "authorId")
             let envelopeData: Data? = SDSDeserialization.optionalData(record.envelopeData, name: "envelopeData")
 
@@ -1200,7 +923,6 @@ extension TSInteraction {
                                                              uniqueThreadId: uniqueThreadId,
                                                              attachmentIds: attachmentIds,
                                                              body: body,
-                                                             bodyRanges: bodyRanges,
                                                              contactShare: contactShare,
                                                              expireStartedAt: expireStartedAt,
                                                              expiresAt: expiresAt,
@@ -1215,8 +937,6 @@ extension TSInteraction {
                                                              errorType: errorType,
                                                              read: read,
                                                              recipientAddress: recipientAddress,
-                                                             sender: sender,
-                                                             wasIdentityVerified: wasIdentityVerified,
                                                              authorId: authorId,
                                                              envelopeData: envelopeData)
 
@@ -1230,8 +950,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1253,9 +971,6 @@ extension TSInteraction {
             let read: Bool = try SDSDeserialization.required(record.read, name: "read")
             let recipientAddressSerialized: Data? = record.recipientAddress
             let recipientAddress: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(recipientAddressSerialized, name: "recipientAddress")
-            let senderSerialized: Data? = record.sender
-            let sender: SignalServiceAddress? = try SDSDeserialization.optionalUnarchive(senderSerialized, name: "sender")
-            let wasIdentityVerified: Bool = try SDSDeserialization.required(record.wasIdentityVerified, name: "wasIdentityVerified")
             let messageId: String = try SDSDeserialization.required(record.messageId, name: "messageId")
             let preKeyBundleSerialized: Data? = record.preKeyBundle
             let preKeyBundle: PreKeyBundle = try SDSDeserialization.unarchive(preKeyBundleSerialized, name: "preKeyBundle")
@@ -1268,7 +983,6 @@ extension TSInteraction {
                                                            uniqueThreadId: uniqueThreadId,
                                                            attachmentIds: attachmentIds,
                                                            body: body,
-                                                           bodyRanges: bodyRanges,
                                                            contactShare: contactShare,
                                                            expireStartedAt: expireStartedAt,
                                                            expiresAt: expiresAt,
@@ -1283,8 +997,6 @@ extension TSInteraction {
                                                            errorType: errorType,
                                                            read: read,
                                                            recipientAddress: recipientAddress,
-                                                           sender: sender,
-                                                           wasIdentityVerified: wasIdentityVerified,
                                                            messageId: messageId,
                                                            preKeyBundle: preKeyBundle)
 
@@ -1298,8 +1010,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1324,7 +1034,6 @@ extension TSInteraction {
                              uniqueThreadId: uniqueThreadId,
                              attachmentIds: attachmentIds,
                              body: body,
-                             bodyRanges: bodyRanges,
                              contactShare: contactShare,
                              expireStartedAt: expireStartedAt,
                              expiresAt: expiresAt,
@@ -1347,8 +1056,6 @@ extension TSInteraction {
             let attachmentIdsSerialized: Data? = record.attachmentIds
             let attachmentIds: [String] = try SDSDeserialization.unarchive(attachmentIdsSerialized, name: "attachmentIds")
             let body: String? = record.body
-            let bodyRangesSerialized: Data? = record.bodyRanges
-            let bodyRanges: MessageBodyRanges? = try SDSDeserialization.optionalUnarchive(bodyRangesSerialized, name: "bodyRanges")
             let contactShareSerialized: Data? = record.contactShare
             let contactShare: OWSContact? = try SDSDeserialization.optionalUnarchive(contactShareSerialized, name: "contactShare")
             let expireStartedAt: UInt64 = try SDSDeserialization.required(record.expireStartedAt, name: "expireStartedAt")
@@ -1391,7 +1098,6 @@ extension TSInteraction {
                                      uniqueThreadId: uniqueThreadId,
                                      attachmentIds: attachmentIds,
                                      body: body,
-                                     bodyRanges: bodyRanges,
                                      contactShare: contactShare,
                                      expireStartedAt: expireStartedAt,
                                      expiresAt: expiresAt,
@@ -1448,9 +1154,6 @@ extension TSInteraction: SDSModel {
         case let model as TSUnreadIndicatorInteraction:
             assert(type(of: model) == TSUnreadIndicatorInteraction.self)
             return TSUnreadIndicatorInteractionSerializer(model: model)
-        case let model as OWSOutgoingPaymentMessage:
-            assert(type(of: model) == OWSOutgoingPaymentMessage.self)
-            return OWSOutgoingPaymentMessageSerializer(model: model)
         case let model as TSOutgoingMessage:
             assert(type(of: model) == TSOutgoingMessage.self)
             return TSOutgoingMessageSerializer(model: model)
@@ -1487,9 +1190,6 @@ extension TSInteraction: SDSModel {
         case let model as OWSUnknownContactBlockOfferMessage:
             assert(type(of: model) == OWSUnknownContactBlockOfferMessage.self)
             return OWSUnknownContactBlockOfferMessageSerializer(model: model)
-        case let model as OWSRecoverableDecryptionPlaceholder:
-            assert(type(of: model) == OWSRecoverableDecryptionPlaceholder.self)
-            return OWSRecoverableDecryptionPlaceholderSerializer(model: model)
         case let model as TSErrorMessage:
             assert(type(of: model) == TSErrorMessage.self)
             return TSErrorMessageSerializer(model: model)
@@ -1499,24 +1199,21 @@ extension TSInteraction: SDSModel {
         case let model as TSCall:
             assert(type(of: model) == TSCall.self)
             return TSCallSerializer(model: model)
-        case let model as OWSGroupCallMessage:
-            assert(type(of: model) == OWSGroupCallMessage.self)
-            return OWSGroupCallMessageSerializer(model: model)
         default:
             return TSInteractionSerializer(model: self)
         }
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        InteractionRecord.databaseTableName
+        return InteractionRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        TSInteractionSerializer.table
+        return TSInteractionSerializer.table
     }
 }
 
@@ -1548,188 +1245,6 @@ extension TSInteraction: DeepCopyable {
                                                 uniqueThreadId: uniqueThreadId)
         }
 
-        if let modelToCopy = self as? OWSOutgoingPaymentMessage {
-            assert(type(of: modelToCopy) == OWSOutgoingPaymentMessage.self)
-            let uniqueId: String = modelToCopy.uniqueId
-            let receivedAtTimestamp: UInt64 = modelToCopy.receivedAtTimestamp
-            let sortId: UInt64 = modelToCopy.sortId
-            let timestamp: UInt64 = modelToCopy.timestamp
-            let uniqueThreadId: String = modelToCopy.uniqueThreadId
-            // NOTE: If this generates build errors, you made need to
-            // implement DeepCopyable for this type in DeepCopy.swift.
-            let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
-            let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let contactShare: OWSContact?
-            if let contactShareForCopy = modelToCopy.contactShare {
-               contactShare = try DeepCopies.deepCopy(contactShareForCopy)
-            } else {
-               contactShare = nil
-            }
-            let expireStartedAt: UInt64 = modelToCopy.expireStartedAt
-            let expiresAt: UInt64 = modelToCopy.expiresAt
-            let expiresInSeconds: UInt32 = modelToCopy.expiresInSeconds
-            let isViewOnceComplete: Bool = modelToCopy.isViewOnceComplete
-            let isViewOnceMessage: Bool = modelToCopy.isViewOnceMessage
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let linkPreview: OWSLinkPreview?
-            if let linkPreviewForCopy = modelToCopy.linkPreview {
-               linkPreview = try DeepCopies.deepCopy(linkPreviewForCopy)
-            } else {
-               linkPreview = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let messageSticker: MessageSticker?
-            if let messageStickerForCopy = modelToCopy.messageSticker {
-               messageSticker = try DeepCopies.deepCopy(messageStickerForCopy)
-            } else {
-               messageSticker = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let quotedMessage: TSQuotedMessage?
-            if let quotedMessageForCopy = modelToCopy.quotedMessage {
-               quotedMessage = try DeepCopies.deepCopy(quotedMessageForCopy)
-            } else {
-               quotedMessage = nil
-            }
-            let storedShouldStartExpireTimer: Bool = modelToCopy.storedShouldStartExpireTimer
-            let wasRemotelyDeleted: Bool = modelToCopy.wasRemotelyDeleted
-            let customMessage: String? = modelToCopy.customMessage
-            let groupMetaMessage: TSGroupMetaMessage = modelToCopy.groupMetaMessage
-            let hasLegacyMessageState: Bool = modelToCopy.hasLegacyMessageState
-            let hasSyncedTranscript: Bool = modelToCopy.hasSyncedTranscript
-            let isFromLinkedDevice: Bool = modelToCopy.isFromLinkedDevice
-            let isVoiceMessage: Bool = modelToCopy.isVoiceMessage
-            let legacyMessageState: TSOutgoingMessageState = modelToCopy.legacyMessageState
-            let legacyWasDelivered: Bool = modelToCopy.legacyWasDelivered
-            let mostRecentFailureText: String? = modelToCopy.mostRecentFailureText
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let recipientAddressStates: [SignalServiceAddress: TSOutgoingMessageRecipientState]?
-            if let recipientAddressStatesForCopy = modelToCopy.recipientAddressStates {
-               recipientAddressStates = try DeepCopies.deepCopy(recipientAddressStatesForCopy)
-            } else {
-               recipientAddressStates = nil
-            }
-            let storedMessageState: TSOutgoingMessageState = modelToCopy.storedMessageState
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let paymentCancellation: TSPaymentCancellation?
-            if let paymentCancellationForCopy = modelToCopy.paymentCancellation {
-               paymentCancellation = try DeepCopies.deepCopy(paymentCancellationForCopy)
-            } else {
-               paymentCancellation = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let paymentNotification: TSPaymentNotification?
-            if let paymentNotificationForCopy = modelToCopy.paymentNotification {
-               paymentNotification = try DeepCopies.deepCopy(paymentNotificationForCopy)
-            } else {
-               paymentNotification = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let paymentRequest: TSPaymentRequest?
-            if let paymentRequestForCopy = modelToCopy.paymentRequest {
-               paymentRequest = try DeepCopies.deepCopy(paymentRequestForCopy)
-            } else {
-               paymentRequest = nil
-            }
-
-            return OWSOutgoingPaymentMessage(grdbId: id,
-                                             uniqueId: uniqueId,
-                                             receivedAtTimestamp: receivedAtTimestamp,
-                                             sortId: sortId,
-                                             timestamp: timestamp,
-                                             uniqueThreadId: uniqueThreadId,
-                                             attachmentIds: attachmentIds,
-                                             body: body,
-                                             bodyRanges: bodyRanges,
-                                             contactShare: contactShare,
-                                             expireStartedAt: expireStartedAt,
-                                             expiresAt: expiresAt,
-                                             expiresInSeconds: expiresInSeconds,
-                                             isViewOnceComplete: isViewOnceComplete,
-                                             isViewOnceMessage: isViewOnceMessage,
-                                             linkPreview: linkPreview,
-                                             messageSticker: messageSticker,
-                                             quotedMessage: quotedMessage,
-                                             storedShouldStartExpireTimer: storedShouldStartExpireTimer,
-                                             wasRemotelyDeleted: wasRemotelyDeleted,
-                                             customMessage: customMessage,
-                                             groupMetaMessage: groupMetaMessage,
-                                             hasLegacyMessageState: hasLegacyMessageState,
-                                             hasSyncedTranscript: hasSyncedTranscript,
-                                             isFromLinkedDevice: isFromLinkedDevice,
-                                             isVoiceMessage: isVoiceMessage,
-                                             legacyMessageState: legacyMessageState,
-                                             legacyWasDelivered: legacyWasDelivered,
-                                             mostRecentFailureText: mostRecentFailureText,
-                                             recipientAddressStates: recipientAddressStates,
-                                             storedMessageState: storedMessageState,
-                                             paymentCancellation: paymentCancellation,
-                                             paymentNotification: paymentNotification,
-                                             paymentRequest: paymentRequest)
-        }
-
         if let modelToCopy = self as? TSOutgoingMessage {
             assert(type(of: modelToCopy) == TSOutgoingMessage.self)
             let uniqueId: String = modelToCopy.uniqueId
@@ -1741,19 +1256,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -1845,7 +1347,6 @@ extension TSInteraction: DeepCopyable {
                                      uniqueThreadId: uniqueThreadId,
                                      attachmentIds: attachmentIds,
                                      body: body,
-                                     bodyRanges: bodyRanges,
                                      contactShare: contactShare,
                                      expireStartedAt: expireStartedAt,
                                      expiresAt: expiresAt,
@@ -1881,19 +1382,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -1996,7 +1484,6 @@ extension TSInteraction: DeepCopyable {
                                                      uniqueThreadId: uniqueThreadId,
                                                      attachmentIds: attachmentIds,
                                                      body: body,
-                                                     bodyRanges: bodyRanges,
                                                      contactShare: contactShare,
                                                      expireStartedAt: expireStartedAt,
                                                      expiresAt: expiresAt,
@@ -2029,19 +1516,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2153,7 +1627,6 @@ extension TSInteraction: DeepCopyable {
                                                     uniqueThreadId: uniqueThreadId,
                                                     attachmentIds: attachmentIds,
                                                     body: body,
-                                                    bodyRanges: bodyRanges,
                                                     contactShare: contactShare,
                                                     expireStartedAt: expireStartedAt,
                                                     expiresAt: expiresAt,
@@ -2185,19 +1658,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2299,7 +1759,6 @@ extension TSInteraction: DeepCopyable {
                                                                  uniqueThreadId: uniqueThreadId,
                                                                  attachmentIds: attachmentIds,
                                                                  body: body,
-                                                                 bodyRanges: bodyRanges,
                                                                  contactShare: contactShare,
                                                                  expireStartedAt: expireStartedAt,
                                                                  expiresAt: expiresAt,
@@ -2333,19 +1792,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2443,7 +1889,6 @@ extension TSInteraction: DeepCopyable {
                                                         uniqueThreadId: uniqueThreadId,
                                                         attachmentIds: attachmentIds,
                                                         body: body,
-                                                        bodyRanges: bodyRanges,
                                                         contactShare: contactShare,
                                                         expireStartedAt: expireStartedAt,
                                                         expiresAt: expiresAt,
@@ -2473,19 +1918,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2583,7 +2015,6 @@ extension TSInteraction: DeepCopyable {
                                                 uniqueThreadId: uniqueThreadId,
                                                 attachmentIds: attachmentIds,
                                                 body: body,
-                                                bodyRanges: bodyRanges,
                                                 contactShare: contactShare,
                                                 expireStartedAt: expireStartedAt,
                                                 expiresAt: expiresAt,
@@ -2613,19 +2044,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2723,7 +2141,6 @@ extension TSInteraction: DeepCopyable {
                                  uniqueThreadId: uniqueThreadId,
                                  attachmentIds: attachmentIds,
                                  body: body,
-                                 bodyRanges: bodyRanges,
                                  contactShare: contactShare,
                                  expireStartedAt: expireStartedAt,
                                  expiresAt: expiresAt,
@@ -2753,19 +2170,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2828,11 +2232,8 @@ extension TSInteraction: DeepCopyable {
             let authorPhoneNumber: String? = modelToCopy.authorPhoneNumber
             let authorUUID: String? = modelToCopy.authorUUID
             let read: Bool = modelToCopy.wasRead
-            let serverDeliveryTimestamp: UInt64 = modelToCopy.serverDeliveryTimestamp
-            let serverGuid: String? = modelToCopy.serverGuid
             let serverTimestamp: NSNumber? = modelToCopy.serverTimestamp
             let sourceDeviceId: UInt32 = modelToCopy.sourceDeviceId
-            let viewed: Bool = modelToCopy.wasViewed
             let wasReceivedByUD: Bool = modelToCopy.wasReceivedByUD
 
             return TSIncomingMessage(grdbId: id,
@@ -2843,7 +2244,6 @@ extension TSInteraction: DeepCopyable {
                                      uniqueThreadId: uniqueThreadId,
                                      attachmentIds: attachmentIds,
                                      body: body,
-                                     bodyRanges: bodyRanges,
                                      contactShare: contactShare,
                                      expireStartedAt: expireStartedAt,
                                      expiresAt: expiresAt,
@@ -2858,11 +2258,8 @@ extension TSInteraction: DeepCopyable {
                                      authorPhoneNumber: authorPhoneNumber,
                                      authorUUID: authorUUID,
                                      read: read,
-                                     serverDeliveryTimestamp: serverDeliveryTimestamp,
-                                     serverGuid: serverGuid,
                                      serverTimestamp: serverTimestamp,
                                      sourceDeviceId: sourceDeviceId,
-                                     viewed: viewed,
                                      wasReceivedByUD: wasReceivedByUD)
         }
 
@@ -2877,19 +2274,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -2964,20 +2348,6 @@ extension TSInteraction: DeepCopyable {
             } else {
                recipientAddress = nil
             }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
             let messageId: String = modelToCopy.messageId
             // NOTE: If this generates build errors, you made need to
             // implement DeepCopyable for this type in DeepCopy.swift.
@@ -2991,7 +2361,6 @@ extension TSInteraction: DeepCopyable {
                                                            uniqueThreadId: uniqueThreadId,
                                                            attachmentIds: attachmentIds,
                                                            body: body,
-                                                           bodyRanges: bodyRanges,
                                                            contactShare: contactShare,
                                                            expireStartedAt: expireStartedAt,
                                                            expiresAt: expiresAt,
@@ -3006,8 +2375,6 @@ extension TSInteraction: DeepCopyable {
                                                            errorType: errorType,
                                                            read: read,
                                                            recipientAddress: recipientAddress,
-                                                           sender: sender,
-                                                           wasIdentityVerified: wasIdentityVerified,
                                                            messageId: messageId,
                                                            preKeyBundle: preKeyBundle)
         }
@@ -3030,19 +2397,6 @@ extension TSInteraction: DeepCopyable {
             //
             // * Implement DeepCopyable for this type (e.g. a model).
             // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
             let contactShare: OWSContact?
             if let contactShareForCopy = modelToCopy.contactShare {
                contactShare = try DeepCopies.deepCopy(contactShareForCopy)
@@ -3110,20 +2464,6 @@ extension TSInteraction: DeepCopyable {
             } else {
                recipientAddress = nil
             }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
             let authorId: String = modelToCopy.authorId
             let envelopeData: Data? = modelToCopy.envelopeData
 
@@ -3135,7 +2475,6 @@ extension TSInteraction: DeepCopyable {
                                                              uniqueThreadId: uniqueThreadId,
                                                              attachmentIds: attachmentIds,
                                                              body: body,
-                                                             bodyRanges: bodyRanges,
                                                              contactShare: contactShare,
                                                              expireStartedAt: expireStartedAt,
                                                              expiresAt: expiresAt,
@@ -3150,8 +2489,6 @@ extension TSInteraction: DeepCopyable {
                                                              errorType: errorType,
                                                              read: read,
                                                              recipientAddress: recipientAddress,
-                                                             sender: sender,
-                                                             wasIdentityVerified: wasIdentityVerified,
                                                              authorId: authorId,
                                                              envelopeData: envelopeData)
         }
@@ -3174,19 +2511,6 @@ extension TSInteraction: DeepCopyable {
             //
             // * Implement DeepCopyable for this type (e.g. a model).
             // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
             let contactShare: OWSContact?
             if let contactShareForCopy = modelToCopy.contactShare {
                contactShare = try DeepCopies.deepCopy(contactShareForCopy)
@@ -3254,20 +2578,6 @@ extension TSInteraction: DeepCopyable {
             } else {
                recipientAddress = nil
             }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
 
             return TSInvalidIdentityKeyErrorMessage(grdbId: id,
                                                     uniqueId: uniqueId,
@@ -3277,7 +2587,6 @@ extension TSInteraction: DeepCopyable {
                                                     uniqueThreadId: uniqueThreadId,
                                                     attachmentIds: attachmentIds,
                                                     body: body,
-                                                    bodyRanges: bodyRanges,
                                                     contactShare: contactShare,
                                                     expireStartedAt: expireStartedAt,
                                                     expiresAt: expiresAt,
@@ -3291,9 +2600,7 @@ extension TSInteraction: DeepCopyable {
                                                     wasRemotelyDeleted: wasRemotelyDeleted,
                                                     errorType: errorType,
                                                     read: read,
-                                                    recipientAddress: recipientAddress,
-                                                    sender: sender,
-                                                    wasIdentityVerified: wasIdentityVerified)
+                                                    recipientAddress: recipientAddress)
         }
 
         if let modelToCopy = self as? OWSUnknownContactBlockOfferMessage {
@@ -3314,19 +2621,6 @@ extension TSInteraction: DeepCopyable {
             //
             // * Implement DeepCopyable for this type (e.g. a model).
             // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
             let contactShare: OWSContact?
             if let contactShareForCopy = modelToCopy.contactShare {
                contactShare = try DeepCopies.deepCopy(contactShareForCopy)
@@ -3394,20 +2688,6 @@ extension TSInteraction: DeepCopyable {
             } else {
                recipientAddress = nil
             }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
 
             return OWSUnknownContactBlockOfferMessage(grdbId: id,
                                                       uniqueId: uniqueId,
@@ -3417,7 +2697,6 @@ extension TSInteraction: DeepCopyable {
                                                       uniqueThreadId: uniqueThreadId,
                                                       attachmentIds: attachmentIds,
                                                       body: body,
-                                                      bodyRanges: bodyRanges,
                                                       contactShare: contactShare,
                                                       expireStartedAt: expireStartedAt,
                                                       expiresAt: expiresAt,
@@ -3431,149 +2710,7 @@ extension TSInteraction: DeepCopyable {
                                                       wasRemotelyDeleted: wasRemotelyDeleted,
                                                       errorType: errorType,
                                                       read: read,
-                                                      recipientAddress: recipientAddress,
-                                                      sender: sender,
-                                                      wasIdentityVerified: wasIdentityVerified)
-        }
-
-        if let modelToCopy = self as? OWSRecoverableDecryptionPlaceholder {
-            assert(type(of: modelToCopy) == OWSRecoverableDecryptionPlaceholder.self)
-            let uniqueId: String = modelToCopy.uniqueId
-            let receivedAtTimestamp: UInt64 = modelToCopy.receivedAtTimestamp
-            let sortId: UInt64 = modelToCopy.sortId
-            let timestamp: UInt64 = modelToCopy.timestamp
-            let uniqueThreadId: String = modelToCopy.uniqueThreadId
-            // NOTE: If this generates build errors, you made need to
-            // implement DeepCopyable for this type in DeepCopy.swift.
-            let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
-            let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let contactShare: OWSContact?
-            if let contactShareForCopy = modelToCopy.contactShare {
-               contactShare = try DeepCopies.deepCopy(contactShareForCopy)
-            } else {
-               contactShare = nil
-            }
-            let expireStartedAt: UInt64 = modelToCopy.expireStartedAt
-            let expiresAt: UInt64 = modelToCopy.expiresAt
-            let expiresInSeconds: UInt32 = modelToCopy.expiresInSeconds
-            let isViewOnceComplete: Bool = modelToCopy.isViewOnceComplete
-            let isViewOnceMessage: Bool = modelToCopy.isViewOnceMessage
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let linkPreview: OWSLinkPreview?
-            if let linkPreviewForCopy = modelToCopy.linkPreview {
-               linkPreview = try DeepCopies.deepCopy(linkPreviewForCopy)
-            } else {
-               linkPreview = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let messageSticker: MessageSticker?
-            if let messageStickerForCopy = modelToCopy.messageSticker {
-               messageSticker = try DeepCopies.deepCopy(messageStickerForCopy)
-            } else {
-               messageSticker = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let quotedMessage: TSQuotedMessage?
-            if let quotedMessageForCopy = modelToCopy.quotedMessage {
-               quotedMessage = try DeepCopies.deepCopy(quotedMessageForCopy)
-            } else {
-               quotedMessage = nil
-            }
-            let storedShouldStartExpireTimer: Bool = modelToCopy.storedShouldStartExpireTimer
-            let wasRemotelyDeleted: Bool = modelToCopy.wasRemotelyDeleted
-            let errorType: TSErrorMessageType = modelToCopy.errorType
-            let read: Bool = modelToCopy.wasRead
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let recipientAddress: SignalServiceAddress?
-            if let recipientAddressForCopy = modelToCopy.recipientAddress {
-               recipientAddress = try DeepCopies.deepCopy(recipientAddressForCopy)
-            } else {
-               recipientAddress = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
-
-            return OWSRecoverableDecryptionPlaceholder(grdbId: id,
-                                                       uniqueId: uniqueId,
-                                                       receivedAtTimestamp: receivedAtTimestamp,
-                                                       sortId: sortId,
-                                                       timestamp: timestamp,
-                                                       uniqueThreadId: uniqueThreadId,
-                                                       attachmentIds: attachmentIds,
-                                                       body: body,
-                                                       bodyRanges: bodyRanges,
-                                                       contactShare: contactShare,
-                                                       expireStartedAt: expireStartedAt,
-                                                       expiresAt: expiresAt,
-                                                       expiresInSeconds: expiresInSeconds,
-                                                       isViewOnceComplete: isViewOnceComplete,
-                                                       isViewOnceMessage: isViewOnceMessage,
-                                                       linkPreview: linkPreview,
-                                                       messageSticker: messageSticker,
-                                                       quotedMessage: quotedMessage,
-                                                       storedShouldStartExpireTimer: storedShouldStartExpireTimer,
-                                                       wasRemotelyDeleted: wasRemotelyDeleted,
-                                                       errorType: errorType,
-                                                       read: read,
-                                                       recipientAddress: recipientAddress,
-                                                       sender: sender,
-                                                       wasIdentityVerified: wasIdentityVerified)
+                                                      recipientAddress: recipientAddress)
         }
 
         if let modelToCopy = self as? TSErrorMessage {
@@ -3594,19 +2731,6 @@ extension TSInteraction: DeepCopyable {
             //
             // * Implement DeepCopyable for this type (e.g. a model).
             // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
             let contactShare: OWSContact?
             if let contactShareForCopy = modelToCopy.contactShare {
                contactShare = try DeepCopies.deepCopy(contactShareForCopy)
@@ -3674,20 +2798,6 @@ extension TSInteraction: DeepCopyable {
             } else {
                recipientAddress = nil
             }
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let sender: SignalServiceAddress?
-            if let senderForCopy = modelToCopy.sender {
-               sender = try DeepCopies.deepCopy(senderForCopy)
-            } else {
-               sender = nil
-            }
-            let wasIdentityVerified: Bool = modelToCopy.wasIdentityVerified
 
             return TSErrorMessage(grdbId: id,
                                   uniqueId: uniqueId,
@@ -3697,7 +2807,6 @@ extension TSInteraction: DeepCopyable {
                                   uniqueThreadId: uniqueThreadId,
                                   attachmentIds: attachmentIds,
                                   body: body,
-                                  bodyRanges: bodyRanges,
                                   contactShare: contactShare,
                                   expireStartedAt: expireStartedAt,
                                   expiresAt: expiresAt,
@@ -3711,9 +2820,7 @@ extension TSInteraction: DeepCopyable {
                                   wasRemotelyDeleted: wasRemotelyDeleted,
                                   errorType: errorType,
                                   read: read,
-                                  recipientAddress: recipientAddress,
-                                  sender: sender,
-                                  wasIdentityVerified: wasIdentityVerified)
+                                  recipientAddress: recipientAddress)
         }
 
         if let modelToCopy = self as? TSMessage {
@@ -3727,19 +2834,6 @@ extension TSInteraction: DeepCopyable {
             // implement DeepCopyable for this type in DeepCopy.swift.
             let attachmentIds: [String] = try DeepCopies.deepCopy(modelToCopy.attachmentIds)
             let body: String? = modelToCopy.body
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let bodyRanges: MessageBodyRanges?
-            if let bodyRangesForCopy = modelToCopy.bodyRanges {
-               bodyRanges = try DeepCopies.deepCopy(bodyRangesForCopy)
-            } else {
-               bodyRanges = nil
-            }
             // NOTE: If this generates build errors, you made need to
             // modify DeepCopy.swift to support this type.
             //
@@ -3808,7 +2902,6 @@ extension TSInteraction: DeepCopyable {
                              uniqueThreadId: uniqueThreadId,
                              attachmentIds: attachmentIds,
                              body: body,
-                             bodyRanges: bodyRanges,
                              contactShare: contactShare,
                              expireStartedAt: expireStartedAt,
                              expiresAt: expiresAt,
@@ -3830,7 +2923,6 @@ extension TSInteraction: DeepCopyable {
             let timestamp: UInt64 = modelToCopy.timestamp
             let uniqueThreadId: String = modelToCopy.uniqueThreadId
             let callType: RPRecentCallType = modelToCopy.callType
-            let offerType: TSRecentCallOfferType = modelToCopy.offerType
             let read: Bool = modelToCopy.wasRead
 
             return TSCall(grdbId: id,
@@ -3840,46 +2932,7 @@ extension TSInteraction: DeepCopyable {
                           timestamp: timestamp,
                           uniqueThreadId: uniqueThreadId,
                           callType: callType,
-                          offerType: offerType,
                           read: read)
-        }
-
-        if let modelToCopy = self as? OWSGroupCallMessage {
-            assert(type(of: modelToCopy) == OWSGroupCallMessage.self)
-            let uniqueId: String = modelToCopy.uniqueId
-            let receivedAtTimestamp: UInt64 = modelToCopy.receivedAtTimestamp
-            let sortId: UInt64 = modelToCopy.sortId
-            let timestamp: UInt64 = modelToCopy.timestamp
-            let uniqueThreadId: String = modelToCopy.uniqueThreadId
-            let creatorUuid: String? = modelToCopy.creatorUuid
-            let eraId: String? = modelToCopy.eraId
-            let hasEnded: Bool = modelToCopy.hasEnded
-            // NOTE: If this generates build errors, you made need to
-            // modify DeepCopy.swift to support this type.
-            //
-            // That might mean:
-            //
-            // * Implement DeepCopyable for this type (e.g. a model).
-            // * Modify DeepCopies.deepCopy() to support this type (e.g. a collection).
-            let joinedMemberUuids: [String]?
-            if let joinedMemberUuidsForCopy = modelToCopy.joinedMemberUuids {
-               joinedMemberUuids = try DeepCopies.deepCopy(joinedMemberUuidsForCopy)
-            } else {
-               joinedMemberUuids = nil
-            }
-            let read: Bool = modelToCopy.wasRead
-
-            return OWSGroupCallMessage(grdbId: id,
-                                       uniqueId: uniqueId,
-                                       receivedAtTimestamp: receivedAtTimestamp,
-                                       sortId: sortId,
-                                       timestamp: timestamp,
-                                       uniqueThreadId: uniqueThreadId,
-                                       creatorUuid: creatorUuid,
-                                       eraId: eraId,
-                                       hasEnded: hasEnded,
-                                       joinedMemberUuids: joinedMemberUuids,
-                                       read: read)
         }
 
         do {
@@ -3908,81 +2961,67 @@ extension TSInteractionSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var receivedAtTimestampColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "receivedAtTimestamp", columnType: .int64) }
-    static var timestampColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "timestamp", columnType: .int64) }
-    static var uniqueThreadIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueThreadId", columnType: .unicodeString) }
-    static var attachmentIdsColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "attachmentIds", columnType: .blob, isOptional: true) }
-    static var authorIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "authorId", columnType: .unicodeString, isOptional: true) }
-    static var authorPhoneNumberColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "authorPhoneNumber", columnType: .unicodeString, isOptional: true) }
-    static var authorUUIDColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "authorUUID", columnType: .unicodeString, isOptional: true) }
-    static var bodyColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "body", columnType: .unicodeString, isOptional: true) }
-    static var callTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "callType", columnType: .int, isOptional: true) }
-    static var configurationDurationSecondsColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "configurationDurationSeconds", columnType: .int64, isOptional: true) }
-    static var configurationIsEnabledColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "configurationIsEnabled", columnType: .int, isOptional: true) }
-    static var contactShareColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "contactShare", columnType: .blob, isOptional: true) }
-    static var createdByRemoteNameColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "createdByRemoteName", columnType: .unicodeString, isOptional: true) }
-    static var createdInExistingGroupColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "createdInExistingGroup", columnType: .int, isOptional: true) }
-    static var customMessageColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "customMessage", columnType: .unicodeString, isOptional: true) }
-    static var envelopeDataColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "envelopeData", columnType: .blob, isOptional: true) }
-    static var errorTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "errorType", columnType: .int, isOptional: true) }
-    static var expireStartedAtColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "expireStartedAt", columnType: .int64, isOptional: true) }
-    static var expiresAtColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "expiresAt", columnType: .int64, isOptional: true) }
-    static var expiresInSecondsColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "expiresInSeconds", columnType: .int64, isOptional: true) }
-    static var groupMetaMessageColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "groupMetaMessage", columnType: .int, isOptional: true) }
-    static var hasLegacyMessageStateColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "hasLegacyMessageState", columnType: .int, isOptional: true) }
-    static var hasSyncedTranscriptColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "hasSyncedTranscript", columnType: .int, isOptional: true) }
-    static var isFromLinkedDeviceColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isFromLinkedDevice", columnType: .int, isOptional: true) }
-    static var isLocalChangeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isLocalChange", columnType: .int, isOptional: true) }
-    static var isViewOnceCompleteColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isViewOnceComplete", columnType: .int, isOptional: true) }
-    static var isViewOnceMessageColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isViewOnceMessage", columnType: .int, isOptional: true) }
-    static var isVoiceMessageColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "isVoiceMessage", columnType: .int, isOptional: true) }
-    static var legacyMessageStateColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "legacyMessageState", columnType: .int, isOptional: true) }
-    static var legacyWasDeliveredColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "legacyWasDelivered", columnType: .int, isOptional: true) }
-    static var linkPreviewColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "linkPreview", columnType: .blob, isOptional: true) }
-    static var messageIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "messageId", columnType: .unicodeString, isOptional: true) }
-    static var messageStickerColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "messageSticker", columnType: .blob, isOptional: true) }
-    static var messageTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "messageType", columnType: .int, isOptional: true) }
-    static var mostRecentFailureTextColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "mostRecentFailureText", columnType: .unicodeString, isOptional: true) }
-    static var preKeyBundleColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "preKeyBundle", columnType: .blob, isOptional: true) }
-    static var protocolVersionColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "protocolVersion", columnType: .int64, isOptional: true) }
-    static var quotedMessageColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "quotedMessage", columnType: .blob, isOptional: true) }
-    static var readColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "read", columnType: .int, isOptional: true) }
-    static var recipientAddressColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientAddress", columnType: .blob, isOptional: true) }
-    static var recipientAddressStatesColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientAddressStates", columnType: .blob, isOptional: true) }
-    static var senderColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "sender", columnType: .blob, isOptional: true) }
-    static var serverTimestampColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "serverTimestamp", columnType: .int64, isOptional: true) }
-    static var sourceDeviceIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "sourceDeviceId", columnType: .int64, isOptional: true) }
-    static var storedMessageStateColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "storedMessageState", columnType: .int, isOptional: true) }
-    static var storedShouldStartExpireTimerColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "storedShouldStartExpireTimer", columnType: .int, isOptional: true) }
-    static var unregisteredAddressColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "unregisteredAddress", columnType: .blob, isOptional: true) }
-    static var verificationStateColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "verificationState", columnType: .int, isOptional: true) }
-    static var wasReceivedByUDColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "wasReceivedByUD", columnType: .int, isOptional: true) }
-    static var infoMessageUserInfoColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "infoMessageUserInfo", columnType: .blob, isOptional: true) }
-    static var wasRemotelyDeletedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "wasRemotelyDeleted", columnType: .int, isOptional: true) }
-    static var bodyRangesColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "bodyRanges", columnType: .blob, isOptional: true) }
-    static var offerTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "offerType", columnType: .int, isOptional: true) }
-    static var serverDeliveryTimestampColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "serverDeliveryTimestamp", columnType: .int64, isOptional: true) }
-    static var eraIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "eraId", columnType: .unicodeString, isOptional: true) }
-    static var hasEndedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "hasEnded", columnType: .int, isOptional: true) }
-    static var creatorUuidColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "creatorUuid", columnType: .unicodeString, isOptional: true) }
-    static var joinedMemberUuidsColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "joinedMemberUuids", columnType: .blob, isOptional: true) }
-    static var wasIdentityVerifiedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "wasIdentityVerified", columnType: .int, isOptional: true) }
-    static var paymentCancellationColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "paymentCancellation", columnType: .blob, isOptional: true) }
-    static var paymentNotificationColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "paymentNotification", columnType: .blob, isOptional: true) }
-    static var paymentRequestColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "paymentRequest", columnType: .blob, isOptional: true) }
-    static var viewedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "viewed", columnType: .int, isOptional: true) }
-    static var serverGuidColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "serverGuid", columnType: .unicodeString, isOptional: true) }
+    static let receivedAtTimestampColumn = SDSColumnMetadata(columnName: "receivedAtTimestamp", columnType: .int64)
+    static let timestampColumn = SDSColumnMetadata(columnName: "timestamp", columnType: .int64)
+    static let uniqueThreadIdColumn = SDSColumnMetadata(columnName: "uniqueThreadId", columnType: .unicodeString)
+    static let attachmentIdsColumn = SDSColumnMetadata(columnName: "attachmentIds", columnType: .blob, isOptional: true)
+    static let authorIdColumn = SDSColumnMetadata(columnName: "authorId", columnType: .unicodeString, isOptional: true)
+    static let authorPhoneNumberColumn = SDSColumnMetadata(columnName: "authorPhoneNumber", columnType: .unicodeString, isOptional: true)
+    static let authorUUIDColumn = SDSColumnMetadata(columnName: "authorUUID", columnType: .unicodeString, isOptional: true)
+    static let bodyColumn = SDSColumnMetadata(columnName: "body", columnType: .unicodeString, isOptional: true)
+    static let callTypeColumn = SDSColumnMetadata(columnName: "callType", columnType: .int, isOptional: true)
+    static let configurationDurationSecondsColumn = SDSColumnMetadata(columnName: "configurationDurationSeconds", columnType: .int64, isOptional: true)
+    static let configurationIsEnabledColumn = SDSColumnMetadata(columnName: "configurationIsEnabled", columnType: .int, isOptional: true)
+    static let contactShareColumn = SDSColumnMetadata(columnName: "contactShare", columnType: .blob, isOptional: true)
+    static let createdByRemoteNameColumn = SDSColumnMetadata(columnName: "createdByRemoteName", columnType: .unicodeString, isOptional: true)
+    static let createdInExistingGroupColumn = SDSColumnMetadata(columnName: "createdInExistingGroup", columnType: .int, isOptional: true)
+    static let customMessageColumn = SDSColumnMetadata(columnName: "customMessage", columnType: .unicodeString, isOptional: true)
+    static let envelopeDataColumn = SDSColumnMetadata(columnName: "envelopeData", columnType: .blob, isOptional: true)
+    static let errorTypeColumn = SDSColumnMetadata(columnName: "errorType", columnType: .int, isOptional: true)
+    static let expireStartedAtColumn = SDSColumnMetadata(columnName: "expireStartedAt", columnType: .int64, isOptional: true)
+    static let expiresAtColumn = SDSColumnMetadata(columnName: "expiresAt", columnType: .int64, isOptional: true)
+    static let expiresInSecondsColumn = SDSColumnMetadata(columnName: "expiresInSeconds", columnType: .int64, isOptional: true)
+    static let groupMetaMessageColumn = SDSColumnMetadata(columnName: "groupMetaMessage", columnType: .int, isOptional: true)
+    static let hasLegacyMessageStateColumn = SDSColumnMetadata(columnName: "hasLegacyMessageState", columnType: .int, isOptional: true)
+    static let hasSyncedTranscriptColumn = SDSColumnMetadata(columnName: "hasSyncedTranscript", columnType: .int, isOptional: true)
+    static let isFromLinkedDeviceColumn = SDSColumnMetadata(columnName: "isFromLinkedDevice", columnType: .int, isOptional: true)
+    static let isLocalChangeColumn = SDSColumnMetadata(columnName: "isLocalChange", columnType: .int, isOptional: true)
+    static let isViewOnceCompleteColumn = SDSColumnMetadata(columnName: "isViewOnceComplete", columnType: .int, isOptional: true)
+    static let isViewOnceMessageColumn = SDSColumnMetadata(columnName: "isViewOnceMessage", columnType: .int, isOptional: true)
+    static let isVoiceMessageColumn = SDSColumnMetadata(columnName: "isVoiceMessage", columnType: .int, isOptional: true)
+    static let legacyMessageStateColumn = SDSColumnMetadata(columnName: "legacyMessageState", columnType: .int, isOptional: true)
+    static let legacyWasDeliveredColumn = SDSColumnMetadata(columnName: "legacyWasDelivered", columnType: .int, isOptional: true)
+    static let linkPreviewColumn = SDSColumnMetadata(columnName: "linkPreview", columnType: .blob, isOptional: true)
+    static let messageIdColumn = SDSColumnMetadata(columnName: "messageId", columnType: .unicodeString, isOptional: true)
+    static let messageStickerColumn = SDSColumnMetadata(columnName: "messageSticker", columnType: .blob, isOptional: true)
+    static let messageTypeColumn = SDSColumnMetadata(columnName: "messageType", columnType: .int, isOptional: true)
+    static let mostRecentFailureTextColumn = SDSColumnMetadata(columnName: "mostRecentFailureText", columnType: .unicodeString, isOptional: true)
+    static let preKeyBundleColumn = SDSColumnMetadata(columnName: "preKeyBundle", columnType: .blob, isOptional: true)
+    static let protocolVersionColumn = SDSColumnMetadata(columnName: "protocolVersion", columnType: .int64, isOptional: true)
+    static let quotedMessageColumn = SDSColumnMetadata(columnName: "quotedMessage", columnType: .blob, isOptional: true)
+    static let readColumn = SDSColumnMetadata(columnName: "read", columnType: .int, isOptional: true)
+    static let recipientAddressColumn = SDSColumnMetadata(columnName: "recipientAddress", columnType: .blob, isOptional: true)
+    static let recipientAddressStatesColumn = SDSColumnMetadata(columnName: "recipientAddressStates", columnType: .blob, isOptional: true)
+    static let senderColumn = SDSColumnMetadata(columnName: "sender", columnType: .blob, isOptional: true)
+    static let serverTimestampColumn = SDSColumnMetadata(columnName: "serverTimestamp", columnType: .int64, isOptional: true)
+    static let sourceDeviceIdColumn = SDSColumnMetadata(columnName: "sourceDeviceId", columnType: .int64, isOptional: true)
+    static let storedMessageStateColumn = SDSColumnMetadata(columnName: "storedMessageState", columnType: .int, isOptional: true)
+    static let storedShouldStartExpireTimerColumn = SDSColumnMetadata(columnName: "storedShouldStartExpireTimer", columnType: .int, isOptional: true)
+    static let unregisteredAddressColumn = SDSColumnMetadata(columnName: "unregisteredAddress", columnType: .blob, isOptional: true)
+    static let verificationStateColumn = SDSColumnMetadata(columnName: "verificationState", columnType: .int, isOptional: true)
+    static let wasReceivedByUDColumn = SDSColumnMetadata(columnName: "wasReceivedByUD", columnType: .int, isOptional: true)
+    static let infoMessageUserInfoColumn = SDSColumnMetadata(columnName: "infoMessageUserInfo", columnType: .blob, isOptional: true)
+    static let wasRemotelyDeletedColumn = SDSColumnMetadata(columnName: "wasRemotelyDeleted", columnType: .int, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: TSInteraction.collection(),
-                         tableName: "model_TSInteraction",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: TSInteraction.collection(),
+                                               tableName: "model_TSInteraction",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
@@ -4037,21 +3076,7 @@ extension TSInteractionSerializer {
         wasReceivedByUDColumn,
         infoMessageUserInfoColumn,
         wasRemotelyDeletedColumn,
-        bodyRangesColumn,
-        offerTypeColumn,
-        serverDeliveryTimestampColumn,
-        eraIdColumn,
-        hasEndedColumn,
-        creatorUuidColumn,
-        joinedMemberUuidsColumn,
-        wasIdentityVerifiedColumn,
-        paymentCancellationColumn,
-        paymentNotificationColumn,
-        paymentRequestColumn,
-        viewedColumn,
-        serverGuidColumn
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -4176,7 +3201,7 @@ public class TSInteractionCursor: NSObject {
             return nil
         }
         let value = try TSInteraction.fromRecord(record)
-        Self.modelReadCaches.interactionReadCache.didReadInteraction(value, transaction: transaction.asAnyRead)
+        SSKEnvironment.shared.modelReadCaches.interactionReadCache.didReadInteraction(value, transaction: transaction.asAnyRead)
         return value
     }
 
@@ -4230,11 +3255,13 @@ public extension TSInteraction {
         assert(uniqueId.count > 0)
 
         if !ignoreCache,
-            let cachedCopy = Self.modelReadCaches.interactionReadCache.getInteraction(uniqueId: uniqueId, transaction: transaction) {
+            let cachedCopy = SSKEnvironment.shared.modelReadCaches.interactionReadCache.getInteraction(uniqueId: uniqueId, transaction: transaction) {
             return cachedCopy
         }
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return TSInteraction.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(InteractionRecord.databaseTableName) WHERE \(interactionColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -4265,20 +3292,28 @@ public extension TSInteraction {
                             batchSize: UInt,
                             block: @escaping (TSInteraction, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            TSInteraction.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? TSInteraction else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = TSInteraction.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = TSInteraction.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -4306,6 +3341,10 @@ public extension TSInteraction {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: TSInteraction.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -4337,6 +3376,8 @@ public extension TSInteraction {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: TSInteraction.collection())
         case .grdbRead(let grdbTransaction):
             return InteractionRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -4346,6 +3387,8 @@ public extension TSInteraction {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: TSInteraction.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try InteractionRecord.deleteAll(grdbTransaction.database)
@@ -4365,20 +3408,24 @@ public extension TSInteraction {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -4390,6 +3437,8 @@ public extension TSInteraction {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: TSInteraction.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(InteractionRecord.databaseTableName) WHERE \(interactionColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -4409,7 +3458,7 @@ public extension TSInteraction {
             let cursor = try InteractionRecord.fetchCursor(transaction.database, sqlRequest)
             return TSInteractionCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return TSInteractionCursor(transaction: transaction, cursor: nil)
         }
@@ -4427,7 +3476,7 @@ public extension TSInteraction {
             }
 
             let value = try TSInteraction.fromRecord(record)
-            Self.modelReadCaches.interactionReadCache.didReadInteraction(value, transaction: transaction.asAnyRead)
+            SSKEnvironment.shared.modelReadCaches.interactionReadCache.didReadInteraction(value, transaction: transaction.asAnyRead)
             return value
         } catch {
             owsFailDebug("error: \(error)")
@@ -4507,21 +3556,8 @@ class TSInteractionSerializer: SDSSerializer {
         let wasReceivedByUD: Bool? = nil
         let infoMessageUserInfo: Data? = nil
         let wasRemotelyDeleted: Bool? = nil
-        let bodyRanges: Data? = nil
-        let offerType: TSRecentCallOfferType? = nil
-        let serverDeliveryTimestamp: UInt64? = nil
-        let eraId: String? = nil
-        let hasEnded: Bool? = nil
-        let creatorUuid: String? = nil
-        let joinedMemberUuids: Data? = nil
-        let wasIdentityVerified: Bool? = nil
-        let paymentCancellation: Data? = nil
-        let paymentNotification: Data? = nil
-        let paymentRequest: Data? = nil
-        let viewed: Bool? = nil
-        let serverGuid: String? = nil
 
-        return InteractionRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, receivedAtTimestamp: receivedAtTimestamp, timestamp: timestamp, threadUniqueId: threadUniqueId, attachmentIds: attachmentIds, authorId: authorId, authorPhoneNumber: authorPhoneNumber, authorUUID: authorUUID, body: body, callType: callType, configurationDurationSeconds: configurationDurationSeconds, configurationIsEnabled: configurationIsEnabled, contactShare: contactShare, createdByRemoteName: createdByRemoteName, createdInExistingGroup: createdInExistingGroup, customMessage: customMessage, envelopeData: envelopeData, errorType: errorType, expireStartedAt: expireStartedAt, expiresAt: expiresAt, expiresInSeconds: expiresInSeconds, groupMetaMessage: groupMetaMessage, hasLegacyMessageState: hasLegacyMessageState, hasSyncedTranscript: hasSyncedTranscript, isFromLinkedDevice: isFromLinkedDevice, isLocalChange: isLocalChange, isViewOnceComplete: isViewOnceComplete, isViewOnceMessage: isViewOnceMessage, isVoiceMessage: isVoiceMessage, legacyMessageState: legacyMessageState, legacyWasDelivered: legacyWasDelivered, linkPreview: linkPreview, messageId: messageId, messageSticker: messageSticker, messageType: messageType, mostRecentFailureText: mostRecentFailureText, preKeyBundle: preKeyBundle, protocolVersion: protocolVersion, quotedMessage: quotedMessage, read: read, recipientAddress: recipientAddress, recipientAddressStates: recipientAddressStates, sender: sender, serverTimestamp: serverTimestamp, sourceDeviceId: sourceDeviceId, storedMessageState: storedMessageState, storedShouldStartExpireTimer: storedShouldStartExpireTimer, unregisteredAddress: unregisteredAddress, verificationState: verificationState, wasReceivedByUD: wasReceivedByUD, infoMessageUserInfo: infoMessageUserInfo, wasRemotelyDeleted: wasRemotelyDeleted, bodyRanges: bodyRanges, offerType: offerType, serverDeliveryTimestamp: serverDeliveryTimestamp, eraId: eraId, hasEnded: hasEnded, creatorUuid: creatorUuid, joinedMemberUuids: joinedMemberUuids, wasIdentityVerified: wasIdentityVerified, paymentCancellation: paymentCancellation, paymentNotification: paymentNotification, paymentRequest: paymentRequest, viewed: viewed, serverGuid: serverGuid)
+        return InteractionRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, receivedAtTimestamp: receivedAtTimestamp, timestamp: timestamp, threadUniqueId: threadUniqueId, attachmentIds: attachmentIds, authorId: authorId, authorPhoneNumber: authorPhoneNumber, authorUUID: authorUUID, body: body, callType: callType, configurationDurationSeconds: configurationDurationSeconds, configurationIsEnabled: configurationIsEnabled, contactShare: contactShare, createdByRemoteName: createdByRemoteName, createdInExistingGroup: createdInExistingGroup, customMessage: customMessage, envelopeData: envelopeData, errorType: errorType, expireStartedAt: expireStartedAt, expiresAt: expiresAt, expiresInSeconds: expiresInSeconds, groupMetaMessage: groupMetaMessage, hasLegacyMessageState: hasLegacyMessageState, hasSyncedTranscript: hasSyncedTranscript, isFromLinkedDevice: isFromLinkedDevice, isLocalChange: isLocalChange, isViewOnceComplete: isViewOnceComplete, isViewOnceMessage: isViewOnceMessage, isVoiceMessage: isVoiceMessage, legacyMessageState: legacyMessageState, legacyWasDelivered: legacyWasDelivered, linkPreview: linkPreview, messageId: messageId, messageSticker: messageSticker, messageType: messageType, mostRecentFailureText: mostRecentFailureText, preKeyBundle: preKeyBundle, protocolVersion: protocolVersion, quotedMessage: quotedMessage, read: read, recipientAddress: recipientAddress, recipientAddressStates: recipientAddressStates, sender: sender, serverTimestamp: serverTimestamp, sourceDeviceId: sourceDeviceId, storedMessageState: storedMessageState, storedShouldStartExpireTimer: storedShouldStartExpireTimer, unregisteredAddress: unregisteredAddress, verificationState: verificationState, wasReceivedByUD: wasReceivedByUD, infoMessageUserInfo: infoMessageUserInfo, wasRemotelyDeleted: wasRemotelyDeleted)
     }
 }
 
@@ -4541,3 +3577,4 @@ public extension TSInteraction {
     }
 }
 #endif
+                                                                                   

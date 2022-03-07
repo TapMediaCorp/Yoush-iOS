@@ -1,14 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 import SignalMetadataKit
 import ZKGroup
 
 public class GroupsV2Protos {
-
     private init() {}
 
     // MARK: -
@@ -33,11 +33,12 @@ public class GroupsV2Protos {
     public class func buildMemberProto(profileKeyCredential: ProfileKeyCredential,
                                        role: GroupsProtoMemberRole,
                                        groupV2Params: GroupV2Params) throws -> GroupsProtoMember {
-        var builder = GroupsProtoMember.builder()
+        let builder = GroupsProtoMember.builder()
         builder.setRole(role)
         let presentationData = try self.presentationData(profileKeyCredential: profileKeyCredential,
                                                          groupV2Params: groupV2Params)
         builder.setPresentation(presentationData)
+
         return try builder.build()
     }
 
@@ -45,28 +46,14 @@ public class GroupsV2Protos {
                                               role: GroupsProtoMemberRole,
                                               localUuid: UUID,
                                               groupV2Params: GroupV2Params) throws -> GroupsProtoPendingMember {
-        var builder = GroupsProtoPendingMember.builder()
+        let builder = GroupsProtoPendingMember.builder()
 
-        var memberBuilder = GroupsProtoMember.builder()
+        let memberBuilder = GroupsProtoMember.builder()
         memberBuilder.setRole(role)
         let userId = try groupV2Params.userId(forUuid: uuid)
-        if DebugFlags.groupsV2corruptInvites.get() {
-            let corruptUserId = Randomness.generateRandomBytes(Int32(userId.count))
-            memberBuilder.setUserID(corruptUserId)
-        } else {
-            memberBuilder.setUserID(userId)
-        }
+        memberBuilder.setUserID(userId)
         builder.setMember(try memberBuilder.build())
 
-        return try builder.build()
-    }
-
-    public class func buildRequestingMemberProto(profileKeyCredential: ProfileKeyCredential,
-                                                 groupV2Params: GroupV2Params) throws -> GroupsProtoRequestingMember {
-        var builder = GroupsProtoRequestingMember.builder()
-        let presentationData = try self.presentationData(profileKeyCredential: profileKeyCredential,
-                                                         groupV2Params: groupV2Params)
-        builder.setPresentation(presentationData)
         return try builder.build()
     }
 
@@ -83,7 +70,6 @@ public class GroupsV2Protos {
     public typealias ProfileKeyCredentialMap = [UUID: ProfileKeyCredential]
 
     public class func buildNewGroupProto(groupModel: TSGroupModelV2,
-                                         disappearingMessageToken: DisappearingMessageToken,
                                          groupV2Params: GroupV2Params,
                                          profileKeyCredentialMap: ProfileKeyCredentialMap,
                                          localUuid: UUID) throws -> GroupsProtoGroup {
@@ -94,21 +80,12 @@ public class GroupsV2Protos {
         }
         // Collect credentials for all members except self.
 
-        var groupBuilder = GroupsProtoGroup.builder()
+        let groupBuilder = GroupsProtoGroup.builder()
         let initialRevision: UInt32 = 0
         groupBuilder.setRevision(initialRevision)
         groupBuilder.setPublicKey(groupV2Params.groupPublicParamsData)
         // GroupsV2 TODO: Will production implementation of encryptString() pad?
-
-        let groupTitle = groupModel.groupName?.ows_stripped() ?? " "
-        let groupTitleEncrypted = try groupV2Params.encryptGroupName(groupTitle)
-        guard groupTitle.glyphCount <= GroupManager.maxGroupNameGlyphCount else {
-            throw OWSAssertionError("groupTitle is too long.")
-        }
-        guard groupTitleEncrypted.count <= GroupManager.maxGroupNameEncryptedByteCount else {
-            throw OWSAssertionError("Encrypted groupTitle is too long.")
-        }
-        groupBuilder.setTitle(groupTitleEncrypted)
+        groupBuilder.setTitle(try groupV2Params.encryptGroupName(groupModel.groupName?.stripped ?? " "))
 
         let hasAvatarUrl = groupModel.avatarUrlPath != nil
         let hasAvatarData = groupModel.groupAvatarData != nil
@@ -119,20 +96,16 @@ public class GroupsV2Protos {
             groupBuilder.setAvatar(avatarUrl)
         }
 
-        let groupAccess = groupModel.access
-        groupBuilder.setAccessControl(try buildAccessProto(groupAccess: groupAccess))
-
-        if let inviteLinkPassword = groupModel.inviteLinkPassword,
-            !inviteLinkPassword.isEmpty {
-                groupBuilder.setInviteLinkPassword(inviteLinkPassword)
-        }
+        groupBuilder.setAccessControl(try buildAccessProto(groupAccess: groupModel.access))
 
         // * You will be member 0 and the only admin.
         // * Other members will be non-admin members.
         //
         // Add local user first to ensure that they are user 0.
         let groupMembership = groupModel.groupMembership
-        assert(groupMembership.isFullMemberAndAdministrator(localUuid))
+        let localAddress = SignalServiceAddress(uuid: localUuid)
+        assert(groupMembership.isAdministrator(localAddress))
+        assert(!groupMembership.isPending(localAddress))
         groupBuilder.addMembers(try buildMemberProto(profileKeyCredential: localProfileKeyCredential,
                                                      role: .administrator,
                                                      groupV2Params: groupV2Params))
@@ -140,24 +113,25 @@ public class GroupsV2Protos {
             guard uuid != localUuid else {
                 continue
             }
-            let isInvited = groupMembership.isInvitedMember(uuid)
-            guard !isInvited else {
+            let address = SignalServiceAddress(uuid: uuid)
+            let isAdministrator = groupMembership.isAdministrator(address)
+            let isPending = groupMembership.isPending(address)
+            let role: GroupsProtoMemberRole = isAdministrator ? .administrator : .`default`
+            guard !isPending else {
                 continue
             }
-            let isAdministrator = groupMembership.isFullMemberAndAdministrator(uuid)
-            let role: GroupsProtoMemberRole = isAdministrator ? .administrator : .`default`
             groupBuilder.addMembers(try buildMemberProto(profileKeyCredential: profileKeyCredential,
                                                          role: role,
                                                          groupV2Params: groupV2Params))
         }
-        for address in groupMembership.invitedMembers {
+        for address in groupMembership.pendingMembers {
             guard let uuid = address.uuid else {
                 throw OWSAssertionError("Missing uuid.")
             }
             guard uuid != localUuid else {
                 continue
             }
-            let isAdministrator = groupMembership.isFullOrInvitedAdministrator(uuid)
+            let isAdministrator = groupMembership.isAdministrator(address)
             let role: GroupsProtoMemberRole = isAdministrator ? .administrator : .`default`
             groupBuilder.addPendingMembers(try buildPendingMemberProto(uuid: uuid,
                                                                        role: role,
@@ -165,33 +139,13 @@ public class GroupsV2Protos {
                                                                        groupV2Params: groupV2Params))
         }
 
-        let encryptedTimerData = try groupV2Params.encryptDisappearingMessagesTimer(disappearingMessageToken)
-        groupBuilder.setDisappearingMessagesTimer(encryptedTimerData)
-
-        validateInviteLinkState(inviteLinkPassword: groupModel.inviteLinkPassword, groupAccess: groupAccess)
-
-        groupBuilder.setAnnouncementsOnly(groupModel.isAnnouncementsOnly)
-
         return try groupBuilder.build()
     }
 
-    public class func validateInviteLinkState(inviteLinkPassword: Data?, groupAccess: GroupAccess) {
-        let canJoinFromInviteLink = groupAccess.canJoinFromInviteLink
-        let hasInviteLinkPassword = inviteLinkPassword?.count ?? 0 > 0
-        if canJoinFromInviteLink, !hasInviteLinkPassword {
-            owsFailDebug("Invite links enabled without inviteLinkPassword.")
-        } else if !canJoinFromInviteLink, hasInviteLinkPassword {
-            // We don't clear the password when disabling invite links,
-            // so that the link doesn't change if it is re-enabled.
-            Logger.verbose("inviteLinkPassword set but invite links not enabled.")
-        }
-    }
-
     public class func buildAccessProto(groupAccess: GroupAccess) throws -> GroupsProtoAccessControl {
-        var builder = GroupsProtoAccessControl.builder()
-        builder.setAttributes(groupAccess.attributes.protoAccess)
-        builder.setMembers(groupAccess.members.protoAccess)
-        builder.setAddFromInviteLink(groupAccess.addFromInviteLink.protoAccess)
+        let builder = GroupsProtoAccessControl.builder()
+        builder.setAttributes(GroupAccess.protoAccess(forGroupV2Access: groupAccess.attributes))
+        builder.setMembers(GroupAccess.protoAccess(forGroupV2Access: groupAccess.members))
         return try builder.build()
     }
 
@@ -216,7 +170,6 @@ public class GroupsV2Protos {
                 assert(changeActionsProtoData.count > 0)
                 builder.setGroupChange(changeActionsProtoData)
             } else {
-                // This isn't necessarily a bug, but it should be rare.
                 owsFailDebug("Discarding oversize group change proto.")
             }
         }
@@ -229,7 +182,7 @@ public class GroupsV2Protos {
     // This method throws if verification fails.
     public class func parseAndVerifyChangeActionsProto(_ changeProtoData: Data,
                                                        ignoreSignature: Bool) throws -> GroupsProtoGroupChangeActions {
-        let changeProto = try GroupsProtoGroupChange(serializedData: changeProtoData)
+        let changeProto = try GroupsProtoGroupChange.parseData(changeProtoData)
         guard changeProto.hasChangeEpoch,
             changeProto.changeEpoch <= GroupManager.changeProtoEpoch else {
             throw OWSAssertionError("Invalid embedded change proto epoch: \(changeProto.changeEpoch).")
@@ -253,7 +206,7 @@ public class GroupsV2Protos {
             try serverPublicParams.verifySignature(message: [UInt8](changeActionsProtoData),
                                                    notarySignature: serverSignature)
         }
-        let changeActionsProto = try GroupsProtoGroupChangeActions(serializedData: changeActionsProtoData)
+        let changeActionsProto = try GroupsProtoGroupChangeActions.parseData(changeActionsProtoData)
         return changeActionsProto
     }
 
@@ -264,7 +217,6 @@ public class GroupsV2Protos {
                             groupV2Params: GroupV2Params) throws -> GroupV2Snapshot {
 
         let title = groupV2Params.decryptGroupName(groupProto.title) ?? ""
-        let descriptionText = groupV2Params.decryptGroupDescription(groupProto.descriptionBytes)
 
         var avatarUrlPath: String?
         var avatarData: Data?
@@ -285,28 +237,23 @@ public class GroupsV2Protos {
         // After parsing, we should fill in profileKeys in the profile manager.
         var profileKeys = [UUID: Data]()
 
-        var groupMembershipBuilder = GroupMembership.Builder()
-
+        var members = [GroupV2SnapshotImpl.Member]()
         for memberProto in groupProto.members {
             guard let userID = memberProto.userID else {
                 throw OWSAssertionError("Group member missing userID.")
             }
-            guard memberProto.hasRole,
-                let protoRole = memberProto.role,
-                let role = TSGroupMemberRole.role(for: protoRole) else {
-                    throw OWSAssertionError("Group member missing role.")
+            guard memberProto.hasRole, let role = memberProto.role else {
+                throw OWSAssertionError("Group member missing role.")
             }
 
             // Some userIds/uuidCiphertexts can be validated by
             // the service. This is one.
             let uuid = try groupV2Params.uuid(forUserId: userID)
 
-            let address = SignalServiceAddress(uuid: uuid)
-            guard !groupMembershipBuilder.hasMemberOfAnyKind(address) else {
-                owsFailDebug("Duplicate user in group: \(address)")
-                continue
-            }
-            groupMembershipBuilder.addFullMember(address, role: role, didJoinFromInviteLink: false)
+            let member = GroupV2SnapshotImpl.Member(userID: userID,
+                                                    uuid: uuid,
+                                                    role: role)
+            members.append(member)
 
             guard let profileKeyCiphertextData = memberProto.profileKey else {
                 throw OWSAssertionError("Group member missing profileKeyCiphertextData.")
@@ -317,6 +264,7 @@ public class GroupsV2Protos {
             profileKeys[uuid] = profileKey
         }
 
+        var pendingMembers = [GroupV2SnapshotImpl.PendingMember]()
         for pendingMemberProto in groupProto.pendingMembers {
             guard let memberProto = pendingMemberProto.member else {
                 throw OWSAssertionError("Group pending member missing memberProto.")
@@ -324,13 +272,15 @@ public class GroupsV2Protos {
             guard let userId = memberProto.userID else {
                 throw OWSAssertionError("Group pending member missing userID.")
             }
+            guard pendingMemberProto.hasTimestamp else {
+                throw OWSAssertionError("Group pending member missing timestamp.")
+            }
             guard let addedByUserId = pendingMemberProto.addedByUserID else {
                 throw OWSAssertionError("Group pending member missing addedByUserID.")
             }
-            guard memberProto.hasRole,
-                let protoRole = memberProto.role,
-                let role = TSGroupMemberRole.role(for: protoRole) else {
-                    throw OWSAssertionError("Group member missing role.")
+            let timestamp = pendingMemberProto.timestamp
+            guard memberProto.hasRole, let role = memberProto.role else {
+                throw OWSAssertionError("Group member missing role.")
             }
 
             // Some userIds/uuidCiphertexts can be validated by
@@ -344,58 +294,16 @@ public class GroupsV2Protos {
             do {
                 uuid = try groupV2Params.uuid(forUserId: userId)
             } catch {
-                guard !groupMembershipBuilder.hasInvalidInvite(userId: userId) else {
-                    owsFailDebug("Duplicate invalid invite in group: \(userId)")
-                    continue
-                }
-                groupMembershipBuilder.addInvalidInvite(userId: userId, addedByUserId: addedByUserId)
-                if DebugFlags.groupsV2ignoreCorruptInvites {
-                    Logger.warn("Error parsing uuid: \(error)")
-                } else {
-                    owsFailDebug("Error parsing uuid: \(error)")
-                }
+                owsFailDebug("Error parsing uuid: \(error)")
                 continue
             }
-            let address = SignalServiceAddress(uuid: uuid)
-            guard !groupMembershipBuilder.hasMemberOfAnyKind(address) else {
-                owsFailDebug("Duplicate user in group: \(address)")
-                continue
-            }
-            groupMembershipBuilder.addInvitedMember(address, role: role, addedByUuid: addedByUuid)
+            let pendingMember = GroupV2SnapshotImpl.PendingMember(userID: userId,
+                                                                  uuid: uuid,
+                                                                  timestamp: timestamp,
+                                                                  role: role,
+                                                                  addedByUuid: addedByUuid)
+            pendingMembers.append(pendingMember)
         }
-
-        for requestingMemberProto in groupProto.requestingMembers {
-            guard let userId = requestingMemberProto.userID else {
-                throw OWSAssertionError("Group requesting member missing userID.")
-            }
-
-            // Some userIds/uuidCiphertexts can be validated by
-            // the service. This is one.
-            let uuid = try groupV2Params.uuid(forUserId: userId)
-
-            let address = SignalServiceAddress(uuid: uuid)
-            guard !groupMembershipBuilder.hasMemberOfAnyKind(address) else {
-                owsFailDebug("Duplicate user in group: \(address)")
-                continue
-            }
-            groupMembershipBuilder.addRequestingMember(address)
-
-            guard let profileKeyCiphertextData = requestingMemberProto.profileKey else {
-                throw OWSAssertionError("Group member missing profileKeyCiphertextData.")
-            }
-            let profileKeyCiphertext = try ProfileKeyCiphertext(contents: [UInt8](profileKeyCiphertextData))
-            let profileKey = try groupV2Params.profileKey(forProfileKeyCiphertext: profileKeyCiphertext,
-                                                          uuid: uuid)
-            profileKeys[uuid] = profileKey
-        }
-
-        let groupMembership = groupMembershipBuilder.build()
-
-        let inviteLinkPassword = groupProto.inviteLinkPassword
-
-        let isAnnouncementsOnly = (groupProto.hasAnnouncementsOnly
-                                    ? groupProto.announcementsOnly
-                                    : false)
 
         guard let accessControl = groupProto.accessControl else {
             throw OWSAssertionError("Missing accessControl.")
@@ -406,19 +314,10 @@ public class GroupsV2Protos {
         guard let accessControlForMembers = accessControl.members else {
             throw OWSAssertionError("Missing accessControl.members.")
         }
-        // If group state does not have "invite link" access specified,
-        // assume invite links are disabled.
-        let accessControlForAddFromInviteLink = accessControl.addFromInviteLink ?? .unsatisfiable
 
         // If the timer blob is not populated or has zero duration,
         // disappearing messages should be disabled.
         let disappearingMessageToken = groupV2Params.decryptDisappearingMessagesTimer(groupProto.disappearingMessagesTimer)
-
-        let groupAccess = GroupAccess(members: GroupV2Access.access(forProtoAccess: accessControlForMembers),
-                                      attributes: GroupV2Access.access(forProtoAccess: accessControlForAttributes),
-                                      addFromInviteLink: GroupV2Access.access(forProtoAccess: accessControlForAddFromInviteLink))
-
-        validateInviteLinkState(inviteLinkPassword: inviteLinkPassword, groupAccess: groupAccess)
 
         let revision = groupProto.revision
         let groupSecretParamsData = groupV2Params.groupSecretParamsData
@@ -426,60 +325,14 @@ public class GroupsV2Protos {
                                    groupProto: groupProto,
                                    revision: revision,
                                    title: title,
-                                   descriptionText: descriptionText,
                                    avatarUrlPath: avatarUrlPath,
                                    avatarData: avatarData,
-                                   groupMembership: groupMembership,
-                                   groupAccess: groupAccess,
-                                   inviteLinkPassword: inviteLinkPassword,
+                                   members: members,
+                                   pendingMembers: pendingMembers,
+                                   accessControlForAttributes: accessControlForAttributes,
+                                   accessControlForMembers: accessControlForMembers,
                                    disappearingMessageToken: disappearingMessageToken,
-                                   isAnnouncementsOnly: isAnnouncementsOnly,
                                    profileKeys: profileKeys)
-    }
-
-    // MARK: -
-
-    public class func parseGroupInviteLinkPreview(_ protoData: Data,
-                                                  groupV2Params: GroupV2Params) throws -> GroupInviteLinkPreview {
-        let joinInfoProto = try GroupsProtoGroupJoinInfo.init(serializedData: protoData)
-        guard let titleData = joinInfoProto.title,
-            !titleData.isEmpty else {
-                throw OWSAssertionError("Missing or invalid titleData.")
-        }
-        guard let title = groupV2Params.decryptGroupName(titleData) else {
-            throw OWSAssertionError("Missing or invalid title.")
-        }
-
-        let descriptionText: String? = groupV2Params.decryptGroupDescription(joinInfoProto.descriptionBytes)
-
-        let avatarUrlPath: String? = joinInfoProto.avatar
-        guard joinInfoProto.hasMemberCount,
-            joinInfoProto.hasAddFromInviteLink else {
-            throw OWSAssertionError("Missing or invalid memberCount.")
-        }
-        let memberCount = joinInfoProto.memberCount
-
-        guard let protoAccess = joinInfoProto.addFromInviteLink else {
-            throw OWSAssertionError("Missing or invalid addFromInviteLinkAccess.")
-        }
-        let rawAccess = GroupV2Access.access(forProtoAccess: protoAccess)
-        let addFromInviteLinkAccess = GroupAccess.filter(forAddFromInviteLink: rawAccess)
-        guard addFromInviteLinkAccess != .unknown else {
-            throw OWSAssertionError("Unknown addFromInviteLinkAccess.")
-        }
-        guard joinInfoProto.hasRevision else {
-            throw OWSAssertionError("Missing or invalid revision.")
-        }
-        let revision = joinInfoProto.revision
-        let isLocalUserRequestingMember = joinInfoProto.hasPendingAdminApproval && joinInfoProto.pendingAdminApproval
-
-        return GroupInviteLinkPreview(title: title,
-                                      descriptionText: descriptionText,
-                                      avatarUrlPath: avatarUrlPath,
-                                      memberCount: memberCount,
-                                      addFromInviteLinkAccess: addFromInviteLinkAccess,
-                                      revision: revision,
-                                      isLocalUserRequestingMember: isLocalUserRequestingMember)
     }
 
     // MARK: -
@@ -542,8 +395,7 @@ public class GroupsV2Protos {
             avatarUrlPaths += collectAvatarUrlPaths(groupProto: groupState)
 
             guard let changeProto = changeStateProto.groupChange else {
-                owsFailDebug("Missing groupChange proto.")
-                throw GroupsV2Error.missingGroupChangeProtos
+                throw OWSAssertionError("Missing groupChange proto.")
             }
             // We can ignoreSignature because these protos came from the service.
             let changeActionsProto = try parseAndVerifyChangeActionsProto(changeProto, ignoreSignature: ignoreSignature)

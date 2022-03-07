@@ -1,90 +1,124 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
-// A class used for making HTTP requests against the main service.
-@objc
-public class NetworkManager: NSObject {
-    private let restNetworkManager = RESTNetworkManager()
+public enum NetworkManagerError: Error {
+    /// Wraps TSNetworkManager failure callback params in a single throwable error
+    case taskError(task: URLSessionDataTask, underlyingError: Error)
+}
 
-    @objc
-    public override init() {
-        super.init()
-
-        SwiftSingletons.register(self)
-    }
-
-    // This method can be called from any thread.
-    public func makePromise(request: TSRequest,
-                            websocketSupportsRequest: Bool = false,
-                            remainingRetryCount: Int = 0) -> Promise<HTTPResponse> {
-        firstly { () -> Promise<HTTPResponse> in
-            // Fail over to REST if websocket attempt fails.
-            let shouldUseWebsocket: Bool = {
-                guard !signalService.isCensorshipCircumventionActive else {
-                    return false
-                }
-                return (remainingRetryCount > 0 &&
-                        OWSWebSocket.canAppUseSocketsToMakeRequests &&
-                        websocketSupportsRequest)
-            }()
-            return (shouldUseWebsocket
-                        ? websocketRequestPromise(request: request)
-                        : restRequestPromise(request: request))
-        }.recover(on: .global()) { error -> Promise<HTTPResponse> in
-            if error.isRetryable,
-               remainingRetryCount > 0 {
-                // TODO: Backoff?
-                return self.makePromise(request: request,
-                                        remainingRetryCount: remainingRetryCount - 1)
-            } else {
-                throw error
-            }
+fileprivate extension NetworkManagerError {
+    // NOTE: This function should only be called from TSNetworkManager.isSwiftNetworkConnectivityError.
+    var isNetworkConnectivityError: Bool {
+        switch self {
+        case .taskError(_, let underlyingError):
+            return IsNetworkConnectivityFailure(underlyingError)
         }
     }
 
-    private func isRESTOnlyEndpoint(request: TSRequest) -> Bool {
-        guard let url = request.url else {
-            owsFailDebug("Missing url.")
-            return true
+    // NOTE: This function should only be called from TSNetworkManager.swiftStatusCodeForError.
+    var statusCode: Int {
+        switch self {
+        case .taskError(let task, _):
+            return task.statusCode()
         }
-        guard let urlComponents = URLComponents(string: url.absoluteString) else {
-            owsFailDebug("Missing urlComponents.")
-            return true
-        }
-        let path: String = urlComponents.path
-        let missingEndpoints = [
-            "/v1/payments/auth"
-        ]
-        return missingEndpoints.contains(path)
     }
 
-    private func restRequestPromise(request: TSRequest) -> Promise<HTTPResponse> {
-        restNetworkManager.makePromise(request: request)
-    }
-
-    private func websocketRequestPromise(request: TSRequest) -> Promise<HTTPResponse> {
-        Self.socketManager.makeRequestPromise(request: request)
+    var underlyingError: Error {
+        switch self {
+        case .taskError(_, let underlyingError):
+            return underlyingError
+        }
     }
 }
 
 // MARK: -
 
-#if TESTABLE_BUILD
+extension NetworkManagerError: CustomNSError {
+    public var errorCode: Int {
+        return statusCode
+    }
 
-@objc
-public class OWSFakeNetworkManager: NetworkManager {
+    public var errorUserInfo: [String: Any] {
+        return [NSUnderlyingErrorKey: underlyingError]
+    }
+}
 
-    public override func makePromise(request: TSRequest,
-                                     websocketSupportsRequest: Bool = false,
-                                     remainingRetryCount: Int = 0) -> Promise<HTTPResponse> {
-        Logger.info("Ignoring request: \(request)")
-        // Never resolve.
-        let (promise, _) = Promise<HTTPResponse>.pending()
+// MARK: -
+
+public extension TSNetworkManager {
+    typealias Response = (task: URLSessionDataTask, responseObject: Any?)
+
+    func makePromise(request: TSRequest) -> Promise<Response> {
+        let (promise, resolver) = Promise<Response>.pending()
+
+        self.makeRequest(request,
+                         completionQueue: DispatchQueue.global(),
+                         success: { task, responseObject in
+                            resolver.fulfill((task: task, responseObject: responseObject))
+        },
+                         failure: { task, error in
+                            let nmError = NetworkManagerError.taskError(task: task, underlyingError: error)
+                            let nsError: NSError = nmError as NSError
+                            nsError.isRetryable = (error as NSError).isRetryable
+                            resolver.reject(nsError)
+        })
+
         return promise
     }
 }
 
-#endif
+// MARK: -
+
+@objc
+public extension TSNetworkManager {
+    // NOTE: This function should only be called from IsNetworkConnectivityFailure().
+    static func isSwiftNetworkConnectivityError(_ error: Error?) -> Bool {
+        guard let error = error else {
+            return false
+        }
+        switch error {
+        case let networkManagerError as NetworkManagerError:
+            if networkManagerError.isNetworkConnectivityError {
+                return true
+            }
+            return false
+        case RequestMakerError.websocketRequestError(_, _, let underlyingError):
+            return IsNetworkConnectivityFailure(underlyingError)
+        default:
+            return false
+        }
+    }
+
+    // NOTE: This function should only be called from HTTPStatusCodeForError().
+    static func swiftHTTPStatusCodeForError(_ error: Error?) -> NSNumber? {
+        guard let error = error else {
+            return nil
+        }
+        switch error {
+        case let networkManagerError as NetworkManagerError:
+            guard networkManagerError.statusCode > 0 else {
+                return nil
+            }
+            return NSNumber(value: networkManagerError.statusCode)
+        case RequestMakerError.websocketRequestError(let statusCode, _, _):
+            guard statusCode > 0 else {
+                return nil
+            }
+            return NSNumber(value: statusCode)
+        default:
+            return nil
+        }
+    }
+}
+
+// MARK: -
+
+public extension Error {
+    var httpStatusCode: Int? {
+        HTTPStatusCodeForError(self)?.intValue
+    }
+}

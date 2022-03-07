@@ -1,12 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSCensorshipConfiguration.h"
 #import "OWSCountryMetadata.h"
 #import "OWSError.h"
-#import "OWSHTTPSecurityPolicy.h"
 #import "TSConstants.h"
+#import <AFNetworking/AFHTTPSessionManager.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -15,7 +15,6 @@ NSString *const OWSFrontingHost_GoogleEgypt = @"www.google.com.eg";
 NSString *const OWSFrontingHost_GoogleUAE = @"www.google.ae";
 NSString *const OWSFrontingHost_GoogleOman = @"www.google.com.om";
 NSString *const OWSFrontingHost_GoogleQatar = @"www.google.com.qa";
-NSString *const OWSFrontingHost_GoogleUzbekistan = @"www.google.co.uz";
 NSString *const OWSFrontingHost_Default = @"www.google.com";
 
 @implementation OWSCensorshipConfiguration
@@ -136,15 +135,8 @@ NSString *const OWSFrontingHost_Default = @"www.google.com";
         return self.googlePinningPolicy;
     } else if ([domain isEqualToString:OWSFrontingHost_GoogleUAE]) {
         return self.googlePinningPolicy;
-    } else if ([domain isEqualToString:OWSFrontingHost_GoogleUzbekistan]) {
-        return self.googlePinningPolicy;
     } else {
-        OWSLogVerbose(@"domain: %@", domain);
-        if ([domain containsString:@".google."]) {
-            OWSLogWarn(@"Unknown pinning domain.");
-        } else {
-            OWSFailDebug(@"Unknown pinning domain.");
-        }
+        OWSFailDebug(@"unknown pinning domain.");
         return self.googlePinningPolicy;
     }
 }

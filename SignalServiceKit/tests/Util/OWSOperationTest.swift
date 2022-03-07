@@ -1,10 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import XCTest
-import SignalCoreKit
 
 @testable import SignalServiceKit
 
@@ -28,11 +27,18 @@ class OWSOperationTest: SSKBaseTestSwift {
     }
 
     func test_castSwiftErrorToNSErrorThenSet() {
+        enum FooError: Error {
+            case foo
+        }
+
         let expectedError = expectation(description: "didReportError")
         let operation = TestOperation(expectation: expectedError)
 
-        let error = OWSRetryableError()
-        operation.reportError(error)
+        let error = FooError.foo
+        let nsError = error as NSError
+        nsError.isRetryable = true
+
+        operation.reportError(nsError)
 
         waitForExpectations(timeout: 0.1, handler: nil)
     }
@@ -41,16 +47,17 @@ class OWSOperationTest: SSKBaseTestSwift {
         let expectedError = expectation(description: "didReportError")
         let operation = TestOperation(expectation: expectedError)
 
-        let error = OWSRetryableError()
-        operation.reportError(error)
+        let nsError = NSError(domain: "Foo", code: 3, userInfo: nil)
+        nsError.isRetryable = true
 
+        operation.reportError(nsError)
         waitForExpectations(timeout: 0.1, handler: nil)
     }
 
     func test_operationError() {
-        enum BarError: Error, IsRetryableProvider {
+        enum BarError: OperationError {
             case bar
-            var isRetryableProvider: Bool {
+            var isRetryable: Bool {
                 return true
             }
         }
@@ -61,18 +68,5 @@ class OWSOperationTest: SSKBaseTestSwift {
         operation.reportError(BarError.bar)
 
         waitForExpectations(timeout: 0.1, handler: nil)
-    }
-
-    // MARK: -
-
-    func test_retryInterval() {
-        var totalInterval: TimeInterval = 0
-        for failureCount: UInt in 0..<110 {
-            let retryInterval: TimeInterval = OWSOperation.retryIntervalForExponentialBackoff(failureCount: failureCount)
-            totalInterval += retryInterval
-            let formattedTotal = OWSFormat.formatDurationSeconds(Int(totalInterval))
-            Logger.info("failureCount: \(failureCount), retryInterval: \(retryInterval), totalInterval: \(totalInterval) (\(formattedTotal))")
-        }
-        Logger.flush()
     }
 }

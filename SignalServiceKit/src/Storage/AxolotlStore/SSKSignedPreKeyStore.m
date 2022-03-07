@@ -1,14 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "SSKSignedPreKeyStore.h"
-#import "AxolotlExceptions.h"
-#import "NSData+keyVersionByte.h"
 #import "OWSIdentityManager.h"
 #import "SDSKeyValueStore+ObjC.h"
 #import "SSKPreKeyStore.h"
-#import "SignedPrekeyRecord.h"
+#import <AxolotlKit/AxolotlExceptions.h>
+#import <AxolotlKit/NSData+keyVersionByte.h>
 #import <Curve25519Kit/Ed25519.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
@@ -32,7 +31,7 @@ NS_ASSUME_NONNULL_BEGIN
 @implementation SDSKeyValueStore (SSKSignedPreKeyStore)
 
 - (nullable SignedPreKeyRecord *)signedPreKeyRecordForKey:(NSString *)key
-                                              transaction:(SDSAnyReadTransaction *)transaction
+                                              transaction:(SDSAnyReadTransaction *)transaction;
 {
     return [self.asObjC objectForKey:key ofExpectedType:SignedPreKeyRecord.class transaction:transaction];
 }
@@ -85,6 +84,13 @@ NSString *const kPrekeyCurrentSignedPrekeyIdKey = @"currentSignedPrekeyId";
     return self;
 }
 
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
 #pragma mark -
 
 - (SignedPreKeyRecord *)generateRandomSignedRecord
@@ -93,7 +99,7 @@ NSString *const kPrekeyCurrentSignedPrekeyIdKey = @"currentSignedPrekeyId";
 
     // Signed prekey ids must be > 0.
     int preKeyId = 1 + arc4random_uniform(INT32_MAX - 1);
-    ECKeyPair *_Nullable identityKeyPair = [[OWSIdentityManager shared] identityKeyPair];
+    ECKeyPair *_Nullable identityKeyPair = [[OWSIdentityManager sharedManager] identityKeyPair];
     OWSAssert(identityKeyPair);
 
     @try {
@@ -110,42 +116,49 @@ NSString *const kPrekeyCurrentSignedPrekeyIdKey = @"currentSignedPrekeyId";
     }
 }
 
-- (nullable SignedPreKeyRecord *)loadSignedPreKey:(int)signedPreKeyId transaction:(SDSAnyReadTransaction *)transaction
+- (nullable SignedPreKeyRecord *)loadSignedPreKey:(int)signedPreKeyId
 {
-    return [self.keyStore signedPreKeyRecordForKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
-                                       transaction:transaction];
+    __block SignedPreKeyRecord *_Nullable result;
+    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
+        result = [self.keyStore signedPreKeyRecordForKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
+                                             transaction:transaction];
+    }];
+    return result;
 }
 
-- (NSArray<SignedPreKeyRecord *> *)loadSignedPreKeysWithTransaction:(SDSAnyReadTransaction *)transaction
+- (NSArray *)loadSignedPreKeys
 {
-    return [self.keyStore allValuesWithTransaction:transaction];
+    __block NSArray *signedPreKeyRecords;
+    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
+        signedPreKeyRecords = [self.keyStore allValuesWithTransaction:transaction];
+    }];
+    return signedPreKeyRecords;
 }
 
-- (NSArray<NSString *> *)availableSignedPreKeyIdsWithTransaction:(SDSAnyReadTransaction *)transaction
+- (void)storeSignedPreKey:(int)signedPreKeyId signedPreKeyRecord:(SignedPreKeyRecord *)signedPreKeyRecord
 {
-    return [self.keyStore allKeysWithTransaction:transaction];
+    DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+        [self.keyStore setSignedPreKeyRecord:signedPreKeyRecord
+                                      forKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
+                                 transaction:transaction];
+    });
 }
 
-- (void)storeSignedPreKey:(int)signedPreKeyId
-       signedPreKeyRecord:(SignedPreKeyRecord *)signedPreKeyRecord
-              transaction:(SDSAnyWriteTransaction *)transaction
+- (BOOL)containsSignedPreKey:(int)signedPreKeyId
 {
-    [self.keyStore setSignedPreKeyRecord:signedPreKeyRecord
-                                  forKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
-                             transaction:transaction];
+    __block SignedPreKeyRecord *signedPreKeyRecord;
+    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
+        signedPreKeyRecord = [self.keyStore signedPreKeyRecordForKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
+                                                         transaction:transaction];
+    }];
+    return (signedPreKeyRecord != nil);
 }
 
-- (BOOL)containsSignedPreKey:(int)signedPreKeyId transaction:(SDSAnyReadTransaction *)transaction
+- (void)removeSignedPreKey:(int)signedPrekeyId
 {
-    return [self.keyStore signedPreKeyRecordForKey:[SDSKeyValueStore keyWithInt:signedPreKeyId]
-                                       transaction:transaction];
-}
-
-- (void)removeSignedPreKey:(int)signedPrekeyId transaction:(SDSAnyWriteTransaction *)transaction
-{
-    OWSLogInfo(@"Removing signed prekey id: %lu.", (unsigned long)signedPrekeyId);
-
-    [self.keyStore removeValueForKey:[SDSKeyValueStore keyWithInt:signedPrekeyId] transaction:transaction];
+    DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+        [self.keyStore removeValueForKey:[SDSKeyValueStore keyWithInt:signedPrekeyId] transaction:transaction];
+    });
 }
 
 - (nullable NSNumber *)currentSignedPrekeyId
@@ -159,7 +172,6 @@ NSString *const kPrekeyCurrentSignedPrekeyIdKey = @"currentSignedPrekeyId";
 
 - (void)setCurrentSignedPrekeyId:(int)value
 {
-    OWSLogInfo(@"%lu.", (unsigned long)value);
     DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
         [self.metadataStore setObject:@(value) key:kPrekeyCurrentSignedPrekeyIdKey transaction:transaction];
     });
@@ -279,16 +291,6 @@ NSString *const kPrekeyCurrentSignedPrekeyIdKey = @"currentSignedPrekeyId";
                                              }];
     }];
 }
-
-#if TESTABLE_BUILD
-- (void)removeAll:(SDSAnyWriteTransaction *)transaction
-{
-    OWSLogWarn(@"");
-
-    [self.keyStore removeAllWithTransaction:transaction];
-    [self.metadataStore removeAllWithTransaction:transaction];
-}
-#endif
 
 @end
 

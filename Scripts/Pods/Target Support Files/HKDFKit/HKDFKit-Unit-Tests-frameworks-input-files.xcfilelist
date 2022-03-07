@@ -1,0 +1,5 @@
+${PODS_ROOT}/Target Support Files/HKDFKit/HKDFKit-Unit-Tests-frameworks.sh
+${BUILT_PRODUCTS_DIR}/HKDFKit/HKDFKit.framework
+${BUILT_PRODUCTS_DIR}/CocoaLumberjack/CocoaLumberjack.framework
+${BUILT_PRODUCTS_DIR}/SignalCoreKit/SignalCoreKit.framework
+${PODS_ROOT}/GRKOpenSSLFramework/OpenSSL-iOS/bin/openssl.framework

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
@@ -7,7 +7,7 @@ import SafariServices
 
 @objc
 public class OnboardingPinAttemptsExhaustedViewController: OnboardingBaseViewController {
-
+    var databaseStorage: SDSDatabaseStorage { .shared }
     var hasPendingRestoration: Bool {
         databaseStorage.read { KeyBackupService.hasPendingRestoration(transaction: $0) }
     }
@@ -44,10 +44,10 @@ public class OnboardingPinAttemptsExhaustedViewController: OnboardingBaseViewCon
                                                comment: "Label for the 'learn more' link when reglock is enabled in the 'onboarding pin attempts exhausted' view.")
         }
 
-        let titleLabel = self.createTitleLabel(text: titleText)
+        let titleLabel = self.titleLabel(text: titleText)
         titleLabel.accessibilityIdentifier = "onboarding.pinAtttemptsExhausted." + "titleLabel"
 
-        let explanationLabel = self.createExplanationLabel(explanationText: explanationText)
+        let explanationLabel = self.explanationLabel(explanationText: explanationText)
         explanationLabel.font = UIFont.ows_dynamicTypeBodyClamped
         explanationLabel.textColor = Theme.primaryTextColor
         explanationLabel.accessibilityIdentifier = "onboarding.pinAtttemptsExhausted." + "explanationLabel"
@@ -85,7 +85,7 @@ public class OnboardingPinAttemptsExhaustedViewController: OnboardingBaseViewCon
         Logger.info("")
 
         // TODO PINs: Open the right support center URL
-        let vc = SFSafariViewController(url: URL(string: "https://support.signal.org/hc/articles/360007059792")!)
+        let vc = SFSafariViewController(url: URL(string: "https://support.tapofthink.com/hc/articles/360007059792")!)
         present(vc, animated: true, completion: nil)
     }
 

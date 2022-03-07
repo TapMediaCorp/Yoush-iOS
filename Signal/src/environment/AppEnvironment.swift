@@ -1,13 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import SignalServiceKit
 import SignalMessaging
 
-@objc
-public class AppEnvironment: NSObject {
+@objc public class AppEnvironment: NSObject {
 
     private static var _shared: AppEnvironment = AppEnvironment()
 
@@ -27,58 +26,84 @@ public class AppEnvironment: NSObject {
     }
 
     @objc
-    public var callMessageHandlerRef: WebRTCCallMessageHandler
+    public var callMessageHandler: WebRTCCallMessageHandler
 
     @objc
-    public var callServiceRef: CallService
+    public var callService: CallService
 
     @objc
-    public var outboundIndividualCallInitiatorRef: OutboundIndividualCallInitiator
+    public var outboundCallInitiator: OutboundCallInitiator
 
     @objc
-    public var accountManagerRef: AccountManager
+    public var accountManager: AccountManager
 
     @objc
-    public var notificationPresenterRef: NotificationPresenter
+    public var notificationPresenter: NotificationPresenter
 
     @objc
-    public var pushRegistrationManagerRef: PushRegistrationManager
+    public var pushRegistrationManager: PushRegistrationManager
 
     @objc
-    public var sessionResetJobQueueRef: SessionResetJobQueue
+    public var sessionResetJobQueue: SessionResetJobQueue
 
     @objc
-    let deviceTransferServiceRef = DeviceTransferService()
+    public var broadcastMediaMessageJobQueue: BroadcastMediaMessageJobQueue
 
     @objc
-    let avatarHistorManagerRef = AvatarHistoryManager()
+    public var backup: OWSBackup
 
     @objc
-    let cvAudioPlayerRef = CVAudioPlayer()
+    public var userNotificationActionHandler: UserNotificationActionHandler
 
     @objc
-    public var windowManagerRef: OWSWindowManager = OWSWindowManager()
+    public var backupLazyRestore: BackupLazyRestore
+
+    @objc
+    let deviceTransferService = DeviceTransferService()
 
     private override init() {
-        self.callMessageHandlerRef = WebRTCCallMessageHandler()
-        self.callServiceRef = CallService()
-        self.outboundIndividualCallInitiatorRef = OutboundIndividualCallInitiator()
-        self.accountManagerRef = AccountManager()
-        self.notificationPresenterRef = NotificationPresenter()
-        self.pushRegistrationManagerRef = PushRegistrationManager()
-        self.sessionResetJobQueueRef = SessionResetJobQueue()
+        self.callMessageHandler = WebRTCCallMessageHandler()
+        self.callService = CallService()
+        self.outboundCallInitiator = OutboundCallInitiator()
+        self.accountManager = AccountManager()
+        self.notificationPresenter = NotificationPresenter()
+        self.pushRegistrationManager = PushRegistrationManager()
+        self.sessionResetJobQueue = SessionResetJobQueue()
+        self.broadcastMediaMessageJobQueue = BroadcastMediaMessageJobQueue()
+        self.backup = OWSBackup()
+        self.backupLazyRestore = BackupLazyRestore()
+        self.userNotificationActionHandler = UserNotificationActionHandler()
 
         super.init()
 
         SwiftSingletons.register(self)
+
+        YDBToGRDBMigration.add(keyStore: backup.keyValueStore, label: "backup")
+        YDBToGRDBMigration.add(keyStore: AppUpdateNag.shared.keyValueStore, label: "AppUpdateNag")
+        YDBToGRDBMigration.add(keyStore: ProfileViewController.keyValueStore(), label: "ProfileViewController")
     }
 
     @objc
     public func setup() {
-        callService.individualCallService.createCallUIAdapter()
+        
+        if FeatureFlags.answerCallsOnSecondaryDevice {
+            callService.createCallUIAdapter()
+            //Config Jitsi Callkit Manager
+            CALLKIT_MANAGER.config()
+        } else {
+            AppReadiness.runNowOrWhenAppWillBecomeReady {
+                // Currently, we only build the CallUIAdapter for the primary device, which we can't
+                // determine until *after* storage has been setup. Once we create calling on all
+                // devices, we can create the callUIAdapter unconditionally, on all devices, and get
+                // rid of this.
+                self.callService.createCallUIAdapter()
+                //Config Jitsi Callkit Manager
+                CALLKIT_MANAGER.config()
+            }
+        }
 
         // Hang certain singletons on SSKEnvironment too.
-        SSKEnvironment.shared.notificationsManagerRef = notificationPresenterRef
-        SSKEnvironment.shared.callMessageHandlerRef = callMessageHandlerRef
+        SSKEnvironment.shared.notificationsManager = notificationPresenter
+        SSKEnvironment.shared.callMessageHandler = callMessageHandler
     }
 }

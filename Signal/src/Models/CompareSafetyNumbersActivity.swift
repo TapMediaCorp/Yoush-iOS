@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -17,7 +17,7 @@ protocol CompareSafetyNumbersActivityDelegate {
 class CompareSafetyNumbersActivity: UIActivity {
 
     var mySafetyNumbers: String?
-    weak var delegate: CompareSafetyNumbersActivityDelegate?
+    let delegate: CompareSafetyNumbersActivityDelegate
 
     @objc
     required init(delegate: CompareSafetyNumbersActivityDelegate) {
@@ -59,33 +59,25 @@ class CompareSafetyNumbersActivity: UIActivity {
     override func perform() {
         defer { activityDidFinish(true) }
 
-        guard let delegate = delegate else {
-            owsFailDebug("Missing delegate.")
-            return
-        }
-
-        let pasteboardNumerics = numericOnly(string: UIPasteboard.general.string)
-        guard let pasteboardString = pasteboardNumerics,
-              pasteboardString.count == 60 else {
-            Logger.warn("no valid safety numbers found in pasteboard: \(String(describing: pasteboardNumerics))")
-            let error = OWSError(error: .userError,
-                                 description: NSLocalizedString("PRIVACY_VERIFICATION_FAILED_NO_SAFETY_NUMBERS_IN_CLIPBOARD", comment: "Alert body for user error"),
-                                 isRetryable: false)
+        let pasteboardString = numericOnly(string: UIPasteboard.general.string)
+        guard (pasteboardString != nil && pasteboardString!.count == 60) else {
+            Logger.warn("no valid safety numbers found in pasteboard: \(String(describing: pasteboardString))")
+            let error = OWSErrorWithCodeDescription(OWSErrorCode.userError,
+                                                    NSLocalizedString("PRIVACY_VERIFICATION_FAILED_NO_SAFETY_NUMBERS_IN_CLIPBOARD", comment: "Alert body for user error"))
 
             delegate.compareSafetyNumbersActivity(self, failedWithError: error)
             return
         }
 
-        let pasteboardSafetyNumbers = pasteboardString
+        let pasteboardSafetyNumbers = pasteboardString!
 
         if pasteboardSafetyNumbers == mySafetyNumbers {
             Logger.info("successfully matched safety numbers. local numbers: \(String(describing: mySafetyNumbers)) pasteboard:\(pasteboardSafetyNumbers)")
             delegate.compareSafetyNumbersActivitySucceeded(activity: self)
         } else {
             Logger.warn("local numbers: \(String(describing: mySafetyNumbers)) didn't match pasteboard:\(pasteboardSafetyNumbers)")
-            let error = OWSError(error: .privacyVerificationFailure,
-                                 description: NSLocalizedString("PRIVACY_VERIFICATION_FAILED_MISMATCHED_SAFETY_NUMBERS_IN_CLIPBOARD", comment: "Alert body"),
-                                 isRetryable: false)
+            let error = OWSErrorWithCodeDescription(OWSErrorCode.privacyVerificationFailure,
+                                                    NSLocalizedString("PRIVACY_VERIFICATION_FAILED_MISMATCHED_SAFETY_NUMBERS_IN_CLIPBOARD", comment: "Alert body"))
             delegate.compareSafetyNumbersActivity(self, failedWithError: error)
         }
     }
@@ -99,7 +91,7 @@ class CompareSafetyNumbersActivity: UIActivity {
 
         var numericOnly: String?
         if let regex = try? NSRegularExpression(pattern: "\\D", options: .caseInsensitive) {
-            numericOnly = regex.stringByReplacingMatches(in: string, options: .withTransparentBounds, range: string.entireRange, withTemplate: "")
+            numericOnly = regex.stringByReplacingMatches(in: string, options: .withTransparentBounds, range: NSRange(location: 0, length: string.utf16.count), withTemplate: "")
         }
 
         return numericOnly

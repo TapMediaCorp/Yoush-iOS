@@ -1,9 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "PhoneNumber.h"
-#import "NSString+SSK.h"
 #import "PhoneNumberUtil.h"
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 #import <libPhoneNumber_iOS/NBAsYouTypeFormatter.h>
@@ -44,20 +43,22 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     OWSAssertDebug(text != nil);
     OWSAssertDebug(regionCode != nil);
 
+    PhoneNumberUtil *phoneUtil = [PhoneNumberUtil sharedThreadLocal];
+
     NSError *parseError   = nil;
-    NBPhoneNumber *number = [self.phoneNumberUtil parse:text defaultRegion:regionCode error:&parseError];
+    NBPhoneNumber *number = [phoneUtil parse:text defaultRegion:regionCode error:&parseError];
 
     if (parseError) {
         OWSLogVerbose(@"parseError: %@", parseError);
         return nil;
     }
 
-    if (![self.phoneNumberUtil isPossibleNumber:number]) {
+    if (![phoneUtil.nbPhoneNumberUtil isPossibleNumber:number]) {
         return nil;
     }
 
     NSError *toE164Error;
-    NSString *e164 = [self.phoneNumberUtil format:number numberFormat:NBEPhoneNumberFormatE164 error:&toE164Error];
+    NSString *e164 = [phoneUtil format:number numberFormat:NBEPhoneNumberFormatE164 error:&toE164Error];
     if (toE164Error) {
         OWSLogDebug(@"Issue while formatting number: %@", [toE164Error description]);
         return nil;
@@ -78,7 +79,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 
     NSString *_Nullable countryCode = nil;
 #if TARGET_OS_IPHONE
-    countryCode = [self.phoneNumberUtil countryCodeByCarrier];
+    countryCode = [[PhoneNumberUtil sharedThreadLocal].nbPhoneNumberUtil countryCodeByCarrier];
 
     if ([countryCode isEqualToString:@"ZZ"]) {
         countryCode = [locale objectForKey:NSLocaleCountryCode];
@@ -104,28 +105,6 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     return number;
 }
 
-+ (NSRegularExpression *)phoneRegex
-{
-    static NSRegularExpression *regex = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSError *error;
-        regex = [NSRegularExpression regularExpressionWithPattern:@"^\\+\\d{10,15}$"
-                                                          options:0
-                                                            error:&error];
-        if (error || !regex) {
-            OWSFail(@"could not compile regular expression: %@", error);
-        }
-    });
-    return regex;
-}
-
-+ (BOOL)resemblesE164:(NSString *)text {
-    return [self.phoneRegex rangeOfFirstMatchInString:text
-                                              options:0
-                                                range:NSMakeRange(0, text.length)].location != NSNotFound;
-}
-
 + (NSString *)bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:(NSString *)input {
     return [PhoneNumber bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:input
                                                                withSpecifiedRegionCode:[self defaultCountryCode]];
@@ -142,16 +121,15 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 + (NSString *)bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:(NSString *)input
                                                      withSpecifiedRegionCode:(NSString *)regionCode {
 
-    static AnyLRUCache *cache = nil;
+    static NSMutableDictionary<NSString *, NSString *> *cache = nil;
     static dispatch_once_t onceToken;
-    dispatch_once(
-        &onceToken, ^{ cache = [[AnyLRUCache alloc] initWithMaxSize:256
-                                                         nseMaxSize:0
-                                         shouldEvacuateInBackground:NO]; });
+    dispatch_once(&onceToken, ^{
+        cache = [NSMutableDictionary new];
+    });
 
     @synchronized(cache) {
         NSString *cacheKey = [[input stringByAppendingString:@"@"] stringByAppendingString:regionCode];
-        NSString *_Nullable cachedValue = (NSString *)[cache getWithKey:cacheKey];
+        NSString *_Nullable cachedValue = cache[cacheKey];
         if (cachedValue != nil) {
             return cachedValue;
         }
@@ -161,7 +139,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
         for (NSUInteger i = 0; i < input.length; i++) {
             result = [formatter inputDigit:[input substringWithRange:NSMakeRange(i, 1)]];
         }
-        [cache setObject:result forKey:cacheKey];
+        cache[cacheKey] = result;
         return result;
     }
 }
@@ -210,9 +188,11 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     return formattedPhoneNumber;
 }
 
-+ (nullable NSString *)regionCodeFromCountryCodeString:(NSString *)countryCodeString {
-    NSNumber *countryCallingCode = @([[countryCodeString substringFromIndex:1] integerValue]);
-    return [self.phoneNumberUtil getRegionCodeForCountryCode:countryCallingCode];
++ (NSString *)regionCodeFromCountryCodeString:(NSString *)countryCodeString {
+    NBPhoneNumberUtil *phoneUtil = [PhoneNumberUtil sharedThreadLocal].nbPhoneNumberUtil;
+    NSString *regionCode =
+        [phoneUtil getRegionCodeForCountryCode:@([[countryCodeString substringFromIndex:1] integerValue])];
+    return regionCode;
 }
 
 + (nullable PhoneNumber *)tryParsePhoneNumberFromUserSpecifiedText:(NSString *)text {
@@ -221,7 +201,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     if ([text isEqualToString:@""]) {
         return nil;
     }
-    NSString *sanitizedString = [text filterAsE164];
+    NSString *sanitizedString = [self removeFormattingCharacters:text];
 
     return [self phoneNumberFromUserSpecifiedText:sanitizedString];
 }
@@ -256,7 +236,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
         if (localCallingCode != nil) {
             NSString *localCallingCodePrefix = [NSString stringWithFormat:@"+%@", localCallingCode];
             NSString *localCountryCode =
-                [self.phoneNumberUtil probableCountryCodeForCallingCode:localCallingCodePrefix];
+                [PhoneNumberUtil.sharedThreadLocal probableCountryCodeForCallingCode:localCallingCodePrefix];
             if (localCountryCode && ![localCountryCode isEqualToString:[self defaultCountryCode]]) {
                 NBMetadataHelper *helper = [[NBMetadataHelper alloc] init];
                 NBPhoneMetaData *localNumberRegionMetadata = [helper getMetadataForRegion:localCountryCode];
@@ -331,37 +311,41 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     return [result copy];
 }
 
-+ (NSArray<PhoneNumber *> *)tryParsePhoneNumbersFromNormalizedText:(NSString *)textParam
++ (NSArray<PhoneNumber *> *)tryParsePhoneNumbersFromNormalizedText:(NSString *)text
                                                  clientPhoneNumber:(NSString *)clientPhoneNumber
 {
-    OWSAssertDebug(textParam != nil);
+    OWSAssertDebug(text != nil);
 
-    NSString *text = [textParam filterAsE164];
-    if (text.length < 1) {
-        return @[];
+    text = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if ([text isEqualToString:@""]) {
+        return nil;
     }
+    
+    NSString *sanitizedString = [self removeFormattingCharacters:text];
+    OWSAssertDebug(sanitizedString != nil);
 
     NSMutableArray *result = [NSMutableArray new];
     NSMutableSet *phoneNumberSet = [NSMutableSet new];
-    void (^tryParsingWithCountryCode)(NSString *, NSString *) = ^(NSString *text, NSString *countryCode) {
-        PhoneNumber *_Nullable phoneNumber = [PhoneNumber phoneNumberFromText:text andRegion:countryCode];
-        NSString *_Nullable e164 = [phoneNumber toE164];
-        if (e164.length > 0 && ![phoneNumberSet containsObject:e164]) {
+    void (^tryParsingWithCountryCode)(NSString *, NSString *) = ^(NSString *text,
+                                                      NSString *countryCode) {
+        PhoneNumber *phoneNumber = [PhoneNumber phoneNumberFromText:text
+                                                          andRegion:countryCode];
+        if (phoneNumber && [phoneNumber toE164] && ![phoneNumberSet containsObject:[phoneNumber toE164]]) {
             [result addObject:phoneNumber];
-            [phoneNumberSet addObject:e164];
+            [phoneNumberSet addObject:[phoneNumber toE164]];
         }
     };
 
-    tryParsingWithCountryCode(text, [self defaultCountryCode]);
+    tryParsingWithCountryCode(sanitizedString, [self defaultCountryCode]);
 
-    if ([text hasPrefix:@"+"]) {
+    if ([sanitizedString hasPrefix:@"+"]) {
         // If the text starts with "+", don't try prepending
         // anything else.
         return result;
     }
 
     // Try just adding "+" and parsing it.
-    tryParsingWithCountryCode([@"+" stringByAppendingString:text], [self defaultCountryCode]);
+    tryParsingWithCountryCode([NSString stringWithFormat:@"+%@", sanitizedString], [self defaultCountryCode]);
 
     // Order matters; better results should appear first so prefer
     // matches with the same country code as this client's phone number.
@@ -382,7 +366,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 
     NSString *callingCodePrefix = [NSString stringWithFormat:@"+%@", callingCodeForLocalNumber];
 
-    tryParsingWithCountryCode([callingCodePrefix stringByAppendingString:text], [self defaultCountryCode]);
+    tryParsingWithCountryCode([callingCodePrefix stringByAppendingString:sanitizedString], [self defaultCountryCode]);
 
     // Try to determine what the country code is for the local phone number
     // and also try parsing the phone number using that country code if it
@@ -392,15 +376,15 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     // Italian phone number but use French region/language for their
     // phone. They're likely to have both Italian and French contacts.
     NSString *localCountryCode =
-        [self.phoneNumberUtil probableCountryCodeForCallingCode:callingCodePrefix];
+        [PhoneNumberUtil.sharedThreadLocal probableCountryCodeForCallingCode:callingCodePrefix];
     if (localCountryCode && ![localCountryCode isEqualToString:[self defaultCountryCode]]) {
-        tryParsingWithCountryCode([callingCodePrefix stringByAppendingString:text], localCountryCode);
+        tryParsingWithCountryCode([callingCodePrefix stringByAppendingString:sanitizedString], localCountryCode);
     }
 
     NSString *_Nullable phoneNumberByApplyingMissingAreaCode =
         [self applyMissingAreaCodeWithCallingCodeForReferenceNumber:callingCodeForLocalNumber
                                                     referenceNumber:clientPhoneNumber
-                                                 sanitizedInputText:text];
+                                                 sanitizedInputText:sanitizedString];
     if (phoneNumberByApplyingMissingAreaCode) {
         tryParsingWithCountryCode(phoneNumberByApplyingMissingAreaCode, localCountryCode);
     }
@@ -558,6 +542,21 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 
 #pragma mark -
 
++ (NSString *)removeFormattingCharacters:(NSString *)inputString {
+    char outputString[inputString.length + 1];
+
+    int outputLength = 0;
+    for (NSUInteger i = 0; i < inputString.length; i++) {
+        unichar c = [inputString characterAtIndex:i];
+        if (c == '+' || (c >= '0' && c <= '9')) {
+            outputString[outputLength++] = (char)c;
+        }
+    }
+
+    outputString[outputLength] = 0;
+    return [NSString stringWithUTF8String:(void *)outputString];
+}
+
 + (nullable PhoneNumber *)tryParsePhoneNumberFromE164:(NSString *)text {
     OWSAssertDebug(text != nil);
     if (![text hasPrefix:COUNTRY_CODE_PREFIX]) {
@@ -583,9 +582,9 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 - (nullable NSString *)nationalNumber
 {
     NSError *error;
-    NSString *nationalNumber = [self.phoneNumberUtil format:self.phoneNumber
-                                               numberFormat:NBEPhoneNumberFormatNATIONAL
-                                                      error:&error];
+    NSString *nationalNumber = [[PhoneNumberUtil sharedThreadLocal] format:self.phoneNumber
+                                                              numberFormat:NBEPhoneNumberFormatNATIONAL
+                                                                     error:&error];
     if (error) {
         OWSLogVerbose(@"error parsing number into national format: %@", error);
         return nil;
@@ -596,7 +595,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
 
 - (BOOL)isValid
 {
-    return [self.phoneNumberUtil isValidNumber:self.phoneNumber];
+    return [[PhoneNumberUtil sharedThreadLocal].nbPhoneNumberUtil isValidNumber:self.phoneNumber];
 }
 
 - (NSString *)description {
@@ -628,7 +627,7 @@ static NSString *const RPDefaultsKeyPhoneNumberCanonical = @"RPDefaultsKeyPhoneN
     }
     PhoneNumber *otherPhoneNumber = (PhoneNumber *)other;
 
-    return [self.e164 isEqual:otherPhoneNumber.e164];
+    return [self.phoneNumber isEqual:otherPhoneNumber.phoneNumber];
 }
 
 @end

@@ -1,20 +1,22 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "MediaDetailViewController.h"
+#import "AttachmentSharing.h"
 #import "ConversationViewController.h"
-#import "Signal-Swift.h"
+#import "ConversationViewItem.h"
+#import "OWSMessageCell.h"
+#import "Yoush-Swift.h"
+#import "TSAttachmentStream.h"
+#import "TSInteraction.h"
+#import "UIUtil.h"
+#import "UIView+OWS.h"
 #import <AVKit/AVKit.h>
 #import <MediaPlayer/MPMoviePlayerViewController.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <SignalMessaging/SignalMessaging-Swift.h>
 #import <SignalServiceKit/NSData+Image.h>
-#import <SignalServiceKit/TSAttachmentStream.h>
-#import <SignalServiceKit/TSInteraction.h>
-#import <SignalUI/AttachmentSharing.h>
-#import <SignalUI/UIUtil.h>
-#import <SignalUI/UIView+SignalUI.h>
 #import <YYImage/YYImage.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -24,19 +26,18 @@ NS_ASSUME_NONNULL_BEGIN
 @interface MediaDetailViewController () <UIScrollViewDelegate,
     UIGestureRecognizerDelegate,
     PlayerProgressBarDelegate,
-    OWSVideoPlayerDelegate,
-    LoopingVideoViewDelegate,
-    VideoPlayerViewDelegate>
+    OWSVideoPlayerDelegate>
 
 @property (nonatomic) UIScrollView *scrollView;
 @property (nonatomic) UIView *mediaView;
 @property (nonatomic) UIView *replacingView;
 
 @property (nonatomic) TSAttachmentStream *attachmentStream;
+@property (nonatomic, nullable) id<ConversationViewItem> viewItem;
 @property (nonatomic, nullable) UIImage *image;
 
 @property (nonatomic, nullable) OWSVideoPlayer *videoPlayer;
-@property (nonatomic, nullable) UIView *playVideoButton;
+@property (nonatomic, nullable) UIButton *playVideoButton;
 @property (nonatomic, nullable) PlayerProgressBar *videoProgressBar;
 @property (nonatomic, nullable) UIBarButtonItem *videoPlayBarButton;
 @property (nonatomic, nullable) UIBarButtonItem *videoPauseBarButton;
@@ -45,10 +46,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, nullable) NSLayoutConstraint *mediaViewLeadingConstraint;
 @property (nonatomic, nullable) NSLayoutConstraint *mediaViewTopConstraint;
 @property (nonatomic, nullable) NSLayoutConstraint *mediaViewTrailingConstraint;
-
-@property (nonatomic) BOOL shouldAutoPlayVideo;
-@property (nonatomic) BOOL hasAutoPlayedVideo;
-@property (nonatomic) CGFloat lastKnownScrollViewWidth;
 
 @end
 
@@ -61,7 +58,8 @@ NS_ASSUME_NONNULL_BEGIN
     [self stopAnyVideo];
 }
 
-- (instancetype)initWithGalleryItemBox:(GalleryItemBox *)galleryItemBox shouldAutoPlayVideo:(BOOL)shouldAutoPlayVideo
+- (instancetype)initWithGalleryItemBox:(GalleryItemBox *)galleryItemBox
+                              viewItem:(nullable id<ConversationViewItem>)viewItem
 {
     self = [super init];
     if (!self) {
@@ -69,10 +67,19 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     _galleryItemBox = galleryItemBox;
-    self.shouldAutoPlayVideo = shouldAutoPlayVideo;
+    _viewItem = viewItem;
 
     // We cache the image data in case the attachment stream is deleted.
-    self.image = [galleryItemBox.attachmentStream thumbnailImageLargeSync];
+    __weak MediaDetailViewController *weakSelf = self;
+    _image = [galleryItemBox.attachmentStream
+        thumbnailImageLargeWithSuccess:^(UIImage *image) {
+            weakSelf.image = image;
+            [weakSelf updateContents];
+            [weakSelf updateMinZoomScale];
+        }
+        failure:^{
+            OWSLogWarn(@"Could not load media.");
+        }];
 
     return self;
 }
@@ -82,9 +89,14 @@ NS_ASSUME_NONNULL_BEGIN
     return self.galleryItemBox.attachmentStream;
 }
 
+- (BOOL)isAnimated
+{
+    return self.attachmentStream.isAnimated;
+}
+
 - (BOOL)isVideo
 {
-    return self.attachmentStream.isVideo && !self.attachmentStream.isLoopingVideo;
+    return self.attachmentStream.isVideo;
 }
 
 - (void)viewDidLoad
@@ -98,41 +110,45 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)viewWillAppear:(BOOL)animated
 {
-    OWSAssertIsOnMainThread();
-    
     [super viewWillAppear:animated];
     [self resetMediaFrame];
-    
-    [self updateZoomScaleAndConstraints];
-    self.scrollView.zoomScale = self.scrollView.minimumZoomScale;
-}
-
-- (void)viewDidAppear:(BOOL)animated
-{
-    OWSAssertIsOnMainThread();
-
-    [super viewDidAppear:animated];
-
-    if (self.isVideo && self.shouldAutoPlayVideo && !self.hasAutoPlayedVideo) {
-        [self playVideo];
-        self.hasAutoPlayedVideo = YES;
-    }
 }
 
 - (void)viewDidLayoutSubviews
 {
     [super viewDidLayoutSubviews];
 
-    [self updateZoomScaleAndConstraints];
+    [self updateMinZoomScale];
+    [self centerMediaViewConstraints];
+}
 
-    // In iOS multi-tasking, the size of root view (and hence the scroll view)
-    // is set later, after viewWillAppear, etc.  Therefore we need to reset the
-    // zoomScale to the default whenever the scrollView width changes.
-    const CGFloat tolerance = 0.001f;
-    if (fabs(self.lastKnownScrollViewWidth - self.scrollView.frame.size.width) > tolerance) {
-        self.scrollView.zoomScale = self.scrollView.minimumZoomScale;
+- (void)updateMinZoomScale
+{
+    if (!self.image) {
+        self.scrollView.minimumZoomScale = 1.f;
+        self.scrollView.maximumZoomScale = 1.f;
+        self.scrollView.zoomScale = 1.f;
+        return;
     }
-    self.lastKnownScrollViewWidth = self.scrollView.frame.size.width;
+
+    CGSize viewSize = self.scrollView.bounds.size;
+    UIImage *image = self.image;
+    OWSAssertDebug(image);
+
+    if (image.size.width == 0 || image.size.height == 0) {
+        OWSFailDebug(@"Invalid image dimensions. %@", NSStringFromCGSize(image.size));
+        return;
+    }
+
+    CGFloat scaleWidth = viewSize.width / image.size.width;
+    CGFloat scaleHeight = viewSize.height / image.size.height;
+    CGFloat minScale = MIN(scaleWidth, scaleHeight);
+
+    if (minScale != self.scrollView.minimumZoomScale) {
+        self.scrollView.minimumZoomScale = minScale;
+        self.scrollView.maximumZoomScale = minScale * 8;
+        self.scrollView.zoomScale = minScale;
+    }
 }
 
 - (void)zoomOutAnimated:(BOOL)isAnimated
@@ -164,14 +180,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     [scrollView autoPinEdgesToSuperviewEdges];
 
-    if (self.attachmentStream.isLoopingVideo) {
-        if (self.attachmentStream.isValidVideo) {
-            self.mediaView = [self buildLoopingVideoPlayerView];
-        } else {
-            self.mediaView = [UIView new];
-            self.mediaView.backgroundColor = Theme.washColor;
-        }
-    } else if (self.attachmentStream.shouldBeRenderedByYY) {
+    if (self.isAnimated) {
         if (self.attachmentStream.isValidImage) {
             YYImage *animatedGif = [YYImage imageWithContentsOfFile:self.attachmentStream.originalFilePath];
             YYAnimatedImageView *animatedView = [YYAnimatedImageView new];
@@ -240,50 +249,21 @@ NS_ASSUME_NONNULL_BEGIN
         [videoProgressBar autoPinToTopLayoutGuideOfViewController:self withInset:kVideoProgressBarHeight];
         [videoProgressBar autoSetDimension:ALDimensionHeight toSize:kVideoProgressBarHeight];
 
-        __weak MediaDetailViewController *weakSelf = self;
-        OWSButton *playVideoButton = [[OWSButton alloc] initWithBlock:^{ [weakSelf playVideo]; }];
+        UIButton *playVideoButton = [UIButton new];
         self.playVideoButton = playVideoButton;
+
+        [playVideoButton addTarget:self action:@selector(playVideo) forControlEvents:UIControlEventTouchUpInside];
+
+        UIImage *playImage = [UIImage imageNamed:@"play_button"];
+        [playVideoButton setBackgroundImage:playImage forState:UIControlStateNormal];
+        playVideoButton.contentMode = UIViewContentModeScaleAspectFill;
+
         [self.view addSubview:playVideoButton];
 
-        OWSLayerView *playVideoCircleView = [OWSLayerView circleView];
-        playVideoCircleView.backgroundColor = [UIColor.ows_whiteColor colorWithAlphaComponent:0.75f];
-        playVideoCircleView.userInteractionEnabled = NO;
-        [playVideoButton addSubview:playVideoCircleView];
-
-        UIImageView *playVideoIconView = [UIImageView withTemplateImageName:@"play-solid-32"
-                                                                  tintColor:UIColor.ows_blackColor];
-        playVideoIconView.userInteractionEnabled = NO;
-        [playVideoButton addSubview:playVideoIconView];
-
         CGFloat playVideoButtonWidth = ScaleFromIPhone5(70);
-        CGFloat playVideoIconWidth = ScaleFromIPhone5(30);
         [playVideoButton autoSetDimensionsToSize:CGSizeMake(playVideoButtonWidth, playVideoButtonWidth)];
-        [playVideoIconView autoSetDimensionsToSize:CGSizeMake(playVideoIconWidth, playVideoIconWidth)];
-        [playVideoCircleView autoPinEdgesToSuperviewEdges];
-        [playVideoIconView autoCenterInSuperview];
         [playVideoButton autoCenterInSuperview];
     }
-}
-
-- (UIView *)buildLoopingVideoPlayerView
-{
-    NSURL *_Nullable attachmentUrl = self.attachmentStream.originalMediaURL;
-    if (!attachmentUrl) {
-        OWSFailDebug(@"Invalid URL");
-        return [[UIView alloc] init];
-    }
-
-    LoopingVideo *_Nullable video = [[LoopingVideo alloc] initWithUrl:attachmentUrl];
-    if (!video) {
-        OWSFailDebug(@"Invalid looping video");
-        return [[UIView alloc] init];
-    }
-
-    LoopingVideoView *view = [[LoopingVideoView alloc] init];
-    view.video = video;
-    view.delegate = self;
-
-    return view;
 }
 
 - (UIView *)buildVideoPlayerView
@@ -302,7 +282,11 @@ NS_ASSUME_NONNULL_BEGIN
 
     VideoPlayerView *playerView = [VideoPlayerView new];
     playerView.player = player.avPlayer;
-    playerView.delegate = self;
+
+    [NSLayoutConstraint autoSetPriority:UILayoutPriorityDefaultLow
+                         forConstraints:^{
+                             [playerView autoSetDimensionsToSize:self.image.size];
+                         }];
 
     return playerView;
 }
@@ -371,82 +355,6 @@ NS_ASSUME_NONNULL_BEGIN
     [self pauseVideo];
 }
 
-#pragma mark -
-
-- (void)updateZoomScaleAndConstraints
-{
-    // We want a default layout that...
-    //
-    // * Has the media visually centered.
-    // * The media content should be zoomed to just barely fit by default,
-    //   regardless of the content size.
-    // * We should be able to safely zoom.
-    // * The "min zoom scale" should satisfy the requirements above.
-    // * The user should be able to scale in 4x.
-    //
-    // We use constraint-based layout and adjust
-    // UIScrollView.minimumZoomScale, etc.
-
-    // Determine the media's aspect ratio.
-    //
-    // * mediaView.intrinsicContentSize is most accurate, but
-    //   may not be available yet for media that is loaded async.
-    // * The self.image.size should always be available if the
-    //   media is valid.
-    CGSize mediaSize = CGSizeZero;
-    CGSize mediaIntrinsicSize = self.mediaView.intrinsicContentSize;
-    CGSize mediaDefaultSize = self.image.size;
-    if (mediaIntrinsicSize.width > 0 && mediaIntrinsicSize.height > 0) {
-        mediaSize = mediaIntrinsicSize;
-    } else if (mediaDefaultSize.width > 0 && mediaDefaultSize.height > 0) {
-        mediaSize = mediaDefaultSize;
-    }
-
-    CGSize scrollViewSize = self.scrollView.bounds.size;
-
-    if (mediaSize.width <= 0 ||
-        mediaSize.height <= 0 ||
-        scrollViewSize.width <= 0 ||
-        scrollViewSize.height <= 0) {
-        // Invalid content or view state.
-
-        self.scrollView.minimumZoomScale = 1.f;
-        self.scrollView.maximumZoomScale = 1.f;
-        self.scrollView.zoomScale = 1.f;
-
-        self.mediaViewTopConstraint.constant = 0;
-        self.mediaViewBottomConstraint.constant = 0;
-        self.mediaViewLeadingConstraint.constant = 0;
-        self.mediaViewTrailingConstraint.constant = 0;
-
-        return;
-    }
-
-    // Center the media view in the scroll view.
-    CGSize mediaViewSize = self.mediaView.frame.size;
-    CGFloat yOffset = MAX(0, (scrollViewSize.height - mediaViewSize.height) / 2);
-    CGFloat xOffset = MAX(0, (scrollViewSize.width - mediaViewSize.width) / 2);
-    self.mediaViewTopConstraint.constant = yOffset;
-    self.mediaViewBottomConstraint.constant = yOffset;
-    self.mediaViewLeadingConstraint.constant = xOffset;
-    self.mediaViewTrailingConstraint.constant = xOffset;
-
-    // Find minScale for .scaleAspectFit-style layout.
-    CGFloat scaleWidth = scrollViewSize.width / mediaSize.width;
-    CGFloat scaleHeight = scrollViewSize.height / mediaSize.height;
-    CGFloat minScale = MIN(scaleWidth, scaleHeight);
-    CGFloat maxScale = minScale * 8;
-
-    self.scrollView.minimumZoomScale = minScale;
-    self.scrollView.maximumZoomScale = maxScale;
-
-    if (self.scrollView.zoomScale < minScale) {
-        self.scrollView.zoomScale = minScale;
-    } else if (self.scrollView.zoomScale > maxScale) {
-        self.scrollView.zoomScale = maxScale;
-    }
-}
-
 #pragma mark - UIScrollViewDelegate
 
 - (nullable UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView
@@ -454,9 +362,25 @@ NS_ASSUME_NONNULL_BEGIN
     return self.mediaView;
 }
 
+- (void)centerMediaViewConstraints
+{
+    OWSAssertDebug(self.scrollView);
+
+    CGSize scrollViewSize = self.scrollView.bounds.size;
+    CGSize imageViewSize = self.mediaView.frame.size;
+
+    CGFloat yOffset = MAX(0, (scrollViewSize.height - imageViewSize.height) / 2);
+    self.mediaViewTopConstraint.constant = yOffset;
+    self.mediaViewBottomConstraint.constant = -yOffset;
+
+    CGFloat xOffset = MAX(0, (scrollViewSize.width - imageViewSize.width) / 2);
+    self.mediaViewLeadingConstraint.constant = xOffset;
+    self.mediaViewTrailingConstraint.constant = -xOffset;
+}
+
 - (void)scrollViewDidZoom:(UIScrollView *)scrollView
 {
-    [self updateZoomScaleAndConstraints];
+    [self centerMediaViewConstraints];
     [self.view layoutIfNeeded];
 }
 
@@ -555,33 +479,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo
 {
     if (error) {
-        OWSLogWarn(@"There was a problem saving <%@> to camera roll.", error.userErrorDescription);
+        OWSLogWarn(@"There was a problem saving <%@> to camera roll.", error.localizedDescription);
     }
-}
-
-#pragma mark - LoopingVideoViewDelegate
-
-- (void)loopingVideoViewChangedPlayerItem {
-    OWSAssertIsOnMainThread();
-    
-    [self updateZoomScaleAndConstraints];
-    self.scrollView.zoomScale = self.scrollView.minimumZoomScale;
-}
-
-#pragma mark - VideoPlayerViewDelegate
-
-- (void)videoPlayerViewStatusDidChange:(VideoPlayerView *)view
-{
-    OWSAssertIsOnMainThread();
-
-    [self updateZoomScaleAndConstraints];
-}
-
-- (void)videoPlayerViewPlaybackTimeDidChange:(VideoPlayerView *)view
-{
-    OWSAssertIsOnMainThread();
-
-    // Do nothing.
 }
 
 @end

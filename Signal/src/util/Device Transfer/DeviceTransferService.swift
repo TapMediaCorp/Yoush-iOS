@@ -1,11 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import MultipeerConnectivity
+import PromiseKit
 
-protocol DeviceTransferServiceObserver: AnyObject {
+protocol DeviceTransferServiceObserver: class {
     func deviceTransferServiceDiscoveredNewDevice(peerId: MCPeerID, discoveryInfo: [String: String]?)
 
     func deviceTransferServiceDidStartTransfer(progress: Progress)
@@ -64,6 +65,14 @@ protocol DeviceTransferServiceObserver: AnyObject {
 ///
 @objc
 class DeviceTransferService: NSObject {
+    var tsAccountManager: TSAccountManager { .sharedInstance() }
+    var databaseStorage: SDSDatabaseStorage { .shared }
+    var sleepManager: DeviceSleepManager { .sharedInstance }
+
+    @objc
+    static var shared: DeviceTransferService {
+        return AppEnvironment.shared.deviceTransferService
+    }
 
     static let appSharedDataDirectory = URL(fileURLWithPath: OWSFileSystem.appSharedDataDirectoryPath())
     static let pendingTransferDirectory = URL(fileURLWithPath: "transfer", isDirectory: true, relativeTo: appSharedDataDirectory)
@@ -73,10 +82,6 @@ class DeviceTransferService: NSObject {
     static let databaseIdentifier = "database"
     static let databaseWALIdentifier = "database-wal"
 
-    static let missingFileData = "Missing File".data(using: .utf8)!
-    static let missingFileHash = Cryptography.computeSHA256Digest(missingFileData)!
-
-    // This must also be updated in the info.plist
     private static let newDeviceServiceIdentifier = "sgnl-new-device"
 
     private let serialQueue = DispatchQueue(label: "DeviceTransferService")
@@ -90,11 +95,11 @@ class DeviceTransferService: NSObject {
     private(set) var session: MCSession? {
         didSet {
             if let oldValue = oldValue {
-                deviceSleepManager.removeBlock(blockObject: oldValue)
+                sleepManager.removeBlock(blockObject: oldValue)
             }
 
             if let session = session {
-                deviceSleepManager.addBlock(blockObject: session)
+                sleepManager.addBlock(blockObject: session)
             }
         }
     }
@@ -268,10 +273,7 @@ class DeviceTransferService: NSObject {
     // MARK: -
 
     @objc func didEnterBackground() {
-        switch transferState {
-        case .idle:
-            break
-        default:
+        if transferState != .idle {
             notifyObservers { $0.deviceTransferServiceDidEndTransfer(error: .cancel) }
         }
 
@@ -291,7 +293,7 @@ class DeviceTransferService: NSObject {
 
         var promises = [Promise<Void>]()
 
-        let (databasePromise, databaseFuture) = Promise<Void>.pending()
+        let (databasePromise, databaseResolver) = Promise<Void>.pending()
         promises.append(databasePromise)
 
         // Transfer the database files within a write transaction so we can be confident
@@ -300,13 +302,13 @@ class DeviceTransferService: NSObject {
         // minimal amount of time.
         databaseStorage.asyncWrite { _ in
             do {
-                try Promise.when(fulfilled: [
+                try when(fulfilled: [
                     DeviceTransferOperation.scheduleTransfer(file: database.database, priority: .high),
                     DeviceTransferOperation.scheduleTransfer(file: database.wal, priority: .high)
                 ]).wait()
-                databaseFuture.resolve()
+                databaseResolver.fulfill(())
             } catch {
-                databaseFuture.reject(error)
+                databaseResolver.reject(error)
             }
         }
 
@@ -314,7 +316,7 @@ class DeviceTransferService: NSObject {
             promises.append(DeviceTransferOperation.scheduleTransfer(file: file))
         }
 
-        Promise.when(fulfilled: promises).done {
+        when(fulfilled: promises).done {
             if !FeatureFlags.deviceTransferThrowAway {
                 self.tsAccountManager.wasTransferred = true
             }
@@ -350,7 +352,7 @@ class DeviceTransferService: NSObject {
 
         guard let progress: Progress = {
             switch transferState {
-            case .incoming(_, _, _, _, let progress):
+            case .incoming(_, _, _, let progress):
                 return progress
             case .outgoing(_, _, _, _, let progress):
                 return progress

@@ -1,10 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 public extension SignalBaseTest {
+    var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
     func read<T>(block: @escaping (SDSAnyReadTransaction) -> T) -> T {
         return databaseStorage.read(block: block)
     }

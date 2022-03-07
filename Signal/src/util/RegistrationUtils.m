@@ -1,19 +1,35 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "RegistrationUtils.h"
-#import "Signal-Swift.h"
-#import <SignalCoreKit/SignalCoreKit-Swift.h>
+#import "OWSNavigationController.h"
+#import "Yoush-Swift.h"
+#import <PromiseKit/PromiseKit.h>
 #import <SignalMessaging/Environment.h>
 #import <SignalMessaging/OWSPreferences.h>
 #import <SignalMessaging/SignalMessaging-Swift.h>
 #import <SignalServiceKit/TSAccountManager.h>
-#import <SignalUI/OWSNavigationController.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 @implementation RegistrationUtils
+
+#pragma mark - Dependencies
+
++ (TSAccountManager *)tsAccountManager
+{
+    OWSAssertDebug(SSKEnvironment.shared.tsAccountManager);
+    
+    return SSKEnvironment.shared.tsAccountManager;
+}
+
++ (AccountManager *)accountManager
+{
+    return AppEnvironment.shared.accountManager;
+}
+
+#pragma mark -
 
 + (void)showRelinkingUI
 {
@@ -37,7 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
         return;
     }
 
-    ActionSheetController *actionSheet = [ActionSheetController new];
+    ActionSheetController *actionSheet = [[ActionSheetController alloc] initWithTitle:nil message:nil];
 
     [actionSheet
         addAction:[[ActionSheetAction alloc]
@@ -72,9 +88,7 @@ NS_ASSUME_NONNULL_BEGIN
                       [self.accountManager requestAccountVerificationObjCWithRecipientId:phoneNumber
                                                                             captchaToken:nil
                                                                                    isSMS:true]
-                          .done(^(id value) {
-                              OWSAssertIsOnMainThread();
-
+                          .then(^{
                               OWSLogInfo(@"re-registering: send verification code succeeded.");
 
                               [modalActivityIndicator dismissWithCompletion:^{
@@ -99,8 +113,6 @@ NS_ASSUME_NONNULL_BEGIN
                               }];
                           })
                           .catch(^(NSError *error) {
-                              OWSAssertIsOnMainThread();
-
                               OWSLogError(@"re-registering: send verification code failed.");
                               [modalActivityIndicator dismissWithCompletion:^{
                                   if (error.code == 400) {
@@ -109,7 +121,7 @@ NS_ASSUME_NONNULL_BEGIN
                                                            message:NSLocalizedString(
                                                                        @"REGISTRATION_NON_VALID_NUMBER", nil)];
                                   } else {
-                                      [OWSActionSheets showActionSheetWithTitle:error.userErrorDescription
+                                      [OWSActionSheets showActionSheetWithTitle:error.localizedDescription
                                                                         message:error.localizedRecoverySuggestion];
                                   }
                               }];

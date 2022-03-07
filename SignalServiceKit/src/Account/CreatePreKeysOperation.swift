@@ -1,45 +1,47 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc(SSKCreatePreKeysOperation)
 public class CreatePreKeysOperation: OWSOperation {
 
+    private var accountServiceClient: AccountServiceClient {
+        return SSKEnvironment.shared.accountServiceClient
+    }
+
+    private var preKeyStore: SSKPreKeyStore {
+        return SSKEnvironment.shared.preKeyStore
+    }
+
+    private var signedPreKeyStore: SSKSignedPreKeyStore {
+        return SSKEnvironment.shared.signedPreKeyStore
+    }
+
+    private var identityKeyManager: OWSIdentityManager {
+        return OWSIdentityManager.shared()
+    }
+
     public override func run() {
         Logger.debug("")
 
-        if self.identityManager.identityKeyPair() == nil {
-            self.identityManager.generateNewIdentityKey()
+        if self.identityKeyManager.identityKeyPair() == nil {
+            self.identityKeyManager.generateNewIdentityKey()
         }
-        let identityKey: Data = self.identityManager.identityKeyPair()!.publicKey
+        let identityKey: Data = self.identityKeyManager.identityKeyPair()!.publicKey
         let signedPreKeyRecord: SignedPreKeyRecord = self.signedPreKeyStore.generateRandomSignedRecord()
         let preKeyRecords: [PreKeyRecord] = self.preKeyStore.generatePreKeyRecords()
 
-        self.databaseStorage.write { transaction in
-            self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id,
-                                                     signedPreKeyRecord: signedPreKeyRecord,
-                                                     transaction: transaction)
-        }
+        self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id, signedPreKeyRecord: signedPreKeyRecord)
         self.preKeyStore.storePreKeyRecords(preKeyRecords)
 
-        firstly(on: .global()) { () -> Promise<Void> in
-            guard self.tsAccountManager.isRegisteredAndReady else {
-                return Promise.value(())
-            }
-            return self.messageProcessor.fetchingAndProcessingCompletePromise()
-        }.then(on: .global()) { () -> Promise<Void> in
-            self.accountServiceClient.setPreKeys(identityKey: identityKey,
-                                                 signedPreKeyRecord: signedPreKeyRecord,
-                                                 preKeyRecords: preKeyRecords)
+        firstly {
+            self.accountServiceClient.setPreKeys(identityKey: identityKey, signedPreKeyRecord: signedPreKeyRecord, preKeyRecords: preKeyRecords)
         }.done {
             signedPreKeyRecord.markAsAcceptedByService()
-            self.databaseStorage.write { transaction in
-                self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id,
-                                                         signedPreKeyRecord: signedPreKeyRecord,
-                                                         transaction: transaction)
-            }
+            self.signedPreKeyStore.storeSignedPreKey(signedPreKeyRecord.id, signedPreKeyRecord: signedPreKeyRecord)
             self.signedPreKeyStore.setCurrentSignedPrekeyId(signedPreKeyRecord.id)
 
             Logger.debug("done")

@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/MessageSender.h>
+#import "OWSMessageSender.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -10,7 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^messageBlock)(TSOutgoingMessage *);
 
-@interface OWSFakeMessageSender : MessageSender
+@interface OWSFakeMessageSender : OWSMessageSender
 
 @property (nonatomic, nullable) NSError *stubbedFailingError;
 

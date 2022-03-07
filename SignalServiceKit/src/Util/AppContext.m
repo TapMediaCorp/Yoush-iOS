@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "AppContext.h"
@@ -10,6 +10,8 @@ NSString *const OWSApplicationDidEnterBackgroundNotification = @"OWSApplicationD
 NSString *const OWSApplicationWillEnterForegroundNotification = @"OWSApplicationWillEnterForegroundNotification";
 NSString *const OWSApplicationWillResignActiveNotification = @"OWSApplicationWillResignActiveNotification";
 NSString *const OWSApplicationDidBecomeActiveNotification = @"OWSApplicationDidBecomeActiveNotification";
+NSString *const OWSConversationWallPaperDidChange = @"OWSConversationWallPaperDidChange";
+NSString *const OWSGroupCallStateDidChange = @"OWSGroupCallStateDidChange";
 
 NSString *NSStringForUIApplicationState(UIApplicationState value)
 {
@@ -53,7 +55,7 @@ void ClearCurrentAppContextForTests()
 void ExitShareExtension(void)
 {
     OWSLogInfo(@"ExitShareExtension");
-    OWSLogFlush();
+    [DDLog flushLog];
     exit(0);
 }
 

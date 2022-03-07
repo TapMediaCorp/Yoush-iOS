@@ -1,65 +1,59 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "SSKEnvironment.h"
 #import "AppContext.h"
-#import "ProfileManagerProtocol.h"
+#import "OWSBlockingManager.h"
+#import "OWSPrimaryStorage.h"
 #import "TSAccountManager.h"
+#import <SignalServiceKit/ProfileManagerProtocol.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
-
-NSNotificationName const WarmCachesNotification = @"WarmCachesNotification";
 
 static SSKEnvironment *sharedSSKEnvironment;
 
 @interface SSKEnvironment ()
 
-@property (nonatomic) id<ContactsManagerProtocol> contactsManagerRef;
-@property (nonatomic) MessageSender *messageSenderRef;
-@property (nonatomic) id<ProfileManagerProtocol> profileManagerRef;
-@property (nonatomic) NetworkManager *networkManagerRef;
-@property (nonatomic) OWSMessageManager *messageManagerRef;
-@property (nonatomic) BlockingManager *blockingManagerRef;
-@property (nonatomic) OWSIdentityManager *identityManagerRef;
-@property (nonatomic) id<OWSUDManager> udManagerRef;
-@property (nonatomic) OWSMessageDecrypter *messageDecrypterRef;
-@property (nonatomic) GroupsV2MessageProcessor *groupsV2MessageProcessorRef;
-@property (nonatomic) SocketManager *socketManagerRef;
-@property (nonatomic) TSAccountManager *tsAccountManagerRef;
-@property (nonatomic) OWS2FAManager *ows2FAManagerRef;
-@property (nonatomic) OWSDisappearingMessagesJob *disappearingMessagesJobRef;
-@property (nonatomic) OWSReceiptManager *receiptManagerRef;
-@property (nonatomic) OWSOutgoingReceiptManager *outgoingReceiptManagerRef;
-@property (nonatomic) id<SyncManagerProtocol> syncManagerRef;
-@property (nonatomic) id<SSKReachabilityManager> reachabilityManagerRef;
-@property (nonatomic) id<OWSTypingIndicators> typingIndicatorsRef;
-@property (nonatomic) OWSAttachmentDownloads *attachmentDownloadsRef;
-@property (nonatomic) SignalServiceAddressCache *signalServiceAddressCacheRef;
-@property (nonatomic) StickerManager *stickerManagerRef;
-@property (nonatomic) SDSDatabaseStorage *databaseStorageRef;
-@property (nonatomic) StorageCoordinator *storageCoordinatorRef;
-@property (nonatomic) SSKPreferences *sskPreferencesRef;
-@property (nonatomic) id<GroupsV2> groupsV2Ref;
-@property (nonatomic) id<GroupV2Updates> groupV2UpdatesRef;
-@property (nonatomic) MessageFetcherJob *messageFetcherJobRef;
-@property (nonatomic) BulkProfileFetch *bulkProfileFetchRef;
-@property (nonatomic) BulkUUIDLookup *bulkUUIDLookupRef;
-@property (nonatomic) id<VersionedProfiles> versionedProfilesRef;
-@property (nonatomic) ModelReadCaches *modelReadCachesRef;
-@property (nonatomic) EarlyMessageManager *earlyMessageManagerRef;
-@property (nonatomic) OWSMessagePipelineSupervisor *messagePipelineSupervisorRef;
-@property (nonatomic) AppExpiry *appExpiryRef;
-@property (nonatomic) id<PaymentsHelper> paymentsHelperRef;
-@property (nonatomic) id<PaymentsCurrencies> paymentsCurrenciesRef;
-@property (nonatomic) id<PaymentsEvents> paymentsEventsRef;
-@property (nonatomic) id<MobileCoinHelper> mobileCoinHelperRef;
-@property (nonatomic) SpamChallengeResolver *spamChallengeResolverRef;
-@property (nonatomic) SenderKeyStore *senderKeyStoreRef;
-@property (nonatomic) PhoneNumberUtil *phoneNumberUtilRef;
-@property (nonatomic) id<WebSocketFactory> webSocketFactoryRef;
-@property (nonatomic) id<SubscriptionManagerProtocol> subscriptionManagerRef;
+@property (nonatomic) id<ContactsManagerProtocol> contactsManager;
+@property (nonatomic) OWSMessageSender *messageSender;
+@property (nonatomic) id<ProfileManagerProtocol> profileManager;
+@property (nonatomic, nullable) OWSPrimaryStorage *primaryStorage;
+@property (nonatomic) ContactsUpdater *contactsUpdater;
+@property (nonatomic) TSNetworkManager *networkManager;
+@property (nonatomic) OWSMessageManager *messageManager;
+@property (nonatomic) OWSBlockingManager *blockingManager;
+@property (nonatomic) OWSIdentityManager *identityManager;
+@property (nonatomic) id<OWSUDManager> udManager;
+@property (nonatomic) OWSMessageDecrypter *messageDecrypter;
+@property (nonatomic) SSKMessageDecryptJobQueue *messageDecryptJobQueue;
+@property (nonatomic) OWSBatchMessageProcessor *batchMessageProcessor;
+@property (nonatomic) OWSMessageReceiver *messageReceiver;
+@property (nonatomic) GroupsV2MessageProcessor *groupsV2MessageProcessor;
+@property (nonatomic) TSSocketManager *socketManager;
+@property (nonatomic) TSAccountManager *tsAccountManager;
+@property (nonatomic) OWS2FAManager *ows2FAManager;
+@property (nonatomic) OWSDisappearingMessagesJob *disappearingMessagesJob;
+@property (nonatomic) OWSReadReceiptManager *readReceiptManager;
+@property (nonatomic) OWSOutgoingReceiptManager *outgoingReceiptManager;
+@property (nonatomic) id<SyncManagerProtocol> syncManager;
+@property (nonatomic) id<SSKReachabilityManager> reachabilityManager;
+@property (nonatomic) id<OWSTypingIndicators> typingIndicators;
+@property (nonatomic) OWSAttachmentDownloads *attachmentDownloads;
+@property (nonatomic) StickerManager *stickerManager;
+@property (nonatomic) SDSDatabaseStorage *databaseStorage;
+@property (nonatomic) StorageCoordinator *storageCoordinator;
+@property (nonatomic) SSKPreferences *sskPreferences;
+@property (nonatomic) id<GroupsV2> groupsV2;
+@property (nonatomic) id<GroupV2Updates> groupV2Updates;
+@property (nonatomic) MessageProcessing *messageProcessing;
+@property (nonatomic) MessageFetcherJob *messageFetcherJob;
+@property (nonatomic) BulkProfileFetch *bulkProfileFetch;
+@property (nonatomic) BulkUUIDLookup *bulkUUIDLookup;
+@property (nonatomic) id<VersionedProfiles> versionedProfiles;
+@property (nonatomic) ModelReadCaches *modelReadCaches;
+@property (nonatomic) EarlyMessageManager *earlyMessageManager;
 
 @end
 
@@ -67,18 +61,21 @@ static SSKEnvironment *sharedSSKEnvironment;
 
 @implementation SSKEnvironment
 
-@synthesize callMessageHandlerRef = _callMessageHandlerRef;
-@synthesize notificationsManagerRef = _notificationsManagerRef;
+@synthesize callMessageHandler = _callMessageHandler;
+@synthesize notificationsManager = _notificationsManager;
+@synthesize migrationDBConnection = _migrationDBConnection;
 
 - (instancetype)initWithContactsManager:(id<ContactsManagerProtocol>)contactsManager
                      linkPreviewManager:(OWSLinkPreviewManager *)linkPreviewManager
-                          messageSender:(MessageSender *)messageSender
+                          messageSender:(OWSMessageSender *)messageSender
                   messageSenderJobQueue:(MessageSenderJobQueue *)messageSenderJobQueue
-                 pendingReceiptRecorder:(id<PendingReceiptRecorder>)pendingReceiptRecorder
+             pendingReadReceiptRecorder:(id<PendingReadReceiptRecorder>)pendingReadReceiptRecorder
                          profileManager:(id<ProfileManagerProtocol>)profileManager
-                         networkManager:(NetworkManager *)networkManager
+                         primaryStorage:(nullable OWSPrimaryStorage *)primaryStorage
+                        contactsUpdater:(ContactsUpdater *)contactsUpdater
+                         networkManager:(TSNetworkManager *)networkManager
                          messageManager:(OWSMessageManager *)messageManager
-                        blockingManager:(BlockingManager *)blockingManager
+                        blockingManager:(OWSBlockingManager *)blockingManager
                         identityManager:(OWSIdentityManager *)identityManager
                     remoteConfigManager:(id<RemoteConfigManager>)remoteConfigManager
                            sessionStore:(SSKSessionStore *)sessionStore
@@ -86,12 +83,15 @@ static SSKEnvironment *sharedSSKEnvironment;
                             preKeyStore:(SSKPreKeyStore *)preKeyStore
                               udManager:(id<OWSUDManager>)udManager
                        messageDecrypter:(OWSMessageDecrypter *)messageDecrypter
+                 messageDecryptJobQueue:(SSKMessageDecryptJobQueue *)messageDecryptJobQueue
+                  batchMessageProcessor:(OWSBatchMessageProcessor *)batchMessageProcessor
+                        messageReceiver:(OWSMessageReceiver *)messageReceiver
                groupsV2MessageProcessor:(GroupsV2MessageProcessor *)groupsV2MessageProcessor
-                          socketManager:(SocketManager *)socketManager
+                          socketManager:(TSSocketManager *)socketManager
                        tsAccountManager:(TSAccountManager *)tsAccountManager
                           ows2FAManager:(OWS2FAManager *)ows2FAManager
                 disappearingMessagesJob:(OWSDisappearingMessagesJob *)disappearingMessagesJob
-                         receiptManager:(OWSReceiptManager *)receiptManager
+                     readReceiptManager:(OWSReadReceiptManager *)readReceiptManager
                  outgoingReceiptManager:(OWSOutgoingReceiptManager *)outgoingReceiptManager
                     reachabilityManager:(id<SSKReachabilityManager>)reachabilityManager
                             syncManager:(id<SyncManagerProtocol>)syncManager
@@ -106,84 +106,115 @@ static SSKEnvironment *sharedSSKEnvironment;
                          sskPreferences:(SSKPreferences *)sskPreferences
                                groupsV2:(id<GroupsV2>)groupsV2
                          groupV2Updates:(id<GroupV2Updates>)groupV2Updates
+                      messageProcessing:(MessageProcessing *)messageProcessing
                       messageFetcherJob:(MessageFetcherJob *)messageFetcherJob
                        bulkProfileFetch:(BulkProfileFetch *)bulkProfileFetch
                          bulkUUIDLookup:(BulkUUIDLookup *)bulkUUIDLookup
                       versionedProfiles:(id<VersionedProfiles>)versionedProfiles
                         modelReadCaches:(ModelReadCaches *)modelReadCaches
                     earlyMessageManager:(EarlyMessageManager *)earlyMessageManager
-              messagePipelineSupervisor:(OWSMessagePipelineSupervisor *)messagePipelineSupervisor
-                              appExpiry:(AppExpiry *)appExpiry
-                       messageProcessor:(MessageProcessor *)messageProcessor
-                         paymentsHelper:(id<PaymentsHelper>)paymentsHelper
-                     paymentsCurrencies:(id<PaymentsCurrencies>)paymentsCurrencies
-                         paymentsEvents:(id<PaymentsEvents>)paymentsEvents
-                       mobileCoinHelper:(id<MobileCoinHelper>)mobileCoinHelper
-                  spamChallengeResolver:(SpamChallengeResolver *)spamResolver
-                         senderKeyStore:(SenderKeyStore *)senderKeyStore
-                        phoneNumberUtil:(PhoneNumberUtil *)phoneNumberUtil
-                       webSocketFactory:(id<WebSocketFactory>)webSocketFactory
-                    subscriptionManager:(id<SubscriptionManagerProtocol>)subscriptionManager
 {
     self = [super init];
     if (!self) {
         return self;
     }
-    
-    _contactsManagerRef = contactsManager;
-    _linkPreviewManagerRef = linkPreviewManager;
-    _messageSenderRef = messageSender;
-    _messageSenderJobQueueRef = messageSenderJobQueue;
-    _pendingReceiptRecorderRef = pendingReceiptRecorder;
-    _profileManagerRef = profileManager;
-    _networkManagerRef = networkManager;
-    _messageManagerRef = messageManager;
-    _blockingManagerRef = blockingManager;
-    _identityManagerRef = identityManager;
-    _remoteConfigManagerRef = remoteConfigManager;
-    _sessionStoreRef = sessionStore;
-    _signedPreKeyStoreRef = signedPreKeyStore;
-    _preKeyStoreRef = preKeyStore;
-    _udManagerRef = udManager;
-    _messageDecrypterRef = messageDecrypter;
-    _groupsV2MessageProcessorRef = groupsV2MessageProcessor;
-    _socketManagerRef = socketManager;
-    _tsAccountManagerRef = tsAccountManager;
-    _ows2FAManagerRef = ows2FAManager;
-    _disappearingMessagesJobRef = disappearingMessagesJob;
-    _receiptManagerRef = receiptManager;
-    _outgoingReceiptManagerRef = outgoingReceiptManager;
-    _syncManagerRef = syncManager;
-    _reachabilityManagerRef = reachabilityManager;
-    _typingIndicatorsRef = typingIndicators;
-    _attachmentDownloadsRef = attachmentDownloads;
-    _stickerManagerRef = stickerManager;
-    _databaseStorageRef = databaseStorage;
-    _signalServiceAddressCacheRef = signalServiceAddressCache;
-    _accountServiceClientRef = accountServiceClient;
-    _storageServiceManagerRef = storageServiceManager;
-    _storageCoordinatorRef = storageCoordinator;
-    _sskPreferencesRef = sskPreferences;
-    _groupsV2Ref = groupsV2;
-    _groupV2UpdatesRef = groupV2Updates;
-    _messageFetcherJobRef = messageFetcherJob;
-    _bulkProfileFetchRef = bulkProfileFetch;
-    _versionedProfilesRef = versionedProfiles;
-    _bulkUUIDLookupRef = bulkUUIDLookup;
-    _modelReadCachesRef = modelReadCaches;
-    _earlyMessageManagerRef = earlyMessageManager;
-    _messagePipelineSupervisorRef = messagePipelineSupervisor;
-    _appExpiryRef = appExpiry;
-    _messageProcessorRef = messageProcessor;
-    _paymentsHelperRef = paymentsHelper;
-    _paymentsCurrenciesRef = paymentsCurrencies;
-    _paymentsEventsRef = paymentsEvents;
-    _mobileCoinHelperRef = mobileCoinHelper;
-    _spamChallengeResolverRef = spamResolver;
-    _senderKeyStoreRef = senderKeyStore;
-    _phoneNumberUtilRef = phoneNumberUtil;
-    _webSocketFactoryRef = webSocketFactory;
-    _subscriptionManagerRef = subscriptionManager;
+
+    OWSAssertDebug(contactsManager);
+    OWSAssertDebug(linkPreviewManager);
+    OWSAssertDebug(messageSender);
+    OWSAssertDebug(messageSenderJobQueue);
+    OWSAssertDebug(pendingReadReceiptRecorder);
+    OWSAssertDebug(profileManager);
+    OWSAssertDebug(contactsUpdater);
+    OWSAssertDebug(networkManager);
+    OWSAssertDebug(messageManager);
+    OWSAssertDebug(blockingManager);
+    OWSAssertDebug(identityManager);
+    OWSAssertDebug(remoteConfigManager);
+    OWSAssertDebug(sessionStore);
+    OWSAssertDebug(signedPreKeyStore);
+    OWSAssertDebug(preKeyStore);
+    OWSAssertDebug(udManager);
+    OWSAssertDebug(messageDecrypter);
+    OWSAssertDebug(messageDecryptJobQueue);
+    OWSAssertDebug(batchMessageProcessor);
+    OWSAssertDebug(messageReceiver);
+    OWSAssertDebug(groupsV2MessageProcessor);
+    OWSAssertDebug(socketManager);
+    OWSAssertDebug(tsAccountManager);
+    OWSAssertDebug(ows2FAManager);
+    OWSAssertDebug(disappearingMessagesJob);
+    OWSAssertDebug(readReceiptManager);
+    OWSAssertDebug(outgoingReceiptManager);
+    OWSAssertDebug(syncManager);
+    OWSAssertDebug(reachabilityManager);
+    OWSAssertDebug(typingIndicators);
+    OWSAssertDebug(attachmentDownloads);
+    OWSAssertDebug(stickerManager);
+    OWSAssertDebug(databaseStorage);
+    OWSAssertDebug(signalServiceAddressCache);
+    OWSAssertDebug(accountServiceClient);
+    OWSAssertDebug(storageServiceManager);
+    OWSAssertDebug(storageCoordinator);
+    OWSAssertDebug(sskPreferences);
+    OWSAssertDebug(groupsV2);
+    OWSAssertDebug(groupV2Updates);
+    OWSAssertDebug(messageProcessing);
+    OWSAssertDebug(messageFetcherJob);
+    OWSAssertDebug(bulkProfileFetch);
+    OWSAssertDebug(versionedProfiles);
+    OWSAssertDebug(bulkUUIDLookup);
+    OWSAssertDebug(modelReadCaches);
+    OWSAssertDebug(earlyMessageManager);
+
+    _contactsManager = contactsManager;
+    _linkPreviewManager = linkPreviewManager;
+    _messageSender = messageSender;
+    _messageSenderJobQueue = messageSenderJobQueue;
+    _pendingReadReceiptRecorder = pendingReadReceiptRecorder;
+    _profileManager = profileManager;
+    _primaryStorage = primaryStorage;
+    _contactsUpdater = contactsUpdater;
+    _networkManager = networkManager;
+    _messageManager = messageManager;
+    _blockingManager = blockingManager;
+    _identityManager = identityManager;
+    _remoteConfigManager = remoteConfigManager;
+    _sessionStore = sessionStore;
+    _signedPreKeyStore = signedPreKeyStore;
+    _preKeyStore = preKeyStore;
+    _udManager = udManager;
+    _messageDecrypter = messageDecrypter;
+    _messageDecryptJobQueue = messageDecryptJobQueue;
+    _batchMessageProcessor = batchMessageProcessor;
+    _messageReceiver = messageReceiver;
+    _groupsV2MessageProcessor = groupsV2MessageProcessor;
+    _socketManager = socketManager;
+    _tsAccountManager = tsAccountManager;
+    _ows2FAManager = ows2FAManager;
+    _disappearingMessagesJob = disappearingMessagesJob;
+    _readReceiptManager = readReceiptManager;
+    _outgoingReceiptManager = outgoingReceiptManager;
+    _syncManager = syncManager;
+    _reachabilityManager = reachabilityManager;
+    _typingIndicators = typingIndicators;
+    _attachmentDownloads = attachmentDownloads;
+    _stickerManager = stickerManager;
+    _databaseStorage = databaseStorage;
+    _signalServiceAddressCache = signalServiceAddressCache;
+    _accountServiceClient = accountServiceClient;
+    _storageServiceManager = storageServiceManager;
+    _storageCoordinator = storageCoordinator;
+    _sskPreferences = sskPreferences;
+    _groupsV2 = groupsV2;
+    _groupV2Updates = groupV2Updates;
+    _messageProcessing = messageProcessing;
+    _messageFetcherJob = messageFetcherJob;
+    _bulkProfileFetch = bulkProfileFetch;
+    _versionedProfiles = versionedProfiles;
+    _bulkUUIDLookup = bulkUUIDLookup;
+    _modelReadCaches = modelReadCaches;
+    _earlyMessageManager = earlyMessageManager;
 
     return self;
 }
@@ -191,7 +222,7 @@ static SSKEnvironment *sharedSSKEnvironment;
 + (instancetype)shared
 {
     OWSAssertDebug(sharedSSKEnvironment);
-    
+
     return sharedSSKEnvironment;
 }
 
@@ -199,7 +230,7 @@ static SSKEnvironment *sharedSSKEnvironment;
 {
     OWSAssertDebug(env);
     OWSAssertDebug(!sharedSSKEnvironment || CurrentAppContext().isRunningTests);
-    
+
     sharedSSKEnvironment = env;
 }
 
@@ -215,41 +246,41 @@ static SSKEnvironment *sharedSSKEnvironment;
 
 #pragma mark - Mutable Accessors
 
-- (nullable id<OWSCallMessageHandler>)callMessageHandlerRef
+- (nullable id<OWSCallMessageHandler>)callMessageHandler
 {
     @synchronized(self) {
-        OWSAssertDebug(_callMessageHandlerRef);
-        
-        return _callMessageHandlerRef;
+        OWSAssertDebug(_callMessageHandler);
+
+        return _callMessageHandler;
     }
 }
 
-- (void)setCallMessageHandlerRef:(nullable id<OWSCallMessageHandler>)callMessageHandlerRef
+- (void)setCallMessageHandler:(nullable id<OWSCallMessageHandler>)callMessageHandler
 {
     @synchronized(self) {
-        OWSAssertDebug(callMessageHandlerRef);
-        OWSAssertDebug(!_callMessageHandlerRef);
-        
-        _callMessageHandlerRef = callMessageHandlerRef;
+        OWSAssertDebug(callMessageHandler);
+        OWSAssertDebug(!_callMessageHandler);
+
+        _callMessageHandler = callMessageHandler;
     }
 }
 
-- (nullable id<NotificationsProtocol>)notificationsManagerRef
+- (id<NotificationsProtocol>)notificationsManager
 {
     @synchronized(self) {
-        OWSAssertDebug(_notificationsManagerRef);
-        
-        return _notificationsManagerRef;
+        OWSAssertDebug(_notificationsManager);
+
+        return _notificationsManager;
     }
 }
 
-- (void)setNotificationsManagerRef:(nullable id<NotificationsProtocol>)notificationsManagerRef
+- (void)setNotificationsManager:(id<NotificationsProtocol>)notificationsManager
 {
     @synchronized(self) {
-        OWSAssertDebug(notificationsManagerRef);
-        OWSAssertDebug(!_notificationsManagerRef);
-        
-        _notificationsManagerRef = notificationsManagerRef;
+        OWSAssertDebug(notificationsManager);
+        OWSAssertDebug(!_notificationsManager);
+
+        _notificationsManager = notificationsManager;
     }
 }
 
@@ -258,22 +289,37 @@ static SSKEnvironment *sharedSSKEnvironment;
     return (self.callMessageHandler != nil && self.notificationsManager != nil);
 }
 
+- (YapDatabaseConnection *)migrationDBConnection {
+    OWSAssert(self.primaryStorage);
+
+    @synchronized(self) {
+        if (!_migrationDBConnection) {
+            _migrationDBConnection = self.primaryStorage.newDatabaseConnection;
+        }
+        return _migrationDBConnection;
+    }
+}
+
 - (void)warmCaches
 {
-    [self.tsAccountManager warmCaches];
-    [self.signalServiceAddressCache warmCaches];
+    // Pre-heat caches to avoid sneaky transactions during the YDB->GRDB migrations.
+    // We need to warm these caches _before_ the migrations run.
+    //
+    // We need to do as few writes as possible here, to avoid conflicts
+    // with the migrations which haven't run yet.
     [self.remoteConfigManager warmCaches];
-    [self.udManager warmCaches];
     [self.blockingManager warmCaches];
     [self.profileManager warmCaches];
-    [self.receiptManager prepareCachedValues];
+    [self.tsAccountManager warmCaches];
+    [self.readReceiptManager prepareCachedValues];
     [OWSKeyBackupService warmCaches];
-    [PinnedThreadManager warmCaches];
-    [self.typingIndicatorsImpl warmCaches];
-    [self.paymentsHelper warmCaches];
-    [self.paymentsCurrencies warmCaches];
-    
-    [NSNotificationCenter.defaultCenter postNotificationName:WarmCachesNotification object:nil];
+}
+
+- (nullable OWSPrimaryStorage *)primaryStorage
+{
+    OWSAssert(_primaryStorage != nil);
+
+    return _primaryStorage;
 }
 
 @end

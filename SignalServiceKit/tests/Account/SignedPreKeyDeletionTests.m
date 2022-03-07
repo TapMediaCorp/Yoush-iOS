@@ -1,48 +1,21 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
-#import "SDSDatabaseStorage+Objc.h"
 #import "SSKBaseTestObjC.h"
 #import "SSKSignedPreKeyStore.h"
-#import "SignedPrekeyRecord.h"
 #import "TSPreKeyManager.h"
-#import <SignalServiceKit/SignalServiceKit-Swift.h>
+#import <AxolotlKit/SignedPrekeyRecord.h>
 
-@interface TSPreKeyManager (Testing)
+@interface  TSPreKeyManager (Testing)
 
 + (void)clearSignedPreKeyRecordsWithKeyId:(NSNumber *)keyId;
 
 @end
 
-#pragma mark -
-
 @interface SignedPreKeyDeletionTests : SSKBaseTestObjC
 
 @end
-
-#pragma mark -
-
-@interface SSKSignedPreKeyStore (Tests)
-
-@end
-
-#pragma mark -
-
-@implementation SSKSignedPreKeyStore (Tests)
-
-- (nullable SignedPreKeyRecord *)loadSignedPreKey:(int)signedPreKeyId
-{
-    __block SignedPreKeyRecord *_Nullable result;
-    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
-        result = [self loadSignedPreKey:signedPreKeyId transaction:transaction];
-    }];
-    return result;
-}
-
-@end
-
-#pragma mark -
 
 @implementation SignedPreKeyDeletionTests
 
@@ -54,22 +27,23 @@
     [super tearDown];
 }
 
+- (SSKSignedPreKeyStore *)signedPreKeyStore
+{
+    return SSKEnvironment.shared.signedPreKeyStore;
+}
+
 - (NSUInteger)signedPreKeyCount
 {
-    __block NSUInteger result;
-    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
-        result = [self.signedPreKeyStore loadSignedPreKeysWithTransaction:transaction].count;
-    }];
-    return result;
+    return [self.signedPreKeyStore loadSignedPreKeys].count;
 }
 
 - (void)testSignedPreKeyDeletion {
     XCTAssertEqual(0, self.signedPreKeyCount);
 
-    int days = 40;
+    int days = 20;
     int lastPreKeyId = days;
 
-    for (int i = 0; i <= days; i++) { // 41 signed keys are generated, one per day from now until 40 days ago.
+    for (int i = 0; i <= days; i++) { // 21 signed keys are generated, one per day from now until 20 days ago.
         int secondsAgo = (i - days) * 24 * 60 * 60;
         NSAssert(secondsAgo <= 0, @"Time in past must be negative");
         NSDate *generatedAt = [NSDate dateWithTimeIntervalSinceNow:secondsAgo];
@@ -77,20 +51,18 @@
                                                                     keyPair:[Curve25519 generateKeyPair]
                                                                   signature:[NSData new]
                                                                 generatedAt:generatedAt];
-        DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record transaction:transaction];
-        });
+        [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record];
     }
 
     // Sanity check
-    XCTAssertEqual(41, self.signedPreKeyCount);
+    XCTAssertEqual(21, self.signedPreKeyCount);
 
     [TSPreKeyManager clearSignedPreKeyRecordsWithKeyId:@(lastPreKeyId)];
 
     XCTAssert([self.signedPreKeyStore loadSignedPreKey:lastPreKeyId] != nil);
 
-    // We'll delete every key created 30 or more days ago.
-    XCTAssertEqual(30, self.signedPreKeyCount);
+    // We'll delete every key created 7 or more days ago.
+    XCTAssertEqual(7, self.signedPreKeyCount);
 }
 
 - (void)testSignedPreKeyDeletionKeepsSomeOldKeys
@@ -99,8 +71,8 @@
 
     int lastPreKeyId = 10;
     for (int i = 0; i <= 10; i++) {
-        // All these keys will be considered "old", since they were created more than 30 days ago.
-        int secondsAgo = (i - 40) * 24 * 60 * 60;
+        // All these keys will be considered "old", since they were created more than 7 days ago.
+        int secondsAgo = (i - 20) * 24 * 60 * 60;
         NSAssert(secondsAgo <= 0, @"Time in past must be negative");
         NSDate *generatedAt = [NSDate dateWithTimeIntervalSinceNow:secondsAgo];
         SignedPreKeyRecord *record = [[SignedPreKeyRecord alloc] initWithId:i
@@ -109,9 +81,7 @@
                                                                 generatedAt:generatedAt];
         // we only retain accepted keys
         [record markAsAcceptedByService];
-        DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record transaction:transaction];
-        });
+        [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record];
     }
 
     // Sanity check
@@ -140,9 +110,7 @@
                                                                     keyPair:[Curve25519 generateKeyPair]
                                                                   signature:[NSData new]
                                                                 generatedAt:generatedAt];
-        DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record transaction:transaction];
-        });
+        [self.signedPreKeyStore storeSignedPreKey:i signedPreKeyRecord:record];
     }
 
     // Sanity check

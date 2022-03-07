@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 //  Originally based on https://github.com/almassapargali/LocationPicker
@@ -10,7 +10,7 @@
 import UIKit
 import MapKit
 import CoreLocation
-import CoreServices
+import PromiseKit
 
 @objc
 public protocol LocationPickerDelegate {
@@ -214,7 +214,7 @@ public class LocationPicker: UIViewController {
 
             if let error = error, !geocodeCanceled {
                 // show error and remove annotation
-                let alert = ActionSheetController(title: nil, message: error.userErrorDescription)
+                let alert = ActionSheetController(title: nil, message: error.localizedDescription)
                 alert.addAction(ActionSheetAction(title: CommonStrings.okayButton,
                                               style: .cancel, handler: { _ in }))
                 self.present(alert, animated: true) {
@@ -428,7 +428,7 @@ public class Location: NSObject {
     }
 
     public func generateSnapshot() -> Promise<UIImage> {
-        return Promise { future in
+        return Promise { resolver in
             let options = MKMapSnapshotter.Options()
 
             // this is the plus/minus meter range from the given coordinate
@@ -445,12 +445,12 @@ public class Location: NSObject {
             MKMapSnapshotter(options: options).start(with: .global()) { snapshot, error in
                 guard error == nil else {
                     owsFailDebug("Unexpectedly failed to capture map snapshot \(error!)")
-                    return future.reject(LocationError.assertion)
+                    return resolver.reject(LocationError.assertion)
                 }
 
                 guard let snapshot = snapshot else {
                     owsFailDebug("snapshot unexpectedly nil")
-                    return future.reject(LocationError.assertion)
+                    return resolver.reject(LocationError.assertion)
                 }
 
                 // Draw our location pin on the snapshot
@@ -477,10 +477,10 @@ public class Location: NSObject {
 
                 guard let finalImage = image else {
                     owsFailDebug("image unexpectedly nil")
-                    return future.reject(LocationError.assertion)
+                    return resolver.reject(LocationError.assertion)
                 }
 
-                future.resolve(finalImage)
+                resolver.fulfill(finalImage)
             }
         }
     }
@@ -503,7 +503,7 @@ public class Location: NSObject {
             }
 
             let dataSource = DataSourceValue.dataSource(with: jpegData, utiType: kUTTypeJPEG as String)
-            return SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeJPEG as String)
+            return SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeJPEG as String, imageQuality: .original)
         }
     }
 

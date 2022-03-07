@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -18,10 +18,12 @@ protocol AttachmentFinderAdapter {
 @objc
 public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
 
+    let yapAdapter: YAPDBAttachmentFinderAdapter
     let grdbAdapter: GRDBAttachmentFinderAdapter
 
     @objc
     public init(threadUniqueId: String) {
+        self.yapAdapter = YAPDBAttachmentFinderAdapter(threadUniqueId: threadUniqueId)
         self.grdbAdapter = GRDBAttachmentFinderAdapter(threadUniqueId: threadUniqueId)
     }
 
@@ -30,6 +32,8 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
     @objc
     public class func unfailedAttachmentPointerIds(transaction: SDSAnyReadTransaction) -> [String] {
         switch transaction.readTransaction {
+        case .yapRead(let yapRead):
+            return YAPDBAttachmentFinderAdapter.unfailedAttachmentPointerIds(transaction: yapRead)
         case .grdbRead(let grdbRead):
             return GRDBAttachmentFinderAdapter.unfailedAttachmentPointerIds(transaction: grdbRead)
         }
@@ -38,6 +42,8 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
     @objc
     public class func enumerateAttachmentPointersWithLazyRestoreFragments(transaction: SDSAnyReadTransaction, block: @escaping (TSAttachmentPointer, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let yapRead):
+            return YAPDBAttachmentFinderAdapter.enumerateAttachmentPointersWithLazyRestoreFragments(transaction: yapRead, block: block)
         case .grdbRead(let grdbRead):
             return GRDBAttachmentFinderAdapter.enumerateAttachmentPointersWithLazyRestoreFragments(transaction: grdbRead, block: block)
         }
@@ -48,9 +54,6 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
         withAttachmentIds attachmentIds: [String],
         transaction: GRDBReadTransaction
     ) -> [TSAttachment] {
-        guard !attachmentIds.isEmpty else {
-            return []
-        }
         return GRDBAttachmentFinderAdapter.attachments(
             withAttachmentIds: attachmentIds,
             transaction: transaction
@@ -63,9 +66,6 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
         matchingContentType: String,
         transaction: GRDBReadTransaction
     ) -> [TSAttachment] {
-        guard !attachmentIds.isEmpty else {
-            return []
-        }
         return GRDBAttachmentFinderAdapter.attachments(
             withAttachmentIds: attachmentIds,
             matchingContentType: matchingContentType,
@@ -79,9 +79,6 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
         ignoringContentType: String,
         transaction: GRDBReadTransaction
     ) -> [TSAttachment] {
-        guard !attachmentIds.isEmpty else {
-            return []
-        }
         return GRDBAttachmentFinderAdapter.attachments(
             withAttachmentIds: attachmentIds,
             ignoringContentType: ignoringContentType,
@@ -95,14 +92,45 @@ public class AttachmentFinder: NSObject, AttachmentFinderAdapter {
         ignoringContentType: String,
         transaction: GRDBReadTransaction
     ) -> Bool {
-        guard !attachmentIds.isEmpty else {
-            return false
-        }
         return GRDBAttachmentFinderAdapter.existsAttachments(
             withAttachmentIds: attachmentIds,
             ignoringContentType: ignoringContentType,
             transaction: transaction
         )
+    }
+}
+
+// MARK: -
+
+// GRDB TODO: Nice to have: pull all of the YDB finder logic into this file.
+struct YAPDBAttachmentFinderAdapter: AttachmentFinderAdapter {
+
+    private let threadUniqueId: String
+
+    init(threadUniqueId: String) {
+        self.threadUniqueId = threadUniqueId
+    }
+
+    // MARK: - static methods
+
+    static func unfailedAttachmentPointerIds(transaction: YapDatabaseReadTransaction) -> [String] {
+        return OWSFailedAttachmentDownloadsJob.unfailedAttachmentPointerIds(with: transaction)
+    }
+
+    static func enumerateAttachmentPointersWithLazyRestoreFragments(transaction: YapDatabaseReadTransaction, block: @escaping (TSAttachmentPointer, UnsafeMutablePointer<ObjCBool>) -> Void) {
+        guard let view = transaction.safeViewTransaction(TSLazyRestoreAttachmentsDatabaseViewExtensionName) else {
+            owsFailDebug("Could not load view transaction.")
+            return
+        }
+
+        view.safe_enumerateKeysAndObjects(inGroup: TSLazyRestoreAttachmentsGroup,
+                                          extensionName: TSLazyRestoreAttachmentsDatabaseViewExtensionName) { (_, _, object, _, stopPtr) in
+                                            guard let job = object as? TSAttachmentPointer else {
+                                                owsFailDebug("unexpected job: \(type(of: object))")
+                                                return
+                                            }
+                                            block(job, stopPtr)
+        }
     }
 }
 

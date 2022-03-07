@@ -1,15 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
 class AppUpdateNag: NSObject {
 
     // MARK: Public
 
-    @objc(shared)
+    @objc(sharedInstance)
     public static let shared: AppUpdateNag = {
         let versionService = AppStoreVersionService()
         let nagManager = AppUpdateNag(versionService: versionService)
@@ -54,6 +55,12 @@ class AppUpdateNag: NSObject {
     static let kLastNagDateKey = "TSStorageManagerAppUpgradeNagDate"
     static let kFirstHeardOfNewVersionDateKey = "TSStorageManagerAppUpgradeFirstHeardOfNewVersionDate"
 
+    // MARK: - Dependencies
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
     // MARK: - KV Store
 
     @objc
@@ -66,7 +73,7 @@ class AppUpdateNag: NSObject {
     }
 
     var currentVersion: String? {
-        appVersion.currentAppReleaseVersion
+        return bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
     }
 
     var bundleIdentifier: String? {
@@ -114,9 +121,7 @@ class AppUpdateNag: NSObject {
         }
 
         switch frontmostViewController {
-        case is ConversationSplitViewController,
-             is OnboardingSplashViewController,
-             is OnboardingDroppedYdbViewController:
+        case is FLTabbarViewController, is OnboardingSplashViewController:
             self.setLastNagDate(Date())
             self.clearFirstHeardOfNewVersionDate()
             presentUpgradeNag(appStoreRecord: appStoreRecord)
@@ -217,15 +222,16 @@ class AppStoreVersionService: NSObject {
     func fetchLatestVersion(lookupURL: URL) -> Promise<AppStoreRecord> {
         Logger.debug("lookupURL:\(lookupURL)")
 
-        let (promise, future) = Promise<AppStoreRecord>.pending()
+        let (promise, resolver) = Promise<AppStoreRecord>.pending()
 
         let task = URLSession.ephemeral.dataTask(with: lookupURL) { (data, _, networkError) in
             if let networkError = networkError {
-                return future.reject(networkError)
+                return resolver.reject(networkError)
             }
 
             guard let data = data else {
-                future.reject(OWSAssertionError("Missing data."))
+                Logger.warn("data was unexpectedly nil")
+                resolver.reject(OWSErrorMakeUnableToProcessServerResponseError())
                 return
             }
 
@@ -233,13 +239,14 @@ class AppStoreVersionService: NSObject {
                 let decoder = JSONDecoder()
                 let resultSet = try decoder.decode(AppStoreLookupResultSet.self, from: data)
                 guard let appStoreRecord = resultSet.results.first else {
-                    future.reject(OWSAssertionError("Missing or invalid record."))
+                    Logger.warn("record was unexpectedly nil")
+                    resolver.reject(OWSErrorMakeUnableToProcessServerResponseError())
                     return
                 }
 
-                future.resolve(appStoreRecord)
+                resolver.fulfill(appStoreRecord)
             } catch {
-                future.reject(error)
+                resolver.reject(error)
             }
         }
 

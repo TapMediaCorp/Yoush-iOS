@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct SignalRecipientRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        SignalRecipientSerializer.table
+        return SignalRecipientSerializer.table
     }
 
-    public static var databaseTableName: String {
-        SignalRecipientSerializer.table.tableName
-    }
+    public static let databaseTableName: String = SignalRecipientSerializer.table.tableName
 
     public var id: Int64?
 
@@ -44,7 +42,7 @@ public struct SignalRecipientRecord: SDSRecord {
     }
 
     public static func columnName(_ column: SignalRecipientRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -60,7 +58,7 @@ public struct SignalRecipientRecord: SDSRecord {
 
 public extension SignalRecipientRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -133,15 +131,15 @@ extension SignalRecipient: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        SignalRecipientRecord.databaseTableName
+        return SignalRecipientRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        SignalRecipientSerializer.table
+        return SignalRecipientSerializer.table
     }
 }
 
@@ -183,28 +181,26 @@ extension SignalRecipientSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var devicesColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "devices", columnType: .blob) }
-    static var recipientPhoneNumberColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientPhoneNumber", columnType: .unicodeString, isOptional: true) }
-    static var recipientUUIDColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientUUID", columnType: .unicodeString, isOptional: true) }
+    static let devicesColumn = SDSColumnMetadata(columnName: "devices", columnType: .blob)
+    static let recipientPhoneNumberColumn = SDSColumnMetadata(columnName: "recipientPhoneNumber", columnType: .unicodeString, isOptional: true)
+    static let recipientUUIDColumn = SDSColumnMetadata(columnName: "recipientUUID", columnType: .unicodeString, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: SignalRecipient.collection(),
-                         tableName: "model_SignalRecipient",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: SignalRecipient.collection(),
+                                               tableName: "model_SignalRecipient",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
         devicesColumn,
         recipientPhoneNumberColumn,
-        recipientUUIDColumn
+        recipientUUIDColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -329,7 +325,7 @@ public class SignalRecipientCursor: NSObject {
             return nil
         }
         let value = try SignalRecipient.fromRecord(record)
-        Self.modelReadCaches.signalRecipientReadCache.didReadSignalRecipient(value, transaction: transaction.asAnyRead)
+        SSKEnvironment.shared.modelReadCaches.signalRecipientReadCache.didReadSignalRecipient(value, transaction: transaction.asAnyRead)
         return value
     }
 
@@ -374,6 +370,8 @@ public extension SignalRecipient {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return SignalRecipient.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(SignalRecipientRecord.databaseTableName) WHERE \(signalRecipientColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -404,20 +402,28 @@ public extension SignalRecipient {
                             batchSize: UInt,
                             block: @escaping (SignalRecipient, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            SignalRecipient.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? SignalRecipient else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = SignalRecipient.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = SignalRecipient.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -445,6 +451,10 @@ public extension SignalRecipient {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: SignalRecipient.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -476,6 +486,8 @@ public extension SignalRecipient {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: SignalRecipient.collection())
         case .grdbRead(let grdbTransaction):
             return SignalRecipientRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -485,6 +497,8 @@ public extension SignalRecipient {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: SignalRecipient.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try SignalRecipientRecord.deleteAll(grdbTransaction.database)
@@ -504,20 +518,24 @@ public extension SignalRecipient {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -529,6 +547,8 @@ public extension SignalRecipient {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: SignalRecipient.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(SignalRecipientRecord.databaseTableName) WHERE \(signalRecipientColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -548,7 +568,7 @@ public extension SignalRecipient {
             let cursor = try SignalRecipientRecord.fetchCursor(transaction.database, sqlRequest)
             return SignalRecipientCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return SignalRecipientCursor(transaction: transaction, cursor: nil)
         }
@@ -566,7 +586,7 @@ public extension SignalRecipient {
             }
 
             let value = try SignalRecipient.fromRecord(record)
-            Self.modelReadCaches.signalRecipientReadCache.didReadSignalRecipient(value, transaction: transaction.asAnyRead)
+            SSKEnvironment.shared.modelReadCaches.signalRecipientReadCache.didReadSignalRecipient(value, transaction: transaction.asAnyRead)
             return value
         } catch {
             owsFailDebug("error: \(error)")
@@ -619,3 +639,4 @@ public extension SignalRecipient {
     }
 }
 #endif
+                                                                            

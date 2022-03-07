@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSReaction.h"
-#import <SignalServiceKit/SignalServiceKit-Swift.h>
+#import "SignalServiceKit/SignalServiceKit-Swift.h"
 
 @interface OWSReaction ()
 
@@ -86,7 +86,9 @@
                                  reaction.read = YES;
                              }];
 
-    [SSKEnvironment.shared.notificationsManager cancelNotificationsForReactionId:self.uniqueId];
+    [transaction addAsyncCompletion:^{
+        [SSKEnvironment.shared.notificationsManager cancelNotificationsForReactionId:self.uniqueId];
+    }];
 }
 
 @end

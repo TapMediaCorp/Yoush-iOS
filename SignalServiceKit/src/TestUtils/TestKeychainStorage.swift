@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -9,11 +9,9 @@ import Foundation
 @objc
 public class SSKTestKeychainStorage: NSObject, SSKKeychainStorage {
 
-    private let lock = UnfairLock()
     private var dataMap = [String: Data]()
 
-    @objc
-    public override init() {
+    override init() {
         super.init()
     }
 
@@ -37,27 +35,21 @@ public class SSKTestKeychainStorage: NSObject, SSKKeychainStorage {
     }
 
     @objc public func data(forService service: String, key: String) throws -> Data {
-        try lock.withLock {
-            let key = self.key(forService: service, key: key)
-            guard let data = dataMap[key] else {
-                throw KeychainStorageError.failure(description: "\(logTag) could not retrieve data")
-            }
-            return data
+        let key = self.key(forService: service, key: key)
+        guard let data = dataMap[key] else {
+            throw KeychainStorageError.failure(description: "\(logTag) could not retrieve data")
         }
+        return data
     }
 
     @objc public func set(data: Data, service: String, key: String) throws {
-        lock.withLock {
-            let key = self.key(forService: service, key: key)
-            dataMap[key] = data
-        }
+        let key = self.key(forService: service, key: key)
+        dataMap[key] = data
     }
 
     @objc public func remove(service: String, key: String) throws {
-        lock.withLock {
-            let key = self.key(forService: service, key: key)
-            dataMap.removeValue(forKey: key)
-        }
+        let key = self.key(forService: service, key: key)
+        dataMap.removeValue(forKey: key)
     }
 }
 

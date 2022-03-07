@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -14,6 +14,11 @@ public protocol SDSDatabaseStorageDelegate {
 @objc
 public class SDSDatabaseStorage: SDSTransactable {
 
+    @objc
+    public static var shared: SDSDatabaseStorage {
+        return SSKEnvironment.shared.databaseStorage
+    }
+
     private weak var delegate: SDSDatabaseStorageDelegate?
 
     static public var shouldLogDBQueries: Bool = DebugFlags.logSQLQueries
@@ -23,6 +28,23 @@ public class SDSDatabaseStorage: SDSTransactable {
     private let crossProcess = SDSCrossProcess()
 
     // MARK: - Initialization / Setup
+
+    @objc
+    public var yapPrimaryStorage: OWSPrimaryStorage {
+        return yapStorage.storage
+    }
+
+    private var _yapStorage: YAPDBStorageAdapter?
+
+    var yapStorage: YAPDBStorageAdapter {
+        if let storage = _yapStorage {
+            return storage
+        } else {
+            let storage = createYapStorage()
+            _yapStorage = storage
+            return storage
+        }
+    }
 
     private var _grdbStorage: GRDBDatabaseStorageAdapter?
 
@@ -38,7 +60,7 @@ public class SDSDatabaseStorage: SDSTransactable {
     }
 
     @objc
-    public required init(delegate: SDSDatabaseStorageDelegate) {
+    required init(delegate: SDSDatabaseStorageDelegate) {
         self.delegate = delegate
 
         super.init()
@@ -48,6 +70,10 @@ public class SDSDatabaseStorage: SDSTransactable {
 
     private func addObservers() {
         guard !CurrentAppContext().isRunningTests else {
+            return
+        }
+        guard StorageCoordinator.dataStoreForUI == .grdb else {
+            // YDB uses a different mechanism for cross process writes.
             return
         }
         // Cross process writes
@@ -68,206 +94,200 @@ public class SDSDatabaseStorage: SDSTransactable {
         NotificationCenter.default.removeObserver(self)
     }
 
+    // GRDB TODO: Remove
     @objc
-    public class var baseDir: URL {
-        return URL(
-            fileURLWithPath: CurrentAppContext().appDatabaseBaseDirectoryPath(),
-            isDirectory: true
-        )
+    public static var shouldUseDisposableGrdb: Bool {
+        // We don't need to use a "disposable" database in our tests;
+        // TestAppContext ensures that our entire appSharedDataDirectoryPath
+        // is disposable in that case.
+
+        if .grdbThrowawayIfMigrating == FeatureFlags.storageMode {
+            // .grdbThrowawayIfMigrating allows us to re-test the migration on each launch.
+            // It doesn't make sense (and won't work) if there's no YDB database
+            // to migrate.
+            //
+            // Specifically, state persisted in NSUserDefaults won't be "throw away"
+            // and this will break the app if we throw away our database.
+            return StorageCoordinator.hasYdbFile
+        }
+        return false
+    }
+
+    private class func baseDir() -> URL {
+        return URL(fileURLWithPath: CurrentAppContext().appDatabaseBaseDirectoryPath(),
+                   isDirectory: true)
     }
 
     @objc
     public static var grdbDatabaseDirUrl: URL {
-        return GRDBDatabaseStorageAdapter.databaseDirUrl()
+        return GRDBDatabaseStorageAdapter.databaseDirUrl(baseDir: baseDir())
     }
 
     @objc
     public static var grdbDatabaseFileUrl: URL {
-        return GRDBDatabaseStorageAdapter.databaseFileUrl()
+        return GRDBDatabaseStorageAdapter.databaseFileUrl(baseDir: baseDir())
     }
 
-    @objc
-    public static let storageDidReload = Notification.Name("storageDidReload")
-
-    // completion is performed on the main queue.
-    @objc
-    public func runGrdbSchemaMigrations(completion: @escaping () -> Void) {
-        guard storageCoordinatorState == .GRDB else {
-            owsFailDebug("Not GRDB.")
-            return
-        }
-
-        Logger.info("")
-
-        let didPerformIncrementalMigrations = GRDBSchemaMigrator().runSchemaMigrations()
-
-        Logger.info("didPerformIncrementalMigrations: \(didPerformIncrementalMigrations)")
-
-        if didPerformIncrementalMigrations {
-            reopenGRDBStorage(completion: completion)
-        } else {
-            DispatchQueue.main.async(execute: completion)
-        }
-    }
-
-    public func reopenGRDBStorage(completion: @escaping () -> Void = {}) {
-        let benchSteps = BenchSteps()
-
-        // There seems to be a rare issue where at least one reader or writer
-        // (e.g. SQLite connection) in the GRDB pool ends up "stale" after
-        // a schema migration and does not reflect the migrations.
-        grdbStorage.pool.releaseMemory()
-        weak var weakPool = grdbStorage.pool
-        weak var weakGrdbStorage = grdbStorage
-        owsAssertDebug(weakPool != nil)
-        owsAssertDebug(weakGrdbStorage != nil)
-        _grdbStorage = createGrdbStorage()
-
-        DispatchQueue.main.async {
-            // We want to make sure all db connections from the old adapter/pool are closed.
-            //
-            // We only reach this point by a predictable code path; the autoreleasepool
-            // should be drained by this point.
-            owsAssertDebug(weakPool == nil)
-            owsAssertDebug(weakGrdbStorage == nil)
-
-            benchSteps.step("New GRDB adapter.")
-
-            completion()
-        }
-    }
-
-    public func reloadDatabase() -> Guarantee<Void> {
+    public func reload() {
         AssertIsOnMainThread()
         assert(storageCoordinatorState == .GRDB)
 
         Logger.info("")
 
-        let wasRegistered = TSAccountManager.shared.isRegistered
+        let wasRegistered = TSAccountManager.sharedInstance().isRegistered
 
-        let (promise, future) = Guarantee<Void>.pending()
-        reopenGRDBStorage {
-            _ = GRDBSchemaMigrator().runSchemaMigrations()
+        let grdbStorage = createGrdbStorage()
+        _grdbStorage = grdbStorage
 
-            self.grdbStorage.publishUpdatesImmediately()
+        GRDBSchemaMigrator().runSchemaMigrations()
+        grdbStorage.forceUpdateSnapshot()
 
-            // We need to do this _before_ warmCaches().
-            NotificationCenter.default.post(name: Self.storageDidReload, object: nil, userInfo: nil)
+        SSKEnvironment.shared.warmCaches()
+        OWSIdentityManager.shared().recreateDatabaseQueue()
 
-            SSKEnvironment.shared.warmCaches()
-
-            if wasRegistered != TSAccountManager.shared.isRegistered {
-                NotificationCenter.default.post(name: .registrationStateDidChange, object: nil, userInfo: nil)
-            }
-            future.resolve()
+        if wasRegistered != TSAccountManager.sharedInstance().isRegistered {
+            NotificationCenter.default.post(name: .registrationStateDidChange, object: nil, userInfo: nil)
         }
-        return promise
     }
 
     func createGrdbStorage() -> GRDBDatabaseStorageAdapter {
+        if !canLoadGrdb {
+            Logger.error("storageMode: \(FeatureFlags.storageModeDescription).")
+            Logger.error(
+                "StorageCoordinatorState: \(storageCoordinatorStateDescription).")
+            Logger.error(
+                "dataStoreForUI: \(NSStringForDataStore(StorageCoordinator.dataStoreForUI)).")
+
+            switch FeatureFlags.storageModeStrictness {
+            case .fail:
+                owsFail("Unexpected GRDB load.")
+            case .failDebug:
+                owsFailDebug("Unexpected GRDB load.")
+            case .log:
+                Logger.error("Unexpected GRDB load.")
+            }
+        }
+
+        if FeatureFlags.storageMode == .ydbForAll {
+            owsFailDebug("Unexpected storage mode: \(FeatureFlags.storageModeDescription)")
+        }
+        if StorageCoordinator.dataStoreForUI == .ydb && !CurrentAppContext().isRunningTests {
+            owsFailDebug("Unexpected data store.")
+        }
+
         return Bench(title: "Creating GRDB storage") {
-            return GRDBDatabaseStorageAdapter()
+            return GRDBDatabaseStorageAdapter(baseDir: type(of: self).baseDir())
         }
     }
 
     @objc
     public func deleteGrdbFiles() {
-        GRDBDatabaseStorageAdapter.removeAllFiles()
+        GRDBDatabaseStorageAdapter.removeAllFiles(baseDir: type(of: self).baseDir())
     }
 
     @objc
     public func resetAllStorage() {
-        YDBStorage.deleteYDBStorage()
-        GRDBDatabaseStorageAdapter.resetAllStorage()
+        OWSStorage.resetAllStorage()
+        GRDBDatabaseStorageAdapter.resetAllStorage(baseDir: type(of: self).baseDir())
+    }
+
+    func createYapStorage() -> YAPDBStorageAdapter {
+        if !canLoadYdb {
+            Logger.error("storageMode: \(FeatureFlags.storageModeDescription).")
+            Logger.error(
+                "StorageCoordinatorState: \(storageCoordinatorStateDescription).")
+            Logger.error(
+                "dataStoreForUI: \(NSStringForDataStore(StorageCoordinator.dataStoreForUI)).")
+
+            switch FeatureFlags.storageModeStrictness {
+            case .fail:
+                owsFail("Unexpected YDB load.")
+            case .failDebug:
+                owsFailDebug("Unexpected YDB load.")
+            case .log:
+                Logger.error("Unexpected YDB load.")
+            }
+        }
+
+        return Bench(title: "Creating YDB storage") {
+            let yapPrimaryStorage = OWSPrimaryStorage()
+            return YAPDBStorageAdapter(storage: yapPrimaryStorage)
+        }
     }
 
     // MARK: - Observation
 
     @objc
-    public func appendDatabaseChangeDelegate(_ databaseChangeDelegate: DatabaseChangeDelegate) {
-        guard let databaseChangeObserver = grdbStorage.databaseChangeObserver else {
-            owsFailDebug("Missing databaseChangeObserver.")
+    public func appendUIDatabaseSnapshotDelegate(_ snapshotDelegate: UIDatabaseSnapshotDelegate) {
+        guard let uiDatabaseObserver = grdbStorage.uiDatabaseObserver else {
+            owsFailDebug("Missing uiDatabaseObserver.")
             return
         }
-        databaseChangeObserver.appendDatabaseChangeDelegate(databaseChangeDelegate)
+        uiDatabaseObserver.appendSnapshotDelegate(snapshotDelegate)
     }
 
-    // MARK: - Id Mapping
+    // MARK: -
 
     @objc
-    public func updateIdMapping(thread: TSThread, transaction: SDSAnyWriteTransaction) {
-        switch transaction.writeTransaction {
-        case .grdbWrite(let grdb):
-            DatabaseChangeObserver.serializedSync {
-                if let databaseChangeObserver = grdbStorage.databaseChangeObserver {
-                    databaseChangeObserver.updateIdMapping(thread: thread, transaction: grdb)
-                } else if AppReadiness.isAppReady {
-                    owsFailDebug("databaseChangeObserver was unexpectedly nil")
-                }
-            }
-        }
-    }
+    public func newDatabaseQueue() -> SDSAnyDatabaseQueue {
+        var yapDatabaseQueue: YAPDBDatabaseQueue?
+        var grdbDatabaseQueue: GRDBDatabaseQueue?
 
-    @objc
-    public func updateIdMapping(interaction: TSInteraction, transaction: SDSAnyWriteTransaction) {
-        switch transaction.writeTransaction {
-        case .grdbWrite(let grdb):
-            DatabaseChangeObserver.serializedSync {
-                if let databaseChangeObserver = grdbStorage.databaseChangeObserver {
-                    databaseChangeObserver.updateIdMapping(interaction: interaction, transaction: grdb)
-                } else if AppReadiness.isAppReady {
-                    owsFailDebug("databaseChangeObserver was unexpectedly nil")
-                }
-            }
+        switch storageCoordinatorState {
+        case .YDB:
+            yapDatabaseQueue = yapStorage.newDatabaseQueue()
+        case .GRDB:
+            grdbDatabaseQueue = grdbStorage.newDatabaseQueue()
+        case .ydbTests, .grdbTests, .beforeYDBToGRDBMigration, .duringYDBToGRDBMigration:
+            yapDatabaseQueue = yapStorage.newDatabaseQueue()
+            grdbDatabaseQueue = grdbStorage.newDatabaseQueue()
         }
-    }
 
-    @objc
-    public func updateIdMapping(attachment: TSAttachment, transaction: SDSAnyWriteTransaction) {
-        switch transaction.writeTransaction {
-        case .grdbWrite(let grdb):
-            DatabaseChangeObserver.serializedSync {
-                if let databaseChangeObserver = grdbStorage.databaseChangeObserver {
-                    databaseChangeObserver.updateIdMapping(attachment: attachment, transaction: grdb)
-                } else if AppReadiness.isAppReady {
-                    owsFailDebug("databaseChangeObserver was unexpectedly nil")
-                }
-            }
-        }
+        return SDSAnyDatabaseQueue(yapDatabaseQueue: yapDatabaseQueue,
+                                   grdbDatabaseQueue: grdbDatabaseQueue,
+                                   crossProcess: crossProcess)
     }
 
     // MARK: - Touch
 
-    @objc(touchInteraction:shouldReindex:transaction:)
-    public func touch(interaction: TSInteraction, shouldReindex: Bool, transaction: SDSAnyWriteTransaction) {
+    @objc(touchInteraction:transaction:)
+    public func touch(interaction: TSInteraction, transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let yap):
+            let uniqueId = interaction.uniqueId
+            yap.touchObject(forKey: uniqueId, inCollection: TSInteraction.collection())
         case .grdbWrite(let grdb):
-            DatabaseChangeObserver.serializedSync {
-                if let databaseChangeObserver = grdbStorage.databaseChangeObserver {
-                    databaseChangeObserver.didTouch(interaction: interaction, transaction: grdb)
-                } else if AppReadiness.isAppReady {
-                    owsFailDebug("databaseChangeObserver was unexpectedly nil")
+            UIDatabaseObserver.serializedSync {
+                guard !UIDatabaseObserver.skipTouchObservations else {
+                    return
                 }
-            }
-            if shouldReindex {
+
+                if let uiDatabaseObserver = grdbStorage.uiDatabaseObserver {
+                    uiDatabaseObserver.didTouch(interaction: interaction, transaction: grdb)
+                } else if AppReadiness.isAppReady {
+                    owsFailDebug("conversationViewDatabaseObserver was unexpectedly nil")
+                }
                 GRDBFullTextSearchFinder.modelWasUpdated(model: interaction, transaction: grdb)
             }
         }
     }
 
-    @objc(touchThread:shouldReindex:transaction:)
-    public func touch(thread: TSThread, shouldReindex: Bool, transaction: SDSAnyWriteTransaction) {
+    @objc(touchThread:transaction:)
+    public func touch(thread: TSThread, transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let yap):
+            yap.touchObject(forKey: thread.uniqueId, inCollection: TSThread.collection())
         case .grdbWrite(let grdb):
-            DatabaseChangeObserver.serializedSync {
-                if let databaseChangeObserver = grdbStorage.databaseChangeObserver {
-                    databaseChangeObserver.didTouch(thread: thread, transaction: grdb)
-                } else if AppReadiness.isAppReady {
-                    // This can race with observation setup when app becomes ready.
-                    Logger.warn("databaseChangeObserver was unexpectedly nil")
+            UIDatabaseObserver.serializedSync {
+                guard !UIDatabaseObserver.skipTouchObservations else {
+                    return
                 }
-            }
-            if shouldReindex {
+
+                if let uiDatabaseObserver = grdbStorage.uiDatabaseObserver {
+                    uiDatabaseObserver.didTouch(thread: thread, transaction: grdb)
+                } else if AppReadiness.isAppReady {
+                    owsFailDebug("conversationListDatabaseObserver was unexpectedly nil")
+                }
                 GRDBFullTextSearchFinder.modelWasUpdated(model: thread, transaction: grdb)
             }
         }
@@ -284,13 +304,9 @@ public class SDSDatabaseStorage: SDSTransactable {
             return
         }
 
-        // Post these notifications always, sync.
-        NotificationCenter.default.post(name: SDSDatabaseStorage.didReceiveCrossProcessNotificationAlwaysSync, object: nil, userInfo: nil)
-
-        // Post these notifications async and defer if inactive.
         if CurrentAppContext().isMainAppAndActive {
             // If already active, update immediately.
-            postCrossProcessNotificationActiveAsync()
+            postCrossProcessNotification()
         } else {
             // If not active, set flag to update when we become active.
             hasPendingCrossProcessWrite = true
@@ -305,15 +321,13 @@ public class SDSDatabaseStorage: SDSTransactable {
         }
         hasPendingCrossProcessWrite = false
 
-        postCrossProcessNotificationActiveAsync()
+        postCrossProcessNotification()
     }
 
     @objc
-    public static let didReceiveCrossProcessNotificationActiveAsync = Notification.Name("didReceiveCrossProcessNotificationActiveAsync")
-    @objc
-    public static let didReceiveCrossProcessNotificationAlwaysSync = Notification.Name("didReceiveCrossProcessNotificationAlwaysSync")
+    public static let didReceiveCrossProcessNotification = Notification.Name("didReceiveCrossProcessNotification")
 
-    private func postCrossProcessNotificationActiveAsync() {
+    private func postCrossProcessNotification() {
         Logger.info("")
 
         // TODO: The observers of this notification will inevitably do
@@ -326,19 +340,46 @@ public class SDSDatabaseStorage: SDSTransactable {
         //       de-bouncing notifications while inactive and only updating
         //       once when we become active, we should be able to effectively
         //       skip most of the perf cost.
-        NotificationCenter.default.postNotificationNameAsync(SDSDatabaseStorage.didReceiveCrossProcessNotificationActiveAsync, object: nil)
+        NotificationCenter.default.postNotificationNameAsync(SDSDatabaseStorage.didReceiveCrossProcessNotification, object: nil)
     }
 
     // MARK: - SDSTransactable
 
     @objc
-    public override func read(block: (SDSAnyReadTransaction) -> Void) {
-        do {
-            try grdbStorage.read { transaction in
+    public func uiRead(block: @escaping (SDSAnyReadTransaction) -> Void) {
+        switch dataStoreForReads {
+        case .grdb:
+            do {
+                try grdbStorage.uiRead { transaction in
+                    block(transaction.asAnyRead)
+                }
+            } catch {
+                owsFail("error: \(error.grdbErrorForLogging)")
+            }
+        case .ydb:
+            owsFailDebug("YDB UI read.")
+            // We no longer use a UI connection with YDB.
+            yapStorage.read { transaction in
                 block(transaction.asAnyRead)
             }
-        } catch {
-            owsFail("error: \(error.grdbErrorForLogging)")
+        }
+    }
+
+    @objc
+    public override func read(block: @escaping (SDSAnyReadTransaction) -> Void) {
+        switch dataStoreForReads {
+        case .grdb:
+            do {
+                try grdbStorage.read { transaction in
+                    block(transaction.asAnyRead)
+                }
+            } catch {
+                owsFail("error: \(error.grdbErrorForLogging)")
+            }
+        case .ydb:
+            yapStorage.read { transaction in
+                block(transaction.asAnyRead)
+            }
         }
     }
 
@@ -346,7 +387,7 @@ public class SDSDatabaseStorage: SDSTransactable {
     public override func write(file: String = #file,
                                function: String = #function,
                                line: Int = #line,
-                               block: (SDSAnyWriteTransaction) -> Void) {
+                               block: @escaping (SDSAnyWriteTransaction) -> Void) {
         #if TESTABLE_BUILD
         if Thread.isMainThread &&
             AppReadiness.isAppReady {
@@ -355,24 +396,50 @@ public class SDSDatabaseStorage: SDSTransactable {
         #endif
 
         let benchTitle = "Slow Write Transaction \(Self.owsFormatLogMessage(file: file, function: function, line: line))"
-        do {
-            try grdbStorage.write { transaction in
-                Bench(title: benchTitle, logIfLongerThan: 0.1, logInProduction: DebugFlags.internalLogging) {
+        switch dataStoreForWrites {
+        case .grdb:
+            do {
+                try grdbStorage.write { transaction in
+                    Bench(title: benchTitle, logIfLongerThan: 0.1) {
+                        block(transaction.asAnyWrite)
+                    }
+                }
+            } catch {
+                owsFail("error: \(error.grdbErrorForLogging)")
+            }
+        case .ydb:
+            yapStorage.write { transaction in
+                Bench(title: benchTitle, logIfLongerThan: 0.1) {
                     block(transaction.asAnyWrite)
                 }
             }
-        } catch {
-            owsFail("error: \(error.grdbErrorForLogging)")
         }
         crossProcess.notifyChangedAsync()
     }
 
-    public func readThrows(block: (SDSAnyReadTransaction) throws -> Void) throws {
-        try grdbStorage.readThrows { transaction in
-            try autoreleasepool {
+    public func uiReadThrows(block: @escaping (SDSAnyReadTransaction) throws -> Void) throws {
+        switch dataStoreForReads {
+        case .grdb:
+            try grdbStorage.uiReadThrows { transaction in
+                try autoreleasepool {
+                    try block(transaction.asAnyRead)
+                }
+            }
+        case .ydb:
+            owsFailDebug("YDB UI read.")
+            // We no longer use a UI connection with YDB.
+            try yapStorage.readThrows { transaction in
                 try block(transaction.asAnyRead)
             }
         }
+    }
+
+    public func uiRead<T>(block: @escaping (SDSAnyReadTransaction) -> T) -> T {
+        var value: T!
+        uiRead { (transaction) in
+            value = block(transaction)
+        }
+        return value
     }
 
     public static func owsFormatLogMessage(file: String = #file,
@@ -397,7 +464,117 @@ extension SDSDatabaseStorage {
     }
 
     private var storageCoordinatorStateDescription: String {
-        NSStringFromStorageCoordinatorState(storageCoordinatorState)
+        return NSStringFromStorageCoordinatorState(storageCoordinatorState)
+    }
+
+    @objc
+    var dataStoreForReads: DataStore {
+        // Before the migration starts and during the migration, read from YDB.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration, .duringYDBToGRDBMigration:
+            return .ydb
+        case .GRDB:
+            return .grdb
+        case .ydbTests:
+            return .ydb
+        case .grdbTests:
+            return .grdb
+        }
+    }
+
+    @objc
+    var dataStoreForWrites: DataStore {
+        // Before the migration starts (but NOT during the migration), write to YDB.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration:
+            return .ydb
+        case .duringYDBToGRDBMigration, .GRDB:
+            return .grdb
+        case .ydbTests:
+            return .ydb
+        case .grdbTests:
+            return .grdb
+        }
+    }
+
+    private var dataStoreForReporting: DataStore {
+        return StorageCoordinator.dataStoreForUI
+    }
+
+    @objc
+    var canLoadYdb: Bool {
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration, .duringYDBToGRDBMigration:
+            return true
+        case .GRDB:
+            return false
+        case .ydbTests, .grdbTests:
+            return true
+        }
+    }
+
+    @objc
+    var canReadFromYdb: Bool {
+        // We can read from YDB before and during the YDB-to-GRDB migration.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration, .duringYDBToGRDBMigration:
+            return true
+        case .GRDB:
+            return false
+        case .ydbTests, .grdbTests:
+            return true
+        }
+    }
+
+    @objc
+    var canWriteToYdb: Bool {
+        // We can write to YDB before but not during the YDB-to-GRDB migration.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration:
+            return true
+        case .duringYDBToGRDBMigration, .GRDB:
+            return false
+        case .ydbTests, .grdbTests:
+            return true
+        }
+    }
+
+    @objc
+    var canLoadGrdb: Bool {
+        switch storageCoordinatorState {
+        case .YDB:
+            return false
+        case .beforeYDBToGRDBMigration, .duringYDBToGRDBMigration, .GRDB:
+            return true
+        case .ydbTests, .grdbTests:
+            return true
+        }
+    }
+
+    @objc
+    var canReadFromGrdb: Bool {
+        // We can read from GRDB during but not before the YDB-to-GRDB migration.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration:
+            return false
+        case .duringYDBToGRDBMigration, .GRDB:
+            return true
+        case .ydbTests, .grdbTests:
+            return true
+        }
+    }
+
+    @objc
+    var canWriteToGrdb: Bool {
+        // We can write to GRDB during but not before the YDB-to-GRDB migration.
+        switch storageCoordinatorState {
+        case .YDB, .beforeYDBToGRDBMigration:
+            return false
+        case .duringYDBToGRDBMigration, .GRDB:
+            return true
+        case .ydbTests, .grdbTests:
+            return true
+        }
     }
 }
 
@@ -406,8 +583,9 @@ extension SDSDatabaseStorage {
 protocol SDSDatabaseStorageAdapter {
     associatedtype ReadTransaction
     associatedtype WriteTransaction
-    func read(block: (ReadTransaction) -> Void) throws
-    func write(block: (WriteTransaction) -> Void) throws
+    func uiRead(block: @escaping (ReadTransaction) -> Void) throws
+    func read(block: @escaping (ReadTransaction) -> Void) throws
+    func write(block: @escaping (WriteTransaction) -> Void) throws
 }
 
 // MARK: -
@@ -446,20 +624,42 @@ public extension SDSDatabaseStorage {
     }
 
     func logAllFileSizes() {
-        Logger.info("GDRB Database : \(grdbStorage.databaseFileSize)")
-        Logger.info("\t GDRB WAL file size: \(grdbStorage.databaseWALFileSize)")
-        Logger.info("\t GDRB SHM file size: \(grdbStorage.databaseSHMFileSize)")
+        if canLoadYdb {
+            Logger.info("YDB Database : \(yapStorage.databaseFileSize)")
+            Logger.info("\t YDB WAL file size: \(yapStorage.databaseWALFileSize)")
+            Logger.info("\t YDB SHM file size: \(yapStorage.databaseSHMFileSize)")
+        }
+        if canLoadGrdb {
+            Logger.info("GDRB Database : \(grdbStorage.databaseFileSize)")
+            Logger.info("\t GDRB WAL file size: \(grdbStorage.databaseWALFileSize)")
+            Logger.info("\t GDRB SHM file size: \(grdbStorage.databaseSHMFileSize)")
+        }
     }
 
     var databaseFileSize: UInt64 {
-        grdbStorage.databaseFileSize
+        switch dataStoreForReporting {
+        case .grdb:
+            return grdbStorage.databaseFileSize
+        case .ydb:
+            return yapStorage.databaseFileSize
+        }
     }
 
     var databaseWALFileSize: UInt64 {
-        grdbStorage.databaseWALFileSize
+        switch dataStoreForReporting {
+        case .grdb:
+            return grdbStorage.databaseWALFileSize
+        case .ydb:
+            return yapStorage.databaseWALFileSize
+        }
     }
 
     var databaseSHMFileSize: UInt64 {
-        grdbStorage.databaseSHMFileSize
+        switch dataStoreForReporting {
+        case .grdb:
+            return grdbStorage.databaseSHMFileSize
+        case .ydb:
+            return yapStorage.databaseSHMFileSize
+        }
     }
 }

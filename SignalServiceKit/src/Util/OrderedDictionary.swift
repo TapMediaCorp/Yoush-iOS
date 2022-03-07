@@ -1,26 +1,32 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
-public struct OrderedDictionary<KeyType: Hashable, ValueType> {
+public class OrderedDictionary<KeyType: Hashable, ValueType> {
 
     private var keyValueMap = [KeyType: ValueType]()
 
-    public private(set) var orderedKeys = [KeyType]()
+    public var orderedKeys = [KeyType]()
 
     public init() { }
 
-    public init(keyValueMap: [KeyType: ValueType], orderedKeys: [KeyType]) {
-        owsAssertDebug(keyValueMap.count == orderedKeys.count)
-        owsAssertDebug(Set(orderedKeys) == Set(keyValueMap.keys), "Invalid contents.")
+    // Used to clone copies of instances of this class.
+    public init(keyValueMap: [KeyType: ValueType],
+                orderedKeys: [KeyType]) {
 
         self.keyValueMap = keyValueMap
         self.orderedKeys = orderedKeys
     }
 
-    public subscript(key: KeyType) -> ValueType? {
+    // Since the contents are immutable, we only modify copies
+    // made with this method.
+    public func clone() -> OrderedDictionary<KeyType, ValueType> {
+        return OrderedDictionary(keyValueMap: keyValueMap, orderedKeys: orderedKeys)
+    }
+
+    public func value(forKey key: KeyType) -> ValueType? {
         return keyValueMap[key]
     }
 
@@ -28,133 +34,107 @@ public struct OrderedDictionary<KeyType: Hashable, ValueType> {
         return keyValueMap[key] != nil
     }
 
-    public mutating func insert(key: KeyType, at index: Int, value: ValueType) {
-        owsAssert(keyValueMap[key] == nil, "Key already in dictionary: \(key)")
-        owsAssertDebug(!orderedKeys.contains(key), "Unexpected duplicate key in key list: \(key)")
-
+    public func append(key: KeyType, value: ValueType) {
+        if keyValueMap[key] != nil {
+            owsFailDebug("Unexpected duplicate key in key map: \(key)")
+        }
         keyValueMap[key] = value
-        orderedKeys.insert(key, at: index)
 
-        owsAssertDebug(orderedKeys.count == keyValueMap.count, "Invalid contents.")
-    }
-
-    public mutating func append(key: KeyType, value: ValueType) {
-        insert(key: key, at: count, value: value)
-    }
-
-    public mutating func prepend(key: KeyType, value: ValueType) {
-        insert(key: key, at: 0, value: value)
-    }
-
-    @discardableResult
-    public mutating func replace(key: KeyType, value: ValueType) -> ValueType {
-        guard let oldValue = keyValueMap.updateValue(value, forKey: key) else {
-            owsFail("Key is not present in OrderedDictionary: \(key)")
+        if orderedKeys.contains(key) {
+            owsFailDebug("Unexpected duplicate key in key list: \(key)")
+        } else {
+            orderedKeys.append(key)
         }
 
-        owsAssertDebug(orderedKeys.contains(key), "Missing key in key list: \(key)")
-        owsAssertDebug(orderedKeys.count == keyValueMap.count, "Invalid contents.")
-
-        return oldValue
+        if orderedKeys.count != keyValueMap.count {
+            owsFailDebug("Invalid contents.")
+        }
     }
 
-    @discardableResult
-    public mutating func remove(key: KeyType) -> ValueType? {
-        guard let value = keyValueMap.removeValue(forKey: key) else {
-            return nil
+    public func replace(key: KeyType, value: ValueType) {
+        if keyValueMap[key] == nil {
+            owsFailDebug("Missing key in key map: \(key)")
+        }
+        keyValueMap[key] = value
+
+        if !orderedKeys.contains(key) {
+            owsFailDebug("Missing key in key list: \(key)")
         }
 
-        owsAssertDebug(orderedKeys.contains(key), "Missing key in key list: \(key)")
-        orderedKeys.removeAll { $0 == key }
-
-        owsAssertDebug(orderedKeys.count == keyValueMap.count, "Invalid contents.")
-        return value
-    }
-
-    public mutating func remove(at index: Int) {
-        let key = orderedKeys[index]
-        guard keyValueMap.removeValue(forKey: key) != nil else {
-            owsFailDebug("Missing key in dictionary: \(key)")
-            return
+        if orderedKeys.count != keyValueMap.count {
+            owsFailDebug("Invalid contents.")
         }
-        orderedKeys.remove(at: index)
     }
 
-    public mutating func removeSubrange<R: RangeExpression>(_ range: R) where R.Bound == Int {
-        orderedKeys[range].forEach { key in
-            guard keyValueMap.removeValue(forKey: key) != nil else {
-                owsFailDebug("Missing key in dictionary: \(key)")
-                return
-            }
-        }
-        orderedKeys.removeSubrange(range)
-    }
-
-    public mutating func removeAll() {
-        keyValueMap.removeAll()
-        orderedKeys.removeAll()
-    }
-
-    public mutating func moveExistingKeyToFirst(_ key: KeyType) {
-        guard let index = orderedKeys.firstIndex(of: key) else {
-            owsFail("Key not in dictionary: \(key)")
+    public func remove(key: KeyType) {
+        if keyValueMap[key] == nil {
+            owsFailDebug("Missing key in key map: \(key)")
+        } else {
+            keyValueMap.removeValue(forKey: key)
         }
 
-        orderedKeys.remove(at: index)
-        orderedKeys.insert(key, at: 0)
+        if !orderedKeys.contains(key) {
+            owsFailDebug("Missing key in key list: \(key)")
+        } else {
+            orderedKeys = orderedKeys.filter { $0 != key }
+        }
+
+        if orderedKeys.count != keyValueMap.count {
+            owsFailDebug("Invalid contents.")
+        }
+    }
+
+    public var count: Int {
+        if orderedKeys.count != keyValueMap.count {
+            owsFailDebug("Invalid contents.")
+        }
+        return orderedKeys.count
     }
 
     public var orderedValues: [ValueType] {
-        return self.map { $0.value }
-    }
-
-    public var firstKey: KeyType? {
-        orderedKeys.first
-    }
-
-    public var lastKey: KeyType? {
-        orderedKeys.last
-    }
-}
-
-// MARK: -
-
-extension OrderedDictionary: RandomAccessCollection {
-    public var startIndex: Int { 0 }
-    public var endIndex: Int { self.orderedKeys.count }
-
-    public subscript(position: Int) -> (key: KeyType, value: ValueType) {
-        owsAssert(indices.contains(position))
-        let key = orderedKeys[position]
-        guard let value = keyValueMap[key] else {
-            owsFail("Missing value")
+        var values = [ValueType]()
+        for key in orderedKeys {
+            guard let value = self.keyValueMap[key] else {
+                owsFailDebug("Missing value")
+                continue
+            }
+            values.append(value)
         }
-        return (key: key, value: value)
+        return values
     }
 }
 
 // MARK: -
-
-extension OrderedDictionary: Encodable where KeyType: Encodable, ValueType: Encodable {}
-extension OrderedDictionary: Decodable where KeyType: Decodable, ValueType: Decodable {}
-
-// MARK: - Sequence
 
 extension OrderedDictionary: Sequence {
-    public typealias IteratorTuple = (key: KeyType, value: ValueType)
-    public typealias Iterator = AnyIterator<IteratorTuple>
+    public typealias Iterator = AnyIterator<(KeyType, ValueType)>
+
+    struct OrderedDictionaryIterator {
+        private let keys: [KeyType]
+        private let map: [KeyType: ValueType]
+        private var index: Int = 0
+
+        fileprivate init(keys: [KeyType], map: [KeyType: ValueType]) {
+            self.keys = keys
+            self.map = map
+        }
+
+        mutating func next() -> (KeyType, ValueType)? {
+            guard index < keys.count else {
+                return nil
+            }
+            let key = keys[index]
+            index += 1
+            guard let value = map[key] else {
+                owsFailDebug("Missing value for key.")
+                return nil
+            }
+            return (key, value)
+        }
+    }
 
     public func makeIterator() -> Iterator {
-        let keyValueMap = self.keyValueMap
-        var keyIterator = orderedKeys.makeIterator()
-        return Iterator { () -> IteratorTuple? in
-            guard let key = keyIterator.next() else {
-                return nil
-            }
-            guard let value = keyValueMap[key] else {
-                return nil
-            }
-            return (key: key, value: value)
-        }
+        var iterator = OrderedDictionaryIterator(keys: orderedKeys, map: keyValueMap)
+        return AnyIterator { iterator.next() }
     }
 }

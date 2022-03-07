@@ -1,15 +1,24 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
-public class AddToGroupViewController: OWSTableViewController2 {
+public class AddToGroupViewController: OWSTableViewController {
+
+    // MARK: Dependencies
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    // MARK: -
 
     private let address: SignalServiceAddress
     private let collation = UILocalizedIndexedCollation.current()
-    private let maxRecentGroups = 7
+    private let maxRecentGroups = 5
 
     private lazy var threadViewHelper: ThreadViewHelper = {
         let threadViewHelper = ThreadViewHelper()
@@ -19,7 +28,10 @@ public class AddToGroupViewController: OWSTableViewController2 {
 
     init(address: SignalServiceAddress) {
         self.address = address
+
         super.init()
+
+        tableViewStyle = .plain
     }
 
     public class func presentForUser(_ address: SignalServiceAddress,
@@ -38,54 +50,47 @@ public class AddToGroupViewController: OWSTableViewController2 {
 
         navigationItem.title = NSLocalizedString("ADD_TO_GROUP_TITLE", comment: "Title of the 'add to group' view.")
 
-        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(didPressCloseButton))
+        navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .stop, target: self, action: #selector(didPressCloseButton))
 
-        defaultSeparatorInsetLeading = Self.cellHInnerMargin + CGFloat(AvatarBuilder.smallAvatarSizePoints) + ContactCellView.avatarTextHSpacing
-
-        updateGroupThreadsAsync()
+        tableView.separatorStyle = .none
     }
 
-    private var groupThreads = [TSGroupThread]() {
-        didSet {
-            AssertIsOnMainThread()
-            updateTableContents()
-        }
-    }
-    private func updateGroupThreadsAsync() {
-        // make sure threadViewHelper is prepared on the main thread
-        _ = threadViewHelper
-        DispatchQueue.sharedUserInitiated.async { self.updateGroupThreads() }
-    }
-    private func updateGroupThreads() {
-        owsAssertDebug(!Thread.isMainThread)
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
 
-        let groupThreads = databaseStorage.read { transaction in
-            return self.threadViewHelper.threads.filter { thread -> Bool in
-                guard let groupThread = thread as? TSGroupThread else { return false }
-                let threadViewModel = ThreadViewModel(thread: groupThread,
-                                                      forHomeView: false,
-                                                      transaction: transaction)
-                let groupViewHelper = GroupViewHelper(threadViewModel: threadViewModel)
-                return groupViewHelper.canEditConversationMembership
-            } as? [TSGroupThread] ?? []
-        }
+        updateTableContents()
 
-        DispatchQueue.main.async {
-            self.groupThreads = groupThreads
-        }
+        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange), name: .ThemeDidChange, object: nil)
+    }
+
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func updateTableContents() {
         AssertIsOnMainThread()
+
+        let groupThreads = databaseStorage.read { transaction in
+            return self.threadViewHelper.threads.filter { thread -> Bool in
+                guard let groupThread = thread as? TSGroupThread else { return false }
+                let threadViewModel = ThreadViewModel(thread: groupThread, transaction: transaction)
+                let groupViewHelper = GroupViewHelper(threadViewModel: threadViewModel)
+                return groupViewHelper.canEditConversationMembership
+            } as? [TSGroupThread] ?? []
+        }
 
         let contents = OWSTableContents()
 
         let recentGroups = groupThreads.count > maxRecentGroups ? Array(groupThreads[0..<maxRecentGroups]) : groupThreads
 
         let recentsSection = OWSTableSection()
-        recentsSection.headerTitle = NSLocalizedString("ADD_TO_GROUP_RECENTS_TITLE",
-                                                       comment: "The title for the 'add to group' view's recents section")
-        recentsSection.add(items: recentGroups.map(item(forGroupThread:)))
+        recentsSection.customHeaderView = sectionHeader(
+            title: NSLocalizedString("ADD_TO_GROUP_RECENTS_TITLE",
+                                     comment: "The title for the 'add to group' view's recents section")
+        )
+        recentsSection.add(recentGroups.map(item(for:)))
         contents.addSection(recentsSection)
 
         if let additionalGroups = groupThreads.count > maxRecentGroups ? Array(groupThreads[maxRecentGroups..<groupThreads.count]) : nil {
@@ -100,10 +105,11 @@ public class AddToGroupViewController: OWSTableViewController2 {
                 guard let sectionGroups = collatedGroups[section] else { continue }
 
                 let section = OWSTableSection()
-                section.headerTitle = title
-                section.add(items: sectionGroups
+                section.customHeaderView = sectionHeader(title: title)
+                section.add(
+                    sectionGroups
                         .sorted { $0.groupNameOrDefault.localizedCaseInsensitiveCompare($1.groupNameOrDefault) == .orderedAscending }
-                        .map(item(forGroupThread:))
+                        .map(item(for:))
                 )
 
                 contents.addSection(section)
@@ -124,13 +130,8 @@ public class AddToGroupViewController: OWSTableViewController2 {
 
     // MARK: Helpers
 
-    public override func applyTheme() {
-        super.applyTheme()
-        self.tableView.sectionIndexColor = Theme.primaryTextColor
-    }
-
-    public override func themeDidChange() {
-        super.themeDidChange()
+    @objc
+    private func themeDidChange() {
         updateTableContents()
     }
 
@@ -142,53 +143,39 @@ public class AddToGroupViewController: OWSTableViewController2 {
     }
 
     private func didSelectGroup(_ groupThread: TSGroupThread) {
-        let shortName = databaseStorage.read { transaction in
-            return Self.contactsManager.shortDisplayName(for: self.address, transaction: transaction)
+        let shortName = databaseStorage.uiRead { transaction in
+            return Environment.shared.contactsManager.shortDisplayName(for: self.address, transaction: transaction)
         }
 
-        guard !groupThread.groupModel.groupMembership.isMemberOfAnyKind(address) else {
+        guard !groupThread.groupModel.groupMembership.isPendingOrNonPendingMember(address) else {
             let toastFormat = NSLocalizedString(
                 "ADD_TO_GROUP_ALREADY_MEMBER_TOAST_FORMAT",
                 comment: "A toast on the 'add to group' view indicating the user is already a member. Embeds {contact name} and {group name}"
             )
-            let toastText = String(format: toastFormat, shortName, groupThread.groupNameOrDefault)
-            presentToast(text: toastText)
+
+            let toastController = ToastController(
+                text: String(format: toastFormat, shortName, groupThread.groupNameOrDefault)
+            )
+            toastController.presentToastView(fromBottomOfView: view, inset: bottomLayoutGuide.length + 8)
             return
         }
 
+        let titleFormat = NSLocalizedString("ADD_TO_GROUP_ACTION_SHEET_TITLE_FORMAT",
+                                            comment: "The title on the 'add to group' confirmation action sheet. Embeds {group name}")
         let messageFormat = NSLocalizedString("ADD_TO_GROUP_ACTION_SHEET_MESSAGE_FORMAT",
-                                            comment: "The title on the 'add to group' confirmation action sheet. Embeds {contact name, group name}")
+                                            comment: "The title on the 'add to group' confirmation action sheet. Embeds {contact name}")
 
         OWSActionSheets.showConfirmationAlert(
-            title: NSLocalizedString(
-                "ADD_TO_GROUP_ACTION_SHEET_TITLE",
-                comment: "The title on the 'add to group' confirmation action sheet."
-            ),
-            message: String(format: messageFormat, shortName, groupThread.groupNameOrDefault),
+            title: String(format: titleFormat, groupThread.groupNameOrDefault),
+            message: String(format: messageFormat, shortName),
             proceedTitle: NSLocalizedString("ADD_TO_GROUP_ACTION_PROCEED_BUTTON",
                                             comment: "The button on the 'add to group' confirmation to add the user to the group."),
             proceedStyle: .default) { _ in
-                self.addToGroupStep1(groupThread, shortName: shortName)
+                self.addToGroup(groupThread, shortName: shortName)
         }
     }
 
-    private func addToGroupStep1(_ groupThread: TSGroupThread, shortName: String) {
-        AssertIsOnMainThread()
-        guard groupThread.isGroupV2Thread else {
-            addToGroupStep2(groupThread, shortName: shortName)
-            return
-        }
-        let doesUserSupportGroupsV2 = databaseStorage.read { transaction in
-            GroupManager.doesUserSupportGroupsV2(address: self.address, transaction: transaction)
-        }
-        guard doesUserSupportGroupsV2 else {
-            GroupViewUtils.showInvalidGroupMemberAlert(fromViewController: self)
-            return
-        }
-        addToGroupStep2(groupThread, shortName: shortName)
-    }
-
-    private func addToGroupStep2(_ groupThread: TSGroupThread, shortName: String) {
+    private func addToGroup(_ groupThread: TSGroupThread, shortName: String) {
         let oldGroupModel = groupThread.groupModel
         guard let newGroupModel = buildNewGroupModel(oldGroupModel: oldGroupModel) else {
             let error = OWSAssertionError("Couldn't build group model.")
@@ -202,9 +189,7 @@ public class AddToGroupViewController: OWSTableViewController2 {
                 self.updateGroupThreadPromise(oldGroupModel: oldGroupModel,
                                               newGroupModel: newGroupModel)
             },
-            completion: { [weak self] _ in
-                self?.notifyOfAddedAndDismiss(groupThread: groupThread, shortName: shortName)
-            }
+            completion: { self.notifyOfAddedAndDismiss(groupThread: groupThread, shortName: shortName) }
         )
     }
 
@@ -212,12 +197,17 @@ public class AddToGroupViewController: OWSTableViewController2 {
         let toastInset = bottomLayoutGuide.length + 8
 
         dismiss(animated: true) { [presentingViewController] in
+            guard let presentingView = presentingViewController?.view else { return }
+
             let toastFormat = NSLocalizedString(
                 "ADD_TO_GROUP_SUCCESS_TOAST_FORMAT",
                 comment: "A toast on the 'add to group' view indicating the user was added. Embeds {contact name} and {group name}"
             )
-            let toastText = String(format: toastFormat, shortName, groupThread.groupNameOrDefault)
-            presentingViewController?.presentToast(text: toastText)
+
+            let toastController = ToastController(
+                text: String(format: toastFormat, shortName, groupThread.groupNameOrDefault)
+            )
+            toastController.presentToastView(fromBottomOfView: presentingView, inset: toastInset)
         }
     }
 
@@ -230,12 +220,12 @@ public class AddToGroupViewController: OWSTableViewController2 {
                 let oldGroupMembership = oldGroupModel.groupMembership
                 var groupMembershipBuilder = oldGroupMembership.asBuilder
 
-                guard !oldGroupMembership.isMemberOfAnyKind(self.address) else {
+                guard !oldGroupMembership.isPendingOrNonPendingMember(self.address) else {
                     owsFailDebug("Recipient is already in group.")
                     return nil
                 }
                 // GroupManager will separate out members as pending if necessary.
-                groupMembershipBuilder.addFullMember(self.address, role: .normal)
+                groupMembershipBuilder.addNonPendingMember(self.address, role: .normal)
 
                 builder.groupMembership = groupMembershipBuilder.build()
                 return try builder.build(transaction: transaction)
@@ -267,24 +257,30 @@ public class AddToGroupViewController: OWSTableViewController2 {
 
     // MARK: -
 
-    private func item(forGroupThread  groupThread: TSGroupThread) -> OWSTableItem {
-        let alreadyAMemberText = NSLocalizedString(
-            "ADD_TO_GROUP_ALREADY_A_MEMBER",
-            comment: "Text indicating your contact is already a member of the group on the 'add to group' view."
-        )
-        let isAlreadyAMember = groupThread.groupMembership.isFullMember(address)
+    private func sectionHeader(title: String) -> UIView {
+        let textView = UITextView()
+        textView.isOpaque = false
+        textView.isEditable = false
+        textView.contentInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.isScrollEnabled = false
+        textView.textColor = Theme.primaryTextColor
+        textView.font = UIFont.ows_dynamicTypeBody.ows_semibold()
+        textView.backgroundColor = Theme.washColor
+        let tableEdgeInsets: CGFloat = UIDevice.current.isPlusSizePhone ? 20 : 16
+        textView.textContainerInset = UIEdgeInsets(top: 5, left: tableEdgeInsets, bottom: 5, right: tableEdgeInsets)
+        textView.text = title
+        return textView
+    }
 
+    private func item(for groupThread: TSGroupThread) -> OWSTableItem {
         return OWSTableItem(
             customCellBlock: {
                 let cell = GroupTableViewCell()
-                cell.configure(
-                    thread: groupThread,
-                    customSubtitle: isAlreadyAMember ? alreadyAMemberText : nil,
-                    customTextColor: isAlreadyAMember ? Theme.ternaryTextColor : nil
-                )
-                cell.isUserInteractionEnabled = !isAlreadyAMember
+                cell.configure(thread: groupThread)
                 return cell
             },
+            customRowHeight: UITableView.automaticDimension,
             actionBlock: { [weak self] in
                 self?.didSelectGroup(groupThread)
             }
@@ -296,6 +292,6 @@ public class AddToGroupViewController: OWSTableViewController2 {
 
 extension AddToGroupViewController: ThreadViewHelperDelegate {
     public func threadListDidChange() {
-        updateGroupThreadsAsync()
+        updateTableContents()
     }
 }

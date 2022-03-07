@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -73,18 +73,8 @@ class SSKMessageDecryptJobRecordSerializer: SDSSerializer {
         let threadId: String? = nil
         let attachmentId: String? = nil
         let isMediaMessage: Bool? = nil
-        let serverDeliveryTimestamp: UInt64? = model.serverDeliveryTimestamp
-        let exclusiveProcessIdentifier: String? = model.exclusiveProcessIdentifier
-        let isHighPriority: Bool? = nil
-        let receiptCredentailRequest: Data? = nil
-        let receiptCredentailRequestContext: Data? = nil
-        let priorSubscriptionLevel: UInt? = nil
-        let subscriberID: Data? = nil
-        let targetSubscriptionLevel: UInt? = nil
-        let boostPaymentIntentID: String? = nil
-        let isBoost: Bool? = nil
-        let receiptCredentialPresentation: Data? = nil
 
-        return JobRecordRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, failureCount: failureCount, label: label, status: status, attachmentIdMap: attachmentIdMap, contactThreadId: contactThreadId, envelopeData: envelopeData, invisibleMessage: invisibleMessage, messageId: messageId, removeMessageAfterSending: removeMessageAfterSending, threadId: threadId, attachmentId: attachmentId, isMediaMessage: isMediaMessage, serverDeliveryTimestamp: serverDeliveryTimestamp, exclusiveProcessIdentifier: exclusiveProcessIdentifier, isHighPriority: isHighPriority, receiptCredentailRequest: receiptCredentailRequest, receiptCredentailRequestContext: receiptCredentailRequestContext, priorSubscriptionLevel: priorSubscriptionLevel, subscriberID: subscriberID, targetSubscriptionLevel: targetSubscriptionLevel, boostPaymentIntentID: boostPaymentIntentID, isBoost: isBoost, receiptCredentialPresentation: receiptCredentialPresentation)
+        return JobRecordRecord(delegate: model, id: id, recordType: recordType, uniqueId: uniqueId, failureCount: failureCount, label: label, status: status, attachmentIdMap: attachmentIdMap, contactThreadId: contactThreadId, envelopeData: envelopeData, invisibleMessage: invisibleMessage, messageId: messageId, removeMessageAfterSending: removeMessageAfterSending, threadId: threadId, attachmentId: attachmentId, isMediaMessage: isMediaMessage)
     }
 }
+                                                                                        

@@ -1,2 +1,0 @@
-• Trochu jsme vylepšili seznam chatů, aby byly nepřečtené chaty přehlednější
-• Opravy některých problémů s vyhledáváním a přiblížením fotografií

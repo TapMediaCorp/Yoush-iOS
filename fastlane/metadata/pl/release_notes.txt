@@ -1,2 +1,0 @@
-• Poprawiliśmy trochę listę rozmów, aby rozmowy z nieprzeczytanymi wiadomościami były łatwiejsze do zauważenia
-• Poprawki kilku problemów z wyszukiwaniem i powiększaniem zdjęć

@@ -1,15 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugUIPage.h"
-
-NS_ASSUME_NONNULL_BEGIN
-
-@class TSThread;
-
-BOOL shouldUseDebugUI(void);
-void showDebugUI(TSThread *thread, UIViewController *fromViewController);
 
 // This preprocessor symbol controls whether or not the Debug UI is active.
 //
@@ -17,6 +10,8 @@ void showDebugUI(TSThread *thread, UIViewController *fromViewController);
 #ifdef DEBUG
 
 #define USE_DEBUG_UI
+
+NS_ASSUME_NONNULL_BEGIN
 
 @class OWSTableSection;
 @class TSThread;
@@ -29,6 +24,6 @@ void showDebugUI(TSThread *thread, UIViewController *fromViewController);
 
 @end
 
-#endif
-
 NS_ASSUME_NONNULL_END
+
+#endif

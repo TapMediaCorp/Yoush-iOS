@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "StickerPack.h"
@@ -9,9 +9,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation StickerPackItem
 
-- (instancetype)initWithStickerId:(UInt32)stickerId
-                      emojiString:(NSString *)emojiString
-                      contentType:(nullable NSString *)contentType
+- (instancetype)initWithStickerId:(UInt32)stickerId emojiString:(NSString *)emojiString
 {
     self = [super init];
 
@@ -21,9 +19,6 @@ NS_ASSUME_NONNULL_BEGIN
 
     _stickerId = stickerId;
     _emojiString = emojiString;
-    if (contentType.length > 0) {
-        _contentType = contentType;
-    }
 
     return self;
 }

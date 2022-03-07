@@ -1,21 +1,19 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class SMKUDAccessKey;
 
-static NSString *const kSenderKeySendRequestBodyContentType = @"application/vnd.signal-messenger.mrm";
-
-// TODO: Rework to _not_ extend NSMutableURLRequest.
 @interface TSRequest : NSMutableURLRequest
 
 @property (nonatomic) BOOL isUDRequest;
 @property (nonatomic) BOOL shouldHaveAuthorizationHeaders;
-@property (nonatomic) BOOL shouldRedactUrlInLogs;
 @property (atomic, nullable) NSString *authUsername;
 @property (atomic, nullable) NSString *authPassword;
+@property (atomic, nullable) NSString *customHost;
+@property (atomic, nullable) NSString *customCensorshipCircumventionPrefix;
 
 @property (nonatomic, readonly) NSDictionary<NSString *, id> *parameters;
 

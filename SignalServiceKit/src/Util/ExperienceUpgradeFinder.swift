@@ -1,83 +1,57 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import Contacts
 
-public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
+public enum ExperienceUpgradeId: String, CaseIterable {
     case introducingPins = "009"
+    case messageRequests = "012"
     case pinReminder // Never saved, used to periodically prompt the user for their PIN
     case notificationPermissionReminder
     case contactPermissionReminder
-    case linkPreviews
-    case researchMegaphone1
-    case groupsV2AndMentionsSplash2
-    case groupCallsMegaphone
-    case sharingSuggestions
-    case chatColors
-    case avatarBuilder
-    case subscriptionMegaphone
 
     // Until this flag is true the upgrade won't display to users.
     func hasLaunched(transaction: GRDBReadTransaction) -> Bool {
         AssertIsOnMainThread()
 
-        if let registrationDate = tsAccountManager.registrationDate(with: transaction.asAnyRead) {
-            guard Date().timeIntervalSince(registrationDate) >= delayAfterRegistration else {
-                return false
-            }
-        }
-
         switch self {
         case .introducingPins:
             // The PIN setup flow requires an internet connection and you to not already have a PIN
             return RemoteConfig.kbs &&
-                Self.reachabilityManager.isReachable &&
+                SSKEnvironment.shared.reachabilityManager.isReachable &&
                 !KeyBackupService.hasMasterKey(transaction: transaction.asAnyRead)
+        case .messageRequests:
+            return !SSKEnvironment.shared.profileManager.hasProfileName
         case .pinReminder:
-            return OWS2FAManager.shared.isDueForV2Reminder(transaction: transaction.asAnyRead)
+            return OWS2FAManager.shared().isDueForV2Reminder(transaction: transaction.asAnyRead)
         case .notificationPermissionReminder:
-            let (promise, future) = Promise<Bool>.pending()
+            let (promise, resolver) = Promise<Bool>.pending()
 
             Logger.info("Checking notification authorization")
 
             DispatchQueue.global(qos: .userInitiated).async {
                 UNUserNotificationCenter.current().getNotificationSettings { settings in
                     Logger.info("Checked notification authorization \(settings.authorizationStatus)")
-                    future.resolve(settings.authorizationStatus == .authorized)
+                    resolver.fulfill(settings.authorizationStatus == .authorized)
                 }
             }
 
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
                 guard promise.result == nil else { return }
-                future.reject(OWSGenericError("timeout fetching notification permissions"))
+                resolver.reject(OWSGenericError("timeout fetching notification permissions"))
             }
 
             do {
                 return !(try promise.wait())
             } catch {
-                Logger.warn("failed to query notification permission")
+                owsFailDebug("failed to query notification permission")
                 return false
             }
         case .contactPermissionReminder:
             return CNContactStore.authorizationStatus(for: CNEntityType.contacts) != .authorized
-        case .linkPreviews:
-            return true
-        case .researchMegaphone1:
-            return RemoteConfig.researchMegaphone
-        case .groupsV2AndMentionsSplash2:
-            return FeatureFlags.groupsV2showSplash
-        case .groupCallsMegaphone:
-            return RemoteConfig.groupCalling
-        case .sharingSuggestions:
-            return true
-        case .chatColors:
-            return true
-        case .avatarBuilder:
-            return profileManager.localProfileAvatarData() == nil
-        case .subscriptionMegaphone:
-            return RemoteConfig.subscriptionMegaphone && !subscriptionManager.hasCurrentSubscription(transaction: transaction.asAnyRead)
         }
     }
 
@@ -97,31 +71,11 @@ public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
     // If false, this will not be marked complete after registration.
     var skipForNewUsers: Bool {
         switch self {
-        case .introducingPins,
-             .researchMegaphone1,
-             .subscriptionMegaphone:
+        case .messageRequests,
+             .introducingPins:
             return false
         default:
             return true
-        }
-    }
-
-    // This much time must have passed since the user registered
-    // before the megaphone is ever presented.
-    var delayAfterRegistration: TimeInterval {
-        switch self {
-        case .contactPermissionReminder,
-             .notificationPermissionReminder:
-            return kDayInterval
-        case .introducingPins:
-            // Create a PIN after KBS network failure
-            return 2 * kHourInterval
-        case .pinReminder:
-            return 8 * kHourInterval
-        case .subscriptionMegaphone:
-            return 5 * kDayInterval
-        default:
-            return 0
         }
     }
 
@@ -138,27 +92,13 @@ public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
         switch self {
         case .introducingPins:
             return .high
-        case .linkPreviews:
-            return .medium
+        case .messageRequests:
+            return .high
         case .pinReminder:
             return .medium
         case .notificationPermissionReminder:
             return .medium
         case .contactPermissionReminder:
-            return .medium
-        case .researchMegaphone1:
-            return .low
-        case .groupsV2AndMentionsSplash2:
-            return .medium
-        case .groupCallsMegaphone:
-            return .medium
-        case .sharingSuggestions:
-            return .medium
-        case .subscriptionMegaphone:
-            return .low
-        case .chatColors:
-            return .low
-        case .avatarBuilder:
             return .medium
         }
     }
@@ -184,8 +124,6 @@ public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
             return false
         case .contactPermissionReminder:
             return false
-        case .subscriptionMegaphone:
-            return false
         default:
             return true
         }
@@ -197,8 +135,6 @@ public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
             return kDayInterval * 30
         case .contactPermissionReminder:
             return kDayInterval * 30
-        case .subscriptionMegaphone:
-            return RemoteConfig.subscriptionMegaphoneSnoozeInterval
         default:
             return kDayInterval * 2
         }
@@ -209,10 +145,6 @@ public enum ExperienceUpgradeId: String, CaseIterable, Dependencies {
         case .notificationPermissionReminder:
             return true
         case .contactPermissionReminder:
-            return true
-        case .sharingSuggestions:
-            return true
-        case .subscriptionMegaphone:
             return true
         default:
             return false
@@ -244,14 +176,6 @@ public class ExperienceUpgradeFinder: NSObject {
             guard experienceUpgrade.firstViewedTimestamp == 0 else { return }
             experienceUpgrade.firstViewedTimestamp = Date().timeIntervalSince1970
         }
-    }
-
-    public class func hasUnsnoozed(experienceUpgradeId: ExperienceUpgradeId, transaction: GRDBReadTransaction) -> Bool {
-        return allIncomplete(transaction: transaction).first { experienceUpgradeId.rawValue == $0.uniqueId }?.isSnoozed == false
-    }
-
-    public class func markAsSnoozed(experienceUpgradeId: ExperienceUpgradeId, transaction: GRDBWriteTransaction) {
-        markAsSnoozed(experienceUpgrade: ExperienceUpgrade(uniqueId: experienceUpgradeId.rawValue), transaction: transaction)
     }
 
     public class func markAsSnoozed(experienceUpgrade: ExperienceUpgrade, transaction: GRDBWriteTransaction) {
@@ -286,7 +210,7 @@ public class ExperienceUpgradeFinder: NSObject {
     /// yet to be completed. Sorted by priority from highest to lowest. For equal
     /// priority upgrades follows the order of the `ExperienceUpgradeId` enumeration
     private class func allActiveExperienceUpgrades(transaction: GRDBReadTransaction) -> [ExperienceUpgrade] {
-        let isPrimaryDevice = Self.tsAccountManager.isRegisteredPrimaryDevice
+        let isPrimaryDevice = SSKEnvironment.shared.tsAccountManager.isRegisteredPrimaryDevice
 
         let activeIds = ExperienceUpgradeId
             .allCases
@@ -308,14 +232,7 @@ public class ExperienceUpgradeFinder: NSObject {
 
         while true {
             guard let experienceUpgrade = try? cursor.next() else { break }
-            guard experienceUpgrade.id.shouldSave else {
-                // Ignore saved upgrades that we don't currently save.
-                continue
-            }
-            if !experienceUpgrade.isComplete && !experienceUpgrade.hasCompletedVisibleDuration {
-                experienceUpgrades.append(experienceUpgrade)
-            }
-
+            if !experienceUpgrade.isComplete { experienceUpgrades.append(experienceUpgrade) }
             unsavedIds.removeAll { $0 == experienceUpgrade.uniqueId }
         }
 
@@ -354,13 +271,6 @@ public extension ExperienceUpgrade {
         guard firstViewedTimestamp > 0 else { return 0 }
         let secondsSinceFirstView = -Date(timeIntervalSince1970: firstViewedTimestamp).timeIntervalSinceNow
         return Int(secondsSinceFirstView / kDayInterval)
-    }
-
-    var hasCompletedVisibleDuration: Bool {
-        switch id {
-        case .researchMegaphone1: return daysSinceFirstViewed >= 7
-        default: return false
-        }
     }
 
     var hasViewed: Bool { firstViewedTimestamp > 0 }

@@ -1,10 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import SignalCoreKit
-import SwiftProtobuf
 
 // WARNING: This code is generated. Only edit within the markers.
 
@@ -15,12 +14,12 @@ public enum FingerprintProtoError: Error {
 // MARK: - FingerprintProtoLogicalFingerprint
 
 @objc
-public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCoding {
+public class FingerprintProtoLogicalFingerprint: NSObject {
 
     // MARK: - FingerprintProtoLogicalFingerprintBuilder
 
     @objc
-    public static func builder(identityData: Data) -> FingerprintProtoLogicalFingerprintBuilder {
+    public class func builder(identityData: Data) -> FingerprintProtoLogicalFingerprintBuilder {
         return FingerprintProtoLogicalFingerprintBuilder(identityData: identityData)
     }
 
@@ -28,9 +27,6 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
     @objc
     public func asBuilder() -> FingerprintProtoLogicalFingerprintBuilder {
         let builder = FingerprintProtoLogicalFingerprintBuilder(identityData: identityData)
-        if let _value = unknownFields {
-            builder.setUnknownFields(_value)
-        }
         return builder
     }
 
@@ -60,18 +56,14 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
             proto.identityData = valueParam
         }
 
-        public func setUnknownFields(_ unknownFields: SwiftProtobuf.UnknownStorage) {
-            proto.unknownFields = unknownFields
-        }
-
         @objc
         public func build() throws -> FingerprintProtoLogicalFingerprint {
-            return try FingerprintProtoLogicalFingerprint(proto)
+            return try FingerprintProtoLogicalFingerprint.parseProto(proto)
         }
 
         @objc
         public func buildSerializedData() throws -> Data {
-            return try FingerprintProtoLogicalFingerprint(proto).serializedData()
+            return try FingerprintProtoLogicalFingerprint.parseProto(proto).serializedData()
         }
     }
 
@@ -79,14 +71,6 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
 
     @objc
     public let identityData: Data
-
-    public var hasUnknownFields: Bool {
-        return !proto.unknownFields.data.isEmpty
-    }
-    public var unknownFields: SwiftProtobuf.UnknownStorage? {
-        guard hasUnknownFields else { return nil }
-        return proto.unknownFields
-    }
 
     private init(proto: FingerprintProtos_LogicalFingerprint,
                  identityData: Data) {
@@ -100,14 +84,14 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
     }
 
     @objc
-    public convenience init(serializedData: Data) throws {
+    public class func parseData(_ serializedData: Data) throws -> FingerprintProtoLogicalFingerprint {
         let proto = try FingerprintProtos_LogicalFingerprint(serializedData: serializedData)
-        try self.init(proto)
+        return try parseProto(proto)
     }
 
-    fileprivate convenience init(_ proto: FingerprintProtos_LogicalFingerprint) throws {
+    fileprivate class func parseProto(_ proto: FingerprintProtos_LogicalFingerprint) throws -> FingerprintProtoLogicalFingerprint {
         guard proto.hasIdentityData else {
-            throw FingerprintProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: identityData")
+            throw FingerprintProtoError.invalidProtobuf(description: "\(logTag) missing required field: identityData")
         }
         let identityData = proto.identityData
 
@@ -115,38 +99,9 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
 
         // MARK: - End Validation Logic for FingerprintProtoLogicalFingerprint -
 
-        self.init(proto: proto,
-                  identityData: identityData)
-    }
-
-    public required convenience init(from decoder: Swift.Decoder) throws {
-        let singleValueContainer = try decoder.singleValueContainer()
-        let serializedData = try singleValueContainer.decode(Data.self)
-        try self.init(serializedData: serializedData)
-    }
-    public func encode(to encoder: Swift.Encoder) throws {
-        var singleValueContainer = encoder.singleValueContainer()
-        try singleValueContainer.encode(try serializedData())
-    }
-
-    public static var supportsSecureCoding: Bool { true }
-
-    public required convenience init?(coder: NSCoder) {
-        guard let serializedData = coder.decodeData() else { return nil }
-        do {
-            try self.init(serializedData: serializedData)
-        } catch {
-            owsFailDebug("Failed to decode serialized data \(error)")
-            return nil
-        }
-    }
-
-    public func encode(with coder: NSCoder) {
-        do {
-            coder.encode(try serializedData())
-        } catch {
-            owsFailDebug("Failed to encode serialized data \(error)")
-        }
+        let result = FingerprintProtoLogicalFingerprint(proto: proto,
+                                                        identityData: identityData)
+        return result
     }
 
     @objc
@@ -155,7 +110,7 @@ public class FingerprintProtoLogicalFingerprint: NSObject, Codable, NSSecureCodi
     }
 }
 
-#if TESTABLE_BUILD
+#if DEBUG
 
 extension FingerprintProtoLogicalFingerprint {
     @objc
@@ -176,12 +131,12 @@ extension FingerprintProtoLogicalFingerprint.FingerprintProtoLogicalFingerprintB
 // MARK: - FingerprintProtoLogicalFingerprints
 
 @objc
-public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCoding {
+public class FingerprintProtoLogicalFingerprints: NSObject {
 
     // MARK: - FingerprintProtoLogicalFingerprintsBuilder
 
     @objc
-    public static func builder(version: UInt32, localFingerprint: FingerprintProtoLogicalFingerprint, remoteFingerprint: FingerprintProtoLogicalFingerprint) -> FingerprintProtoLogicalFingerprintsBuilder {
+    public class func builder(version: UInt32, localFingerprint: FingerprintProtoLogicalFingerprint, remoteFingerprint: FingerprintProtoLogicalFingerprint) -> FingerprintProtoLogicalFingerprintsBuilder {
         return FingerprintProtoLogicalFingerprintsBuilder(version: version, localFingerprint: localFingerprint, remoteFingerprint: remoteFingerprint)
     }
 
@@ -189,9 +144,6 @@ public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCod
     @objc
     public func asBuilder() -> FingerprintProtoLogicalFingerprintsBuilder {
         let builder = FingerprintProtoLogicalFingerprintsBuilder(version: version, localFingerprint: localFingerprint, remoteFingerprint: remoteFingerprint)
-        if let _value = unknownFields {
-            builder.setUnknownFields(_value)
-        }
         return builder
     }
 
@@ -239,18 +191,14 @@ public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCod
             proto.remoteFingerprint = valueParam.proto
         }
 
-        public func setUnknownFields(_ unknownFields: SwiftProtobuf.UnknownStorage) {
-            proto.unknownFields = unknownFields
-        }
-
         @objc
         public func build() throws -> FingerprintProtoLogicalFingerprints {
-            return try FingerprintProtoLogicalFingerprints(proto)
+            return try FingerprintProtoLogicalFingerprints.parseProto(proto)
         }
 
         @objc
         public func buildSerializedData() throws -> Data {
-            return try FingerprintProtoLogicalFingerprints(proto).serializedData()
+            return try FingerprintProtoLogicalFingerprints.parseProto(proto).serializedData()
         }
     }
 
@@ -264,14 +212,6 @@ public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCod
 
     @objc
     public let remoteFingerprint: FingerprintProtoLogicalFingerprint
-
-    public var hasUnknownFields: Bool {
-        return !proto.unknownFields.data.isEmpty
-    }
-    public var unknownFields: SwiftProtobuf.UnknownStorage? {
-        guard hasUnknownFields else { return nil }
-        return proto.unknownFields
-    }
 
     private init(proto: FingerprintProtos_LogicalFingerprints,
                  version: UInt32,
@@ -289,65 +229,36 @@ public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCod
     }
 
     @objc
-    public convenience init(serializedData: Data) throws {
+    public class func parseData(_ serializedData: Data) throws -> FingerprintProtoLogicalFingerprints {
         let proto = try FingerprintProtos_LogicalFingerprints(serializedData: serializedData)
-        try self.init(proto)
+        return try parseProto(proto)
     }
 
-    fileprivate convenience init(_ proto: FingerprintProtos_LogicalFingerprints) throws {
+    fileprivate class func parseProto(_ proto: FingerprintProtos_LogicalFingerprints) throws -> FingerprintProtoLogicalFingerprints {
         guard proto.hasVersion else {
-            throw FingerprintProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: version")
+            throw FingerprintProtoError.invalidProtobuf(description: "\(logTag) missing required field: version")
         }
         let version = proto.version
 
         guard proto.hasLocalFingerprint else {
-            throw FingerprintProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: localFingerprint")
+            throw FingerprintProtoError.invalidProtobuf(description: "\(logTag) missing required field: localFingerprint")
         }
-        let localFingerprint = try FingerprintProtoLogicalFingerprint(proto.localFingerprint)
+        let localFingerprint = try FingerprintProtoLogicalFingerprint.parseProto(proto.localFingerprint)
 
         guard proto.hasRemoteFingerprint else {
-            throw FingerprintProtoError.invalidProtobuf(description: "\(Self.logTag()) missing required field: remoteFingerprint")
+            throw FingerprintProtoError.invalidProtobuf(description: "\(logTag) missing required field: remoteFingerprint")
         }
-        let remoteFingerprint = try FingerprintProtoLogicalFingerprint(proto.remoteFingerprint)
+        let remoteFingerprint = try FingerprintProtoLogicalFingerprint.parseProto(proto.remoteFingerprint)
 
         // MARK: - Begin Validation Logic for FingerprintProtoLogicalFingerprints -
 
         // MARK: - End Validation Logic for FingerprintProtoLogicalFingerprints -
 
-        self.init(proto: proto,
-                  version: version,
-                  localFingerprint: localFingerprint,
-                  remoteFingerprint: remoteFingerprint)
-    }
-
-    public required convenience init(from decoder: Swift.Decoder) throws {
-        let singleValueContainer = try decoder.singleValueContainer()
-        let serializedData = try singleValueContainer.decode(Data.self)
-        try self.init(serializedData: serializedData)
-    }
-    public func encode(to encoder: Swift.Encoder) throws {
-        var singleValueContainer = encoder.singleValueContainer()
-        try singleValueContainer.encode(try serializedData())
-    }
-
-    public static var supportsSecureCoding: Bool { true }
-
-    public required convenience init?(coder: NSCoder) {
-        guard let serializedData = coder.decodeData() else { return nil }
-        do {
-            try self.init(serializedData: serializedData)
-        } catch {
-            owsFailDebug("Failed to decode serialized data \(error)")
-            return nil
-        }
-    }
-
-    public func encode(with coder: NSCoder) {
-        do {
-            coder.encode(try serializedData())
-        } catch {
-            owsFailDebug("Failed to encode serialized data \(error)")
-        }
+        let result = FingerprintProtoLogicalFingerprints(proto: proto,
+                                                         version: version,
+                                                         localFingerprint: localFingerprint,
+                                                         remoteFingerprint: remoteFingerprint)
+        return result
     }
 
     @objc
@@ -356,7 +267,7 @@ public class FingerprintProtoLogicalFingerprints: NSObject, Codable, NSSecureCod
     }
 }
 
-#if TESTABLE_BUILD
+#if DEBUG
 
 extension FingerprintProtoLogicalFingerprints {
     @objc

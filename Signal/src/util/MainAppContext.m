@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "MainAppContext.h"
-#import "Signal-Swift.h"
+#import "Yoush-Swift.h"
 #import <SignalCoreKit/Threading.h>
 #import <SignalMessaging/Environment.h>
 #import <SignalMessaging/OWSProfileManager.h>
@@ -18,6 +18,9 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 
 @property (nonatomic, nullable) NSMutableArray<AppActiveBlock> *appActiveBlocks;
 
+// POST GRDB TODO: Remove this
+@property (nonatomic) NSUUID *disposableDatabaseUUID;
+
 @property (nonatomic, readonly) UIApplicationState mainApplicationStateOnLaunch;
 
 @end
@@ -30,6 +33,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 @synthesize appLaunchTime = _appLaunchTime;
 @synthesize buildTime = _buildTime;
 @synthesize reportedApplicationState = _reportedApplicationState;
+@synthesize hideConversationPinCode = _hideConversationPinCode;
 
 - (instancetype)init
 {
@@ -42,6 +46,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
     self.reportedApplicationState = UIApplicationStateInactive;
 
     _appLaunchTime = [NSDate new];
+    _disposableDatabaseUUID = [NSUUID UUID];
     _mainApplicationStateOnLaunch = [UIApplication sharedApplication].applicationState;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -127,7 +132,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
     self.reportedApplicationState = UIApplicationStateBackground;
 
     OWSLogInfo(@"");
-    OWSLogFlush();
+    [DDLog flushLog];
 
     [BenchManager benchWithTitle:@"Slow post DidEnterBackground"
                  logIfLongerThan:0.01
@@ -146,7 +151,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
     self.reportedApplicationState = UIApplicationStateInactive;
 
     OWSLogInfo(@"");
-    OWSLogFlush();
+    [DDLog flushLog];
 
     [BenchManager benchWithTitle:@"Slow post WillResignActive"
                  logIfLongerThan:0.01
@@ -183,7 +188,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
     OWSAssertIsOnMainThread();
 
     OWSLogInfo(@"");
-    OWSLogFlush();
+    [DDLog flushLog];
 }
 
 #pragma mark -
@@ -196,11 +201,6 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 - (BOOL)isMainAppAndActive
 {
     return [UIApplication sharedApplication].applicationState == UIApplicationStateActive;
-}
-
-- (BOOL)isNSE
-{
-    return NO;
 }
 
 - (BOOL)isRTL
@@ -267,9 +267,17 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
     return UIApplication.sharedApplication.frontmostViewControllerIgnoringAlerts;
 }
 
-- (void)openSystemSettings
+- (nullable ActionSheetAction *)openSystemSettingsActionWithCompletion:(void (^_Nullable)(void))completion
 {
-    [UIApplication.sharedApplication openSystemSettings];
+    return [[ActionSheetAction alloc] initWithTitle:CommonStrings.openSettingsButton
+                            accessibilityIdentifier:ACCESSIBILITY_IDENTIFIER_WITH_NAME(self, @"system_settings")
+                                              style:ActionSheetActionStyleDefault
+                                            handler:^(ActionSheetAction *_Nonnull action) {
+        if (completion != nil) {
+            completion();
+        }
+        [UIApplication.sharedApplication openSystemSettings];
+    }];
 }
 
 - (BOOL)isRunningTests
@@ -284,10 +292,12 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
         [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"BuildDetails"][@"Timestamp"] integerValue];
 
         if (buildTimestamp == 0) {
+#if RELEASE
             // Production builds should _always_ expire, ensure that here.
-            OWSAssert(OWSIsTestableBuild());
-
+            OWSFail(@"No build timestamp, assuming app never expires.");
+#else
             OWSLogDebug(@"No build timestamp, assuming app never expires.");
+#endif
             _buildTime = [NSDate distantFuture];
         } else {
             _buildTime = [NSDate dateWithTimeIntervalSince1970:buildTimestamp];
@@ -299,7 +309,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 
 - (CGRect)frame
 {
-    return self.mainWindow.frame;
+    return UIApplication.sharedApplication.keyWindow.frame;
 }
 
 - (UIInterfaceOrientation)interfaceOrientation
@@ -378,7 +388,11 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 
 - (NSString *)appDatabaseBaseDirectoryPath
 {
-    return self.appSharedDataDirectoryPath;
+    if (SDSDatabaseStorage.shouldUseDisposableGrdb) {
+        return [self.appSharedDataDirectoryPath stringByAppendingPathComponent:self.disposableDatabaseUUID.UUIDString];
+    } else {
+        return self.appSharedDataDirectoryPath;
+    }
 }
 
 - (NSUserDefaults *)appUserDefaults
@@ -403,21 +417,7 @@ NSString *const ReportedApplicationStateDidChangeNotification = @"ReportedApplic
 
 - (BOOL)didLastLaunchNotTerminate
 {
-    return SignalApp.shared.didLastLaunchNotTerminate;
-}
-
-- (BOOL)hasActiveCall
-{
-    if (AppReadiness.isAppReady) {
-        return AppEnvironment.shared.callService.hasCallInProgress;
-    } else {
-        return NO;
-    }
-}
-
-- (NSString *)debugLogsDirPath
-{
-    return DebugLogger.mainAppDebugLogsDirPath;
+    return SignalApp.sharedApp.didLastLaunchNotTerminate;
 }
 
 @end

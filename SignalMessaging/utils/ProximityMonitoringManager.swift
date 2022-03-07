@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 @objc
-public protocol OWSProximityMonitoringManager: AnyObject {
+public protocol OWSProximityMonitoringManager: class {
     func add(lifetime: AnyObject)
     func remove(lifetime: AnyObject)
 }
@@ -32,7 +32,7 @@ public class OWSProximityMonitoringManagerImpl: NSObject, OWSProximityMonitoring
     public func add(lifetime: AnyObject) {
         objc_sync_enter(self)
 
-        if !lifetimes.contains(where: { $0.value === lifetime }) {
+        if !lifetimes.contains { $0.value === lifetime } {
             lifetimes.append(Weak(value: lifetime))
         }
         reconcile()
@@ -52,9 +52,6 @@ public class OWSProximityMonitoringManagerImpl: NSObject, OWSProximityMonitoring
 
     @objc
     public func setup() {
-        guard !CurrentAppContext().isNSE else {
-            return
-        }
         NotificationCenter.default.addObserver(self, selector: #selector(proximitySensorStateDidChange(notification:)), name: UIDevice.proximityStateDidChangeNotification, object: nil)
     }
 
@@ -76,9 +73,6 @@ public class OWSProximityMonitoringManagerImpl: NSObject, OWSProximityMonitoring
     }
 
     func reconcile() {
-        guard !CurrentAppContext().isNSE else {
-            return
-        }
         lifetimes = lifetimes.filter { $0.value != nil }
         if lifetimes.isEmpty {
             DispatchQueue.main.async {

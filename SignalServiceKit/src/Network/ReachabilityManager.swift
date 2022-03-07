@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -27,17 +27,11 @@ public class SSKReachability: NSObject {
 @objc
 public protocol SSKReachabilityManager {
 
+    var observationContext: AnyObject { get }
+
     var isReachable: Bool { get }
 
     func isReachable(via reachabilityType: ReachabilityType) -> Bool
-}
-
-public extension SSKReachabilityManager {
-    func isReachable(with configuration: NetworkInterfaceSet) -> Bool {
-        NetworkInterface.allCases.contains { interface in
-            configuration.isSuperset(of: interface.singleItemSet) && isReachable(via: interface.reachabilityType)
-        }
-    }
 }
 
 // MARK: -
@@ -45,70 +39,43 @@ public extension SSKReachabilityManager {
 @objc
 public class SSKReachabilityManagerImpl: NSObject, SSKReachabilityManager {
 
-    private let backgroundSession = OWSURLSession(
-        securityPolicy: OWSURLSession.signalServiceSecurityPolicy,
-        configuration: .background(withIdentifier: "backgroundSession")
-    )
-
-    // This property should only be accessed on the main thread.
     private let reachability: Reachability
 
-    private struct Token {
-        let isReachable: Bool
-        let isReachableViaWiFi: Bool
-        let isReachableViaWWAN: Bool
-
-        static var empty: Token {
-            Token(isReachable: false, isReachableViaWiFi: false, isReachableViaWWAN: false)
-        }
+    public var observationContext: AnyObject {
+        return self.reachability
     }
-    private let token = AtomicValue<Token>(.empty)
 
-    // This property can be safely accessed from any thread.
     public var isReachable: Bool {
-        isReachable(via: .any)
+        return isReachable(via: .any)
     }
 
-    // This method can be safely called from any thread.
     public func isReachable(via reachabilityType: ReachabilityType) -> Bool {
         switch reachabilityType {
         case .any:
-            return token.get().isReachable
+            return reachability.isReachable()
         case .wifi:
-            return token.get().isReachableViaWiFi
+            return reachability.isReachableViaWiFi()
         case .cellular:
-            return token.get().isReachableViaWWAN
+            return reachability.isReachableViaWWAN()
         }
     }
 
     @objc
     override public init() {
-        AssertIsOnMainThread()
-
         self.reachability = Reachability.forInternetConnection()
 
         super.init()
 
-        AppReadiness.runNowOrWhenAppDidBecomeReadySync {
+        AppReadiness.runNowOrWhenAppDidBecomeReady {
             self.configure()
         }
     }
 
-    private func updateToken() {
-        AssertIsOnMainThread()
-
-        token.set(Token(isReachable: reachability.isReachable(),
-                        isReachableViaWiFi: reachability.isReachableViaWiFi(),
-                        isReachableViaWWAN: reachability.isReachableViaWWAN()))
-    }
-
     private func configure() {
-        AssertIsOnMainThread()
-
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(reachabilityChanged),
                                                name: .reachabilityChanged,
-                                               object: nil)
+                                               object: self.observationContext)
 
         startNotifier()
     }
@@ -124,16 +91,10 @@ public class SSKReachabilityManagerImpl: NSObject, SSKReachabilityManager {
 
         Logger.verbose("isReachable: \(isReachable)")
 
-        updateToken()
-
-        NotificationCenter.default.post(name: SSKReachability.owsReachabilityDidChange, object: nil)
-
-        scheduleWakeupRequestIfNecessary()
+        NotificationCenter.default.post(name: SSKReachability.owsReachabilityDidChange, object: self.observationContext)
     }
 
     private func startNotifier() {
-        AssertIsOnMainThread()
-
         guard AppReadiness.isAppReady else {
             owsFailDebug("App is unexpectedly not ready.")
             return
@@ -143,41 +104,5 @@ public class SSKReachabilityManagerImpl: NSObject, SSKReachabilityManager {
             return
         }
         Logger.debug("started notifier")
-
-        updateToken()
-
-        scheduleWakeupRequestIfNecessary()
-    }
-
-    private func scheduleWakeupRequestIfNecessary() {
-        AssertIsOnMainThread()
-
-        // Start a background session to wake the app when the network
-        // becomes available. We start this immediately when we lose
-        // connectivity rather than waiting until the app is backgrounded,
-        // because if started while backgrounded when the app is woken up
-        // will be at the OSes discretion.
-        guard !isReachable else { return }
-
-        Logger.info("Scheduling wakeup request for pending message sends.")
-
-        firstly {
-            backgroundSession.downloadTaskPromise(TSConstants.mainServiceURL, method: .get)
-        }.done(on: .global()) { _ in
-            Logger.info("Finished wakeup request.")
-        }.catch(on: .global()) { error in
-            Logger.info("Failed wakeup request \(error)")
-        }
-    }
-}
-
-// MARK: -
-
-private extension NetworkInterface {
-    var reachabilityType: ReachabilityType {
-        switch self {
-        case .cellular: return .cellular
-        case .wifi: return .wifi
-        }
     }
 }

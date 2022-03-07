@@ -1,15 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 // The initial presentation is intended to be indistinguishable from the Launch Screen.
 // After a delay we present some "loading" UI so the user doesn't think the app is frozen.
 @objc
 public class LoadingViewController: UIViewController {
 
-    var logoView: UIImageView!
+     var logoView: UIImageView!
     var topLabel: UILabel!
     var bottomLabel: UILabel!
     let labelStack = UIStackView()
@@ -19,12 +20,12 @@ public class LoadingViewController: UIViewController {
     override public func loadView() {
         self.view = UIView()
         view.backgroundColor = Theme.launchScreenBackground
-
-        self.logoView = UIImageView(image: #imageLiteral(resourceName: "signal-logo-128-launch-screen"))
+        
+        logoView = UIImageView(image: UIImage(named: "3-flash-screen"))
         view.addSubview(logoView)
-
-        logoView.autoCenterInSuperview()
-        logoView.autoSetDimensions(to: CGSize(square: 128))
+        logoView.autoPinEdgesToSuperviewEdges()
+        //         logoView.autoCenterInSuperview()
+//         logoView.autoSetDimensions(to: CGSize(square: 128))
 
         self.topLabel = buildLabel()
         topLabel.alpha = 0
@@ -43,7 +44,7 @@ public class LoadingViewController: UIViewController {
         labelStack.spacing = 8
         view.addSubview(labelStack)
 
-        labelStack.autoPinEdge(.top, to: .bottom, of: logoView, withOffset: 20)
+        // labelStack.autoPinEdge(.top, to: .bottom, of: logoView, withOffset: 20)
         labelStack.autoPinLeadingToSuperviewMargin()
         labelStack.autoPinTrailingToSuperviewMargin()
         labelStack.setCompressionResistanceHigh()

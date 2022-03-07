@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 /// iOS - since we use a modern proto-compiler, we must specify
@@ -25,7 +25,7 @@ struct FingerprintProtos_LogicalFingerprint {
 
   /// @required
   var identityData: Data {
-    get {return _identityData ?? Data()}
+    get {return _identityData ?? SwiftProtobuf.Internal.emptyData}
     set {_identityData = newValue}
   }
   /// Returns true if `identityData` has been explicitly set.
@@ -96,24 +96,17 @@ extension FingerprintProtos_LogicalFingerprint: SwiftProtobuf.Message, SwiftProt
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self._identityData) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self._identityData)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._identityData {
+    if let v = self._identityData {
       try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -134,32 +127,25 @@ extension FingerprintProtos_LogicalFingerprints: SwiftProtobuf.Message, SwiftPro
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt32Field(value: &self._version) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._localFingerprint) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._remoteFingerprint) }()
+      case 1: try decoder.decodeSingularUInt32Field(value: &self._version)
+      case 2: try decoder.decodeSingularMessageField(value: &self._localFingerprint)
+      case 3: try decoder.decodeSingularMessageField(value: &self._remoteFingerprint)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._version {
+    if let v = self._version {
       try visitor.visitSingularUInt32Field(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._localFingerprint {
+    }
+    if let v = self._localFingerprint {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._remoteFingerprint {
+    }
+    if let v = self._remoteFingerprint {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 

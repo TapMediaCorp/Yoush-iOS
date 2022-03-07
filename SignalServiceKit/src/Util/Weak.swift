@@ -34,10 +34,6 @@ public struct WeakArray<Element> {
         array.compactMap { $0.value }
     }
 
-    public var weakReferenceCount: Int {
-        array.count
-    }
-
     public mutating func append(_ element: Element) {
         array = array.filter { $0.value != nil } + [Weak(value: element)]
     }
@@ -46,12 +42,6 @@ public struct WeakArray<Element> {
         try array.removeAll { weakBox in
             guard let element = weakBox.value else { return true }
             return try shouldDelete(element)
-        }
-    }
-
-    public mutating func cullExpired() {
-        array.removeAll { weakBox in
-            weakBox.value == nil
         }
     }
 }

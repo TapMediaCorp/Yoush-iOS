@@ -1,15 +1,36 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
+
+import PromiseKit
 
 @objc
 public class BulkProfileFetch: NSObject {
 
-    private static let serialQueue = DispatchQueue(label: "BulkProfileFetch")
-    private var serialQueue: DispatchQueue { Self.serialQueue }
+    // MARK: - Dependencies
+
+    private var profileManager: ProfileManagerProtocol {
+        return SSKEnvironment.shared.profileManager
+    }
+
+    private var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    private var reachabilityManager: SSKReachabilityManager {
+        return SSKEnvironment.shared.reachabilityManager
+    }
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return .shared
+    }
+
+    // MARK: -
+
+    private let serialQueue = DispatchQueue(label: "BulkProfileFetch")
 
     // This property should only be accessed on serialQueue.
-    private var uuidQueue = OrderedSet<UUID>()
+    private var addressQueue = OrderedSet<SignalServiceAddress>()
 
     // This property should only be accessed on serialQueue.
     private var isUpdateInFlight = false
@@ -34,8 +55,7 @@ public class BulkProfileFetch: NSObject {
     }
 
     // This property should only be accessed on serialQueue.
-    private var lastOutcomeMap = LRUCache<UUID, UpdateOutcome>(maxSize: 16 * 1000,
-                                                               nseMaxSize: 4 * 1000)
+    private var lastOutcomeMap = [SignalServiceAddress: UpdateOutcome]()
 
     // This property should only be accessed on serialQueue.
     private var lastRateLimitErrorDate: Date?
@@ -46,9 +66,9 @@ public class BulkProfileFetch: NSObject {
 
         SwiftSingletons.register(self)
 
-        AppReadiness.runNowOrWhenMainAppDidBecomeReadyAsync {
+        AppReadiness.runNowOrWhenAppDidBecomeReadyPolite {
             // Try to update missing & stale profiles on launch.
-            self.serialQueue.async {
+            DispatchQueue.global(qos: .utility).async {
                 self.fetchMissingAndStaleProfiles()
             }
         }
@@ -75,12 +95,7 @@ public class BulkProfileFetch: NSObject {
     // This should be used for non-urgent profile updates.
     @objc
     public func fetchProfiles(thread: TSThread) {
-        var addresses = Set(thread.recipientAddresses)
-        if let groupThread = thread as? TSGroupThread,
-           let groupModel = groupThread.groupModel as? TSGroupModelV2 {
-            addresses.formUnion(groupModel.droppedMembers)
-        }
-        fetchProfiles(addresses: Array(addresses))
+        fetchProfiles(addresses: thread.recipientAddresses)
     }
 
     // This should be used for non-urgent profile updates.
@@ -92,35 +107,19 @@ public class BulkProfileFetch: NSObject {
     // This should be used for non-urgent profile updates.
     @objc
     public func fetchProfiles(addresses: [SignalServiceAddress]) {
-        let uuids = addresses.compactMap { $0.uuid }
-        fetchProfiles(uuids: uuids)
-    }
-
-    // This should be used for non-urgent profile updates.
-    @objc
-    public func fetchProfile(uuid: UUID) {
-        fetchProfiles(uuids: [uuid])
-    }
-
-    // This should be used for non-urgent profile updates.
-    @objc
-    public func fetchProfiles(uuids: [UUID]) {
         serialQueue.async {
-            guard self.tsAccountManager.isRegisteredAndReady else {
+            guard let localAddress = self.tsAccountManager.localAddress else {
+                owsFailDebug("missing local address")
                 return
             }
-            guard let localUuid = self.tsAccountManager.localUuid else {
-                owsFailDebug("missing localUuid")
-                return
-            }
-            for uuid in uuids {
-                guard uuid != localUuid else {
+            for address in addresses {
+                guard address != localAddress else {
                     continue
                 }
-                guard !self.uuidQueue.contains(uuid) else {
+                guard !self.addressQueue.contains(address) else {
                     continue
                 }
-                self.uuidQueue.append(uuid)
+                self.addressQueue.append(address)
             }
             self.process()
         }
@@ -129,11 +128,15 @@ public class BulkProfileFetch: NSObject {
     private func process() {
         assertOnQueue(serialQueue)
 
-        guard !CurrentAppContext().isRunningTests,
-              CurrentAppContext().isMainApp,
-              reachabilityManager.isReachable,
-              tsAccountManager.isRegisteredAndReady,
-              !DebugFlags.reduceLogChatter else {
+        guard !CurrentAppContext().isRunningTests else {  return }
+
+        guard CurrentAppContext().isMainApp else {
+            return
+        }
+        guard reachabilityManager.isReachable else {
+            return
+        }
+        guard tsAccountManager.isRegisteredAndReady else {
             return
         }
 
@@ -143,17 +146,17 @@ public class BulkProfileFetch: NSObject {
         }
 
         // Dequeue.
-        guard let uuid = self.uuidQueue.first else {
+        guard let address = self.addressQueue.first else {
             return
         }
-        self.uuidQueue.remove(uuid)
+        self.addressQueue.remove(address)
 
         // De-bounce.
-        guard self.shouldUpdateUuid(uuid) else {
+        guard self.shouldUpdateAddress(address) else {
             return
         }
 
-        Logger.verbose("Updating: \(SignalServiceAddress(uuid: uuid))")
+        Logger.verbose("Updating: \(address)")
 
         // Perform update.
         isUpdateInFlight = true
@@ -190,18 +193,18 @@ public class BulkProfileFetch: NSObject {
             if hasHitRateLimitRecently {
                 // Wait before updating if we've recently hit the rate limit.
                 // This will give the rate limit bucket time to refill.
-                return Guarantee.after(seconds: 20.0)
+                return after(seconds: 20.0)
             } else {
                 return Guarantee.value(())
             }
         }.then(on: .global()) {
-            self.profileManager.fetchProfile(forAddressPromise: SignalServiceAddress(uuid: uuid),
+            self.profileManager.fetchProfile(forAddressPromise: address,
                                              mainAppOnly: true,
                                              ignoreThrottling: false).asVoid()
         }.done(on: .global()) {
             self.serialQueue.asyncAfter(deadline: DispatchTime.now() + updateDelaySeconds) {
                 self.isUpdateInFlight = false
-                self.lastOutcomeMap[uuid] = UpdateOutcome(.success)
+                self.lastOutcomeMap[address] = UpdateOutcome(.success)
                 self.process()
             }
         }.catch(on: .global()) { error in
@@ -209,12 +212,12 @@ public class BulkProfileFetch: NSObject {
                 self.isUpdateInFlight = false
                 switch error {
                 case ProfileFetchError.missing:
-                    self.lastOutcomeMap[uuid] = UpdateOutcome(.noProfile)
+                    self.lastOutcomeMap[address] = UpdateOutcome(.noProfile)
                 case ProfileFetchError.throttled:
-                    self.lastOutcomeMap[uuid] = UpdateOutcome(.throttled)
+                    self.lastOutcomeMap[address] = UpdateOutcome(.throttled)
                 case ProfileFetchError.rateLimit:
                     Logger.error("Error: \(error)")
-                    self.lastOutcomeMap[uuid] = UpdateOutcome(.retryLimit)
+                    self.lastOutcomeMap[address] = UpdateOutcome(.retryLimit)
                     self.lastRateLimitErrorDate = Date()
                 case SignalServiceProfile.ValidationError.invalidIdentityKey:
                     // There will be invalid identity keys on staging that can be safely ignored.
@@ -223,26 +226,22 @@ public class BulkProfileFetch: NSObject {
                     } else {
                         Logger.warn("Error: \(error)")
                     }
-                    self.lastOutcomeMap[uuid] = UpdateOutcome(.invalid)
+                    self.lastOutcomeMap[address] = UpdateOutcome(.invalid)
                 default:
-                    if error.isNetworkConnectivityFailure {
+                    if IsNetworkConnectivityFailure(error) {
                         Logger.warn("Error: \(error)")
-                        self.lastOutcomeMap[uuid] = UpdateOutcome(.networkFailure)
+                        self.lastOutcomeMap[address] = UpdateOutcome(.networkFailure)
                     } else if error.httpStatusCode == 413 {
                         Logger.error("Error: \(error)")
-                        self.lastOutcomeMap[uuid] = UpdateOutcome(.retryLimit)
+                        self.lastOutcomeMap[address] = UpdateOutcome(.retryLimit)
                         self.lastRateLimitErrorDate = Date()
                     } else if error.httpStatusCode == 404 {
                         Logger.error("Error: \(error)")
-                        self.lastOutcomeMap[uuid] = UpdateOutcome(.noProfile)
+                        self.lastOutcomeMap[address] = UpdateOutcome(.noProfile)
                     } else {
                         // TODO: We may need to handle more status codes.
-                        if self.tsAccountManager.isRegisteredAndReady {
-                            owsFailDebug("Error: \(error)")
-                        } else {
-                            Logger.warn("Error: \(error)")
-                        }
-                        self.lastOutcomeMap[uuid] = UpdateOutcome(.serviceError)
+                        owsFailDebug("Error: \(error)")
+                        self.lastOutcomeMap[address] = UpdateOutcome(.serviceError)
                     }
                 }
 
@@ -251,35 +250,31 @@ public class BulkProfileFetch: NSObject {
         }
     }
 
-    private func shouldUpdateUuid(_ uuid: UUID) -> Bool {
+    private func shouldUpdateAddress(_ address: SignalServiceAddress) -> Bool {
         assertOnQueue(serialQueue)
 
-        guard let lastOutcome = lastOutcomeMap[uuid] else {
+        guard let lastOutcome = lastOutcomeMap[address] else {
             return true
         }
 
         let minElapsedSeconds: TimeInterval
         let elapsedSeconds = abs(lastOutcome.date.timeIntervalSinceNow)
 
-        if DebugFlags.aggressiveProfileFetching.get() {
-            minElapsedSeconds = 0
-        } else {
-            switch lastOutcome.outcome {
-            case .networkFailure:
-                minElapsedSeconds = 1 * kMinuteInterval
-            case .retryLimit:
-                minElapsedSeconds = 5 * kMinuteInterval
-            case .throttled:
-                minElapsedSeconds = 2 * kMinuteInterval
-            case .noProfile:
-                minElapsedSeconds = 6 * kHourInterval
-            case .serviceError:
-                minElapsedSeconds = 30 * kMinuteInterval
-            case .success:
-                minElapsedSeconds = 2 * kMinuteInterval
-            case .invalid:
-                minElapsedSeconds = 6 * kHourInterval
-            }
+        switch lastOutcome.outcome {
+        case .networkFailure:
+            minElapsedSeconds = 1 * kMinuteInterval
+        case .retryLimit:
+            minElapsedSeconds = 5 * kMinuteInterval
+        case .throttled:
+            minElapsedSeconds = 2 * kMinuteInterval
+        case .noProfile:
+            minElapsedSeconds = 6 * kHourInterval
+        case .serviceError:
+            minElapsedSeconds = 30 * kMinuteInterval
+        case .success:
+            minElapsedSeconds = 2 * kMinuteInterval
+        case .invalid:
+            minElapsedSeconds = 6 * kHourInterval
         }
 
         return elapsedSeconds >= minElapsedSeconds
@@ -321,20 +316,8 @@ public class BulkProfileFetch: NSObject {
             }
             return userProfiles
         }.map(on: .global()) { (userProfiles: [OWSUserProfile]) -> Void in
-            var addresses: [SignalServiceAddress] = userProfiles.map { $0.publicAddress }
-
-            // Limit how many profiles we try to update on launch.
-            let maxProfilesToUpdateCount: Int = 25
-            if addresses.count > maxProfilesToUpdateCount {
-                addresses.shuffle()
-                addresses = Array(addresses.prefix(maxProfilesToUpdateCount))
-            }
-
-            if !addresses.isEmpty {
-                Logger.verbose("Updating profiles: \(addresses.count)")
-                self.fetchProfiles(addresses: addresses)
-            }
-
+            let addresses: [SignalServiceAddress] = userProfiles.map { $0.publicAddress }
+            self.fetchProfiles(addresses: addresses)
             Logger.verbose("Complete.")
         }.catch(on: .global()) { (error: Error) -> Void in
             owsFailDebug("Error: \(error)")

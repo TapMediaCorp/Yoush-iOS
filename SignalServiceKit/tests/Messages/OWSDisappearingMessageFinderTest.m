@@ -1,18 +1,18 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "MockSSKEnvironment.h"
 #import "OWSDisappearingMessagesFinder.h"
-#import "SSKAccessors+SDS.h"
 #import "SSKBaseTestObjC.h"
-#import "StorageCoordinator.h"
 #import "TSContactThread.h"
 #import "TSIncomingMessage.h"
 #import "TSOutgoingMessage.h"
 #import "TestAppContext.h"
 #import <SignalCoreKit/NSDate+OWS.h>
+#import <SignalServiceKit/SSKAccessors+SDS.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
+#import <SignalServiceKit/StorageCoordinator.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -36,6 +36,20 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark -
 
 @implementation OWSDisappearingMessageFinderTest
+
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SSKEnvironment.shared.databaseStorage;
+}
+
+- (StorageCoordinator *)storageCoordinator
+{
+    return SSKEnvironment.shared.storageCoordinator;
+}
+
+#pragma mark -
 
 - (void)setUp
 {
@@ -96,12 +110,12 @@ NS_ASSUME_NONNULL_BEGIN
         if (expireStartedAt > 0) {
             [message markAsReadAtTimestamp:expireStartedAt
                                     thread:thread
-                              circumstance:OWSReceiptCircumstanceOnLinkedDevice
+                              circumstance:OWSReadCircumstanceReadOnLinkedDevice
                                transaction:transaction];
         } else if (markAsRead) {
             [message markAsReadAtTimestamp:self.now - 1000
                                     thread:thread
-                              circumstance:OWSReceiptCircumstanceOnLinkedDevice
+                              circumstance:OWSReadCircumstanceReadOnLinkedDevice
                                transaction:transaction];
         }
     }];
@@ -214,12 +228,10 @@ NS_ASSUME_NONNULL_BEGIN
         // Mark outgoing message as "sent", "delivered" or "delivered and read" using production methods.
         [expiringSentOutgoingMessage updateWithSentRecipient:self.otherAddress wasSentByUD:NO transaction:transaction];
         [expiringDeliveredOutgoingMessage updateWithDeliveredRecipient:self.otherAddress
-                                                     recipientDeviceId:0
                                                      deliveryTimestamp:nil
                                                            transaction:transaction];
         uint64_t nowMs = [NSDate ows_millisecondTimeStamp];
         [expiringDeliveredAndReadOutgoingMessage updateWithReadRecipient:self.otherAddress
-                                                       recipientDeviceId:0
                                                            readTimestamp:nowMs
                                                              transaction:transaction];
     }];

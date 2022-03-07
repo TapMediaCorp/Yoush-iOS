@@ -1,9 +1,8 @@
-NSAppleMusicUsageDescription = "Signal needs to use Apple Music to play media attachments.";
-NSCameraUsageDescription = "Signal uses your camera to take photos and for video calls.";
-NSContactsUsageDescription = "Signal uses your contacts to find users you know. We do not store your contacts on the server.";
-NSFaceIDUsageDescription = "Signal's Screen Lock uses Face ID.";
-NSLocationWhenInUseUsageDescription = "Signal needs access to your location in order to share your current location.";
-NSMicrophoneUsageDescription = "Signal needs access to your microphone to make and receive phone calls and record voice messages.";
-NSPhotoLibraryAddUsageDescription = "Signal will save photos to your library.";
-NSPhotoLibraryUsageDescription = "Signal will let you choose which photos from your library to send.";
-NSLocalNetworkUsageDescription = "Signal uses the local network to allow you to directly transfer your account to a new phone. It will not be used unless you explicitly choose to initiate a transfer to a new device.";
+NSAppleMusicUsageDescription = "To play the media attachments, Yoush will use Apple Music .";
+NSCameraUsageDescription = "Yoush will use your camera to take photos and also to make video call.";
+NSContactsUsageDescription = "Yoush will get contacts from your contact phone list. Anyway, we never store your contacts on our server.";
+NSFaceIDUsageDescription = "Face ID will be used for Yoush's Screen Lock.";
+NSLocationWhenInUseUsageDescription = "For Sharing your current location, Yoush will access to your location.";
+NSMicrophoneUsageDescription = "To make/receive phone calls and record audio messages, Yoush will access to your device microphone.";
+NSPhotoLibraryAddUsageDescription = "Yoush will store photos into your photo library.";
+NSPhotoLibraryUsageDescription = "You could select photos from your photo library to send them with Yoush.";

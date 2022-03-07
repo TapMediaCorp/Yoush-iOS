@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSAttachment.h"
@@ -20,6 +20,8 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
 
 @property (nonatomic, nullable) NSString *sourceFilename;
 
+@property (nonatomic) NSString *contentType;
+
 @property (nonatomic, nullable) NSString *blurHash;
 
 @end
@@ -28,7 +30,14 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
 
 @implementation TSAttachment
 
-@synthesize contentType = _contentType;
+#pragma mark - Dependencies
+
+- (AttachmentReadCache *)attachmentReadCache
+{
+    return SSKEnvironment.shared.modelReadCaches.attachmentReadCache;
+}
+
+#pragma mark -
 
 // This constructor is used for new instances of TSAttachmentPointer,
 // i.e. undownloaded incoming attachments.
@@ -132,9 +141,7 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
     if (!self) {
         return self;
     }
-    if (!SSKDebugFlags.reduceLogChatter) {
-        OWSLogVerbose(@"init attachment with uniqueId: %@", self.uniqueId);
-    }
+    OWSLogVerbose(@"init attachment with uniqueId: %@", self.uniqueId);
 
     _contentType = contentType;
     _byteCount = byteCount;
@@ -292,18 +299,7 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
 - (NSString *)description {
     NSString *attachmentString;
 
-    if (self.isAnimated || self.isLoopingVideo) {
-        BOOL isGIF = ([self.contentType caseInsensitiveCompare:OWSMimeTypeImageGif] == NSOrderedSame);
-        BOOL isLoopingVideo = self.isLoopingVideo && ([MIMETypeUtil isVideo:self.contentType]);
-
-        if (isGIF || isLoopingVideo) {
-            attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_GIF",
-                @"Short text label for a gif attachment, used for thread preview and on the lock screen");
-        } else {
-            attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_IMAGE",
-                @"Short text label for an image attachment, used for thread preview and on the lock screen");
-        }
-    } else if ([MIMETypeUtil isImage:self.contentType]) {
+    if ([MIMETypeUtil isImage:self.contentType]) {
         attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_PHOTO",
             @"Short text label for a photo attachment, used for thread preview and on the lock screen");
     } else if ([MIMETypeUtil isVideo:self.contentType]) {
@@ -319,6 +315,9 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
             attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_AUDIO",
                 @"Short text label for a audio attachment, used for thread preview and on the lock screen");
         }
+    } else if ([MIMETypeUtil isAnimated:self.contentType]) {
+        attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_GIF",
+            @"Short text label for a gif attachment, used for thread preview and on the lock screen");
     } else {
         attachmentString = NSLocalizedString(@"ATTACHMENT_TYPE_FILE",
             @"Short text label for a file attachment, used for thread preview and on the lock screen");
@@ -337,22 +336,7 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
         }
     }
 
-    return [self emojiForMimeType];
-}
-
-- (NSString *)emojiForMimeType
-{
-    if (self.isAnimated || self.isLoopingVideo) {
-        return @"🎡";
-    } else if ([MIMETypeUtil isImage:self.contentType]) {
-        return @"📷";
-    } else if ([MIMETypeUtil isVideo:self.contentType]) {
-        return @"🎥";
-    } else if ([MIMETypeUtil isAudio:self.contentType]) {
-        return @"🎧";
-    } else {
-        return @"📎";
-    }
+    return [TSAttachment emojiForMimeType:self.contentType];
 }
 
 + (NSString *)emojiForMimeType:(NSString *)contentType
@@ -392,12 +376,6 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
 
 - (BOOL)isAnimated
 {
-    // TSAttachmentStream overrides this method and discriminates based on the actual content.
-    return self.hasAnimatedContentType;
-}
-
-- (BOOL)hasAnimatedContentType
-{
     return [MIMETypeUtil isAnimated:self.contentType];
 }
 
@@ -409,11 +387,6 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
 - (BOOL)isBorderless
 {
     return self.attachmentType == TSAttachmentTypeBorderless;
-}
-
-- (BOOL)isLoopingVideo
-{
-    return self.attachmentType == TSAttachmentTypeGIF && self.isVideo;
 }
 
 - (BOOL)isVisualMedia
@@ -436,55 +409,27 @@ NSUInteger const TSAttachmentSchemaVersion = 5;
     return _contentType.filterFilename;
 }
 
-// This method should only be called on instances which have
-// not yet been inserted into the database.
-- (void)replaceUnsavedContentType:(NSString *)contentType
-{
-    if (contentType.length < 1) {
-        OWSFailDebug(@"Missing or empty contentType.");
-        return;
-    }
-    if (self.contentType.length > 0 && ![self.contentType isEqualToString:contentType]) {
-        OWSLogInfo(@"Replacing content type: %@ -> %@", self.contentType, contentType);
-    }
-    _contentType = contentType;
-}
-
-#pragma mark -
+#pragma mark - Update With...
 
 - (void)anyDidInsertWithTransaction:(SDSAnyWriteTransaction *)transaction
 {
     [super anyDidInsertWithTransaction:transaction];
 
-    [self.modelReadCaches.attachmentReadCache didInsertOrUpdateAttachment:self transaction:transaction];
-}
-
-- (void)anyWillRemoveWithTransaction:(SDSAnyWriteTransaction *)transaction
-{
-    [SDSDatabaseStorage.shared updateIdMappingWithAttachment:self transaction:transaction];
-
-    [super anyWillRemoveWithTransaction:transaction];
+    [self.attachmentReadCache didInsertOrUpdateAttachment:self transaction:transaction];
 }
 
 - (void)anyDidUpdateWithTransaction:(SDSAnyWriteTransaction *)transaction
 {
     [super anyDidUpdateWithTransaction:transaction];
 
-    [self.modelReadCaches.attachmentReadCache didInsertOrUpdateAttachment:self transaction:transaction];
+    [self.attachmentReadCache didInsertOrUpdateAttachment:self transaction:transaction];
 }
 
 - (void)anyDidRemoveWithTransaction:(SDSAnyWriteTransaction *)transaction
 {
     [super anyDidRemoveWithTransaction:transaction];
 
-    [self.modelReadCaches.attachmentReadCache didRemoveAttachment:self transaction:transaction];
-}
-
-- (void)setDefaultContentType:(NSString *)contentType
-{
-    if ([self.contentType isEqualToString:OWSMimeTypeApplicationOctetStream]) {
-        _contentType = contentType;
-    }
+    [self.attachmentReadCache didRemoveAttachment:self transaction:transaction];
 }
 
 #pragma mark - Update With...

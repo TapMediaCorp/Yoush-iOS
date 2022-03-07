@@ -1,23 +1,23 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugUIStress.h"
-#import "Signal-Swift.h"
+#import "OWSMessageSender.h"
+#import "OWSTableViewController.h"
+#import "Yoush-Swift.h"
 #import "SignalApp.h"
+#import "ThreadUtil.h"
 #import <SignalCoreKit/Cryptography.h>
 #import <SignalCoreKit/NSDate+OWS.h>
 #import <SignalCoreKit/Randomness.h>
 #import <SignalMessaging/Environment.h>
-#import <SignalMessaging/ThreadUtil.h>
-#import <SignalServiceKit/MessageSender.h>
 #import <SignalServiceKit/OWSDynamicOutgoingMessage.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 #import <SignalServiceKit/TSAccountManager.h>
 #import <SignalServiceKit/TSContactThread.h>
 #import <SignalServiceKit/TSGroupThread.h>
 #import <SignalServiceKit/TSThread.h>
-#import <SignalUI/OWSTableViewController.h>
 
 #ifdef DEBUG
 
@@ -43,6 +43,33 @@ NS_ASSUME_NONNULL_BEGIN
     return instance;
 }
 
+#pragma mark - Dependencies
+
++ (MessageSenderJobQueue *)messageSenderJobQueue
+{
+    return SSKEnvironment.shared.messageSenderJobQueue;
+}
+
+- (MessageSenderJobQueue *)messageSenderJobQueue
+{
+    return self.class.messageSenderJobQueue;
+}
+
++ (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
++ (TSAccountManager *)tsAccountManager
+{
+    return TSAccountManager.sharedInstance;
+}
+
 #pragma mark - Factory Methods
 
 - (NSString *)name
@@ -56,14 +83,18 @@ NS_ASSUME_NONNULL_BEGIN
     
     NSMutableArray<OWSTableItem *> *items = [NSMutableArray new];
 
-    [items addObject:[OWSTableItem
-                         itemWithTitle:@"Send empty message"
-                           actionBlock:^{ [DebugUIStress sendStressMessage:thread block:^{ return [NSData new]; }]; }]];
+    [items addObject:[OWSTableItem itemWithTitle:@"Send empty message"
+                                     actionBlock:^{
+                                         [DebugUIStress sendStressMessage:thread
+                                                                    block:^(SignalRecipient *recipient) {
+                                                                        return [NSData new];
+                                                                    }];
+                                     }]];
     [items addObject:[OWSTableItem itemWithTitle:@"Send random noise message"
                                      actionBlock:^{
                                          [DebugUIStress
                                              sendStressMessage:thread
-                                                         block:^{
+                                                         block:^(SignalRecipient *recipient) {
                                                              NSUInteger contentLength = arc4random_uniform(32);
                                                              return [Cryptography generateRandomBytes:contentLength];
                                                          }];
@@ -71,7 +102,7 @@ NS_ASSUME_NONNULL_BEGIN
     [items addObject:[OWSTableItem itemWithTitle:@"Send no payload message"
                                      actionBlock:^{
                                          [DebugUIStress sendStressMessage:thread
-                                                                    block:^{
+                                                                    block:^(SignalRecipient *recipient) {
                                                                         SSKProtoContentBuilder *contentBuilder =
                                                                             [SSKProtoContent builder];
                                                                         return [[contentBuilder buildIgnoringErrors]
@@ -81,7 +112,7 @@ NS_ASSUME_NONNULL_BEGIN
     [items addObject:[OWSTableItem itemWithTitle:@"Send empty null message"
                                      actionBlock:^{
                                          [DebugUIStress sendStressMessage:thread
-                                                                    block:^{
+                                                                    block:^(SignalRecipient *recipient) {
                                                                         SSKProtoContentBuilder *contentBuilder =
                                                                             [SSKProtoContent builder];
                                                                         SSKProtoNullMessageBuilder *nullMessageBuilder =
@@ -96,7 +127,7 @@ NS_ASSUME_NONNULL_BEGIN
                                      actionBlock:^{
                                          [DebugUIStress
                                              sendStressMessage:thread
-                                                         block:^{
+                                                         block:^(SignalRecipient *recipient) {
                                                              SSKProtoContentBuilder *contentBuilder =
                                                                  [SSKProtoContent builder];
                                                              SSKProtoNullMessageBuilder *nullMessageBuilder =
@@ -113,7 +144,7 @@ NS_ASSUME_NONNULL_BEGIN
     [items addObject:[OWSTableItem itemWithTitle:@"Send empty sync message"
                                      actionBlock:^{
                                          [DebugUIStress sendStressMessage:thread
-                                                                    block:^{
+                                                                    block:^(SignalRecipient *recipient) {
                                                                         SSKProtoContentBuilder *contentBuilder =
                                                                             [SSKProtoContent builder];
                                                                         SSKProtoSyncMessageBuilder *syncMessageBuilder =
@@ -127,7 +158,7 @@ NS_ASSUME_NONNULL_BEGIN
     [items addObject:[OWSTableItem itemWithTitle:@"Send empty sync sent message"
                                      actionBlock:^{
                                          [DebugUIStress sendStressMessage:thread
-                                                                    block:^{
+                                                                    block:^(SignalRecipient *recipient) {
                                                                         SSKProtoContentBuilder *contentBuilder =
                                                                             [SSKProtoContent builder];
                                                                         SSKProtoSyncMessageBuilder *syncMessageBuilder =
@@ -147,7 +178,7 @@ NS_ASSUME_NONNULL_BEGIN
                            actionBlock:^{
                                [DebugUIStress
                                    sendStressMessage:thread
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -163,7 +194,7 @@ NS_ASSUME_NONNULL_BEGIN
                            actionBlock:^{
                                [DebugUIStress
                                    sendStressMessage:thread
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -185,7 +216,7 @@ NS_ASSUME_NONNULL_BEGIN
                            actionBlock:^{
                                [DebugUIStress
                                    sendStressMessage:thread
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -205,7 +236,7 @@ NS_ASSUME_NONNULL_BEGIN
                                 [DebugUIStress
                                     sendStressMessage:thread
                                             timestamp:timestamp
-                                                block:^{
+                                                block:^(SignalRecipient *recipient) {
                                                     SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                     SSKProtoDataMessageBuilder *dataBuilder =
                                                         [SSKProtoDataMessage builder];
@@ -225,7 +256,7 @@ NS_ASSUME_NONNULL_BEGIN
                                [DebugUIStress
                                    sendStressMessage:thread
                                            timestamp:timestamp
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -245,7 +276,7 @@ NS_ASSUME_NONNULL_BEGIN
                                [DebugUIStress
                                    sendStressMessage:thread
                                            timestamp:timestamp
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -265,7 +296,7 @@ NS_ASSUME_NONNULL_BEGIN
                                [DebugUIStress
                                    sendStressMessage:thread
                                            timestamp:timestamp
-                                               block:^{
+                                               block:^(SignalRecipient *recipient) {
                                                    SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                    SSKProtoDataMessageBuilder *dataBuilder =
                                                        [SSKProtoDataMessage builder];
@@ -292,7 +323,9 @@ NS_ASSUME_NONNULL_BEGIN
                                          for (int i = 0; i < 3; i++) {
                                              [DebugUIStress sendStressMessage:thread
                                                                     timestamp:timestamp
-                                                                        block:^{ return data; }];
+                                                                        block:^(SignalRecipient *recipient) {
+                                                                            return data;
+                                                                        }];
                                          }
                                      }]];
     [items
@@ -301,7 +334,7 @@ NS_ASSUME_NONNULL_BEGIN
                         actionBlock:^{
                             [DebugUIStress
                                 sendStressMessage:thread
-                                            block:^{
+                                            block:^(SignalRecipient *recipient) {
                                                 SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                 SSKProtoSyncMessageBuilder *syncMessageBuilder =
                                                     [SSKProtoSyncMessage builder];
@@ -323,7 +356,7 @@ NS_ASSUME_NONNULL_BEGIN
                         actionBlock:^{
                             [DebugUIStress
                                 sendStressMessage:thread
-                                            block:^{
+                                            block:^(SignalRecipient *recipient) {
                                                 SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                 SSKProtoSyncMessageBuilder *syncMessageBuilder =
                                                     [SSKProtoSyncMessage builder];
@@ -345,7 +378,7 @@ NS_ASSUME_NONNULL_BEGIN
                         actionBlock:^{
                             [DebugUIStress
                                 sendStressMessage:thread
-                                            block:^{
+                                            block:^(SignalRecipient *recipient) {
                                                 SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                 SSKProtoSyncMessageBuilder *syncMessageBuilder =
                                                     [SSKProtoSyncMessage builder];
@@ -368,7 +401,7 @@ NS_ASSUME_NONNULL_BEGIN
                         actionBlock:^{
                             [DebugUIStress
                                 sendStressMessage:thread
-                                            block:^{
+                                            block:^(SignalRecipient *recipient) {
                                                 SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                 SSKProtoSyncMessageBuilder *syncMessageBuilder =
                                                     [SSKProtoSyncMessage builder];
@@ -395,7 +428,7 @@ NS_ASSUME_NONNULL_BEGIN
                         actionBlock:^{
                             [DebugUIStress
                                 sendStressMessage:thread
-                                            block:^{
+                                            block:^(SignalRecipient *recipient) {
                                                 SSKProtoContentBuilder *contentBuilder = [SSKProtoContent builder];
                                                 SSKProtoSyncMessageBuilder *syncMessageBuilder =
                                                     [SSKProtoSyncMessage builder];
@@ -419,7 +452,7 @@ NS_ASSUME_NONNULL_BEGIN
     [items addObject:[OWSTableItem itemWithTitle:@"Send empty sync sent message 6"
                                      actionBlock:^{
                                          [DebugUIStress sendStressMessage:thread
-                                                                    block:^{
+                                                                    block:^(SignalRecipient *recipient) {
                                                                         SSKProtoContentBuilder *contentBuilder =
                                                                             [SSKProtoContent builder];
                                                                         SSKProtoSyncMessageBuilder *syncMessageBuilder =
@@ -450,23 +483,10 @@ NS_ASSUME_NONNULL_BEGIN
                                          actionBlock:^{
             [DebugUIStress cloneAsV2Group:groupThread];
         }]];
-        [items addObject:[OWSTableItem itemWithTitle:@"Copy members to another group"
-                                         actionBlock:^{
-                                             UIViewController *fromViewController =
-                                                 [[UIApplication sharedApplication] frontmostViewController];
-                                             [DebugUIStress copyToAnotherGroup:groupThread
-                                                            fromViewController:fromViewController];
-                                         }]];
         [items addObject:[OWSTableItem itemWithTitle:@"Add debug members to group"
                                          actionBlock:^{
             [DebugUIStress addDebugMembersToGroup:groupThread];
         }]];
-        if (thread.isGroupV2Thread) {
-            [items addObject:[OWSTableItem itemWithTitle:@"Make all members admins"
-                                             actionBlock:^{ [DebugUIStress makeAllMembersAdmin:groupThread]; }]];
-        }
-        [items addObject:[OWSTableItem itemWithTitle:@"Log membership"
-                                         actionBlock:^{ [DebugUIStress logMembership:groupThread]; }]];
     }
 
     [items addObject:[OWSTableItem itemWithTitle:@"Make group w. unregistered users"
@@ -483,9 +503,10 @@ NS_ASSUME_NONNULL_BEGIN
                                      actionBlock:^{
                                          [weakSelf thrashWithMaxWritesPerSecond:100 thread:thread];
                                      }]];
-    [items addObject:[OWSTableItem itemWithTitle:@"Stop thrash" actionBlock:^{ [weakSelf stopThrash]; }]];
-    [items addObject:[OWSTableItem itemWithTitle:@"Delete other profiles"
-                                     actionBlock:^{ [DebugUIStress deleteOtherProfiles]; }]];
+    [items addObject:[OWSTableItem itemWithTitle:@"Stop thrash"
+                                     actionBlock:^{
+                                         [weakSelf stopThrash];
+                                     }]];
 
     return [OWSTableSection sectionWithTitle:self.name items:items];
 }
@@ -510,18 +531,9 @@ NS_ASSUME_NONNULL_BEGIN
 {
     OWSAssertDebug(message);
 
-    BOOL isDynamic = [message isKindOfClass:[OWSDynamicOutgoingMessage class]];
-    BOOL shouldSendDurably = !isDynamic;
-
-    if (shouldSendDurably) {
-        DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            [self.messageSenderJobQueue addMessage:message.asPreparer transaction:transaction];
-        });
-    } else {
-        [self.messageSender sendMessage:message.asPreparer
-            success:^{ OWSLogInfo(@"Success."); }
-            failure:^(NSError *error) { OWSFailDebug(@"Error: %@", error); }];
-    }
+    DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+        [self.messageSenderJobQueue addMessage:message.asPreparer transaction:transaction];
+    });
 }
 
 + (void)sendStressMessage:(TSThread *)thread
@@ -562,19 +574,24 @@ NS_ASSUME_NONNULL_BEGIN
     }
     [recipientAddresses addObject:self.tsAccountManager.localAddress];
 
-    for (int i = 0; i < 3; i++) {
-        [recipientAddresses addObject:[[SignalServiceAddress alloc] initWithUuid:[NSUUID UUID] phoneNumber:nil]];
+    if (SSKFeatureFlags.allowUUIDOnlyContacts) {
+        for (int i = 0; i < 3; i++) {
+            [recipientAddresses addObject:[[SignalServiceAddress alloc] initWithUuid:[NSUUID UUID] phoneNumber:nil]];
+        }
     }
 
     [GroupManager localCreateNewGroupObjcWithMembers:recipientAddresses
         groupId:nil
         name:NSUUID.UUID.UUIDString
         avatarData:nil
-        disappearingMessageToken:DisappearingMessageToken.disabledToken
         newGroupSeed:nil
         shouldSendMessage:NO
-        success:^(TSGroupThread *thread) { [SignalApp.shared presentConversationForThread:thread animated:YES]; }
-        failure:^(NSError *error) { OWSFailDebug(@"Error: %@", error); }];
+        success:^(TSGroupThread *thread) {
+            [SignalApp.sharedApp presentConversationForThread:thread animated:YES];
+        }
+        failure:^(NSError *error) {
+            OWSFailDebug(@"Error: %@", error);
+        }];
 }
 
 - (void)thrashWithMaxWritesPerSecond:(NSUInteger)maxWritesPerSecond thread:(TSThread *)thread

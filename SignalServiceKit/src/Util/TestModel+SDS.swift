@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct TestModelRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        TestModelSerializer.table
+        return TestModelSerializer.table
     }
 
-    public static var databaseTableName: String {
-        TestModelSerializer.table.tableName
-    }
+    public static let databaseTableName: String = TestModelSerializer.table.tableName
 
     public var id: Int64?
 
@@ -56,7 +54,7 @@ public struct TestModelRecord: SDSRecord {
     }
 
     public static func columnName(_ column: TestModelRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -72,7 +70,7 @@ public struct TestModelRecord: SDSRecord {
 
 public extension TestModelRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -163,15 +161,15 @@ extension TestModel: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        TestModelRecord.databaseTableName
+        return TestModelRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        TestModelSerializer.table
+        return TestModelSerializer.table
     }
 }
 
@@ -223,26 +221,25 @@ extension TestModelSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var dateValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "dateValue", columnType: .double, isOptional: true) }
-    static var doubleValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "doubleValue", columnType: .double) }
-    static var floatValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "floatValue", columnType: .double) }
-    static var int64ValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "int64Value", columnType: .int64) }
-    static var nsIntegerValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "nsIntegerValue", columnType: .int64) }
-    static var nsNumberValueUsingInt64Column: SDSColumnMetadata { SDSColumnMetadata(columnName: "nsNumberValueUsingInt64", columnType: .int64, isOptional: true) }
-    static var nsNumberValueUsingUInt64Column: SDSColumnMetadata { SDSColumnMetadata(columnName: "nsNumberValueUsingUInt64", columnType: .int64, isOptional: true) }
-    static var nsuIntegerValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "nsuIntegerValue", columnType: .int64) }
-    static var uint64ValueColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uint64Value", columnType: .int64) }
+    static let dateValueColumn = SDSColumnMetadata(columnName: "dateValue", columnType: .double, isOptional: true)
+    static let doubleValueColumn = SDSColumnMetadata(columnName: "doubleValue", columnType: .double)
+    static let floatValueColumn = SDSColumnMetadata(columnName: "floatValue", columnType: .double)
+    static let int64ValueColumn = SDSColumnMetadata(columnName: "int64Value", columnType: .int64)
+    static let nsIntegerValueColumn = SDSColumnMetadata(columnName: "nsIntegerValue", columnType: .int64)
+    static let nsNumberValueUsingInt64Column = SDSColumnMetadata(columnName: "nsNumberValueUsingInt64", columnType: .int64, isOptional: true)
+    static let nsNumberValueUsingUInt64Column = SDSColumnMetadata(columnName: "nsNumberValueUsingUInt64", columnType: .int64, isOptional: true)
+    static let nsuIntegerValueColumn = SDSColumnMetadata(columnName: "nsuIntegerValue", columnType: .int64)
+    static let uint64ValueColumn = SDSColumnMetadata(columnName: "uint64Value", columnType: .int64)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: TestModel.collection(),
-                         tableName: "model_TestModel",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: TestModel.collection(),
+                                               tableName: "model_TestModel",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
@@ -254,9 +251,8 @@ extension TestModelSerializer {
         nsNumberValueUsingInt64Column,
         nsNumberValueUsingUInt64Column,
         nsuIntegerValueColumn,
-        uint64ValueColumn
+        uint64ValueColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -424,6 +420,8 @@ public extension TestModel {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return TestModel.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(TestModelRecord.databaseTableName) WHERE \(testModelColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -454,20 +452,28 @@ public extension TestModel {
                             batchSize: UInt,
                             block: @escaping (TestModel, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            TestModel.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? TestModel else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = TestModel.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = TestModel.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -495,6 +501,10 @@ public extension TestModel {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: TestModel.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -526,6 +536,8 @@ public extension TestModel {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: TestModel.collection())
         case .grdbRead(let grdbTransaction):
             return TestModelRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -535,6 +547,8 @@ public extension TestModel {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: TestModel.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try TestModelRecord.deleteAll(grdbTransaction.database)
@@ -554,20 +568,24 @@ public extension TestModel {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -579,6 +597,8 @@ public extension TestModel {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: TestModel.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(TestModelRecord.databaseTableName) WHERE \(testModelColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -598,7 +618,7 @@ public extension TestModel {
             let cursor = try TestModelRecord.fetchCursor(transaction.database, sqlRequest)
             return TestModelCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return TestModelCursor(transaction: transaction, cursor: nil)
         }
@@ -673,3 +693,4 @@ public extension TestModel {
     }
 }
 #endif
+                                                                               

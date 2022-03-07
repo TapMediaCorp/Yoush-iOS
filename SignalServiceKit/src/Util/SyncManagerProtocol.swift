@@ -1,24 +1,21 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
 public protocol SyncManagerProtocol: SyncManagerProtocolObjc, SyncManagerProtocolSwift {}
-
-// MARK: -
 
 @objc
 public protocol SyncManagerProtocolObjc {
     func sendConfigurationSyncMessage()
 
-    typealias Completion = () -> Void
-
     func syncLocalContact() -> AnyPromise
     func syncAllContacts() -> AnyPromise
     func syncContacts(forSignalAccounts signalAccounts: [SignalAccount]) -> AnyPromise
-    func syncGroups(transaction: SDSAnyWriteTransaction, completion: @escaping Completion)
+    func syncGroups(transaction: SDSAnyWriteTransaction)
 
     func processIncomingConfigurationSyncMessage(_ syncMessage: SSKProtoSyncMessageConfiguration, transaction: SDSAnyWriteTransaction)
     func processIncomingContactsSyncMessage(_ syncMessage: SSKProtoSyncMessageContacts, transaction: SDSAnyWriteTransaction)
@@ -27,10 +24,7 @@ public protocol SyncManagerProtocolObjc {
 
     func sendFetchLatestProfileSyncMessage()
     func sendFetchLatestStorageManifestSyncMessage()
-    func sendFetchLatestSubscriptionStatusSyncMessage()
 }
-
-// MARK: -
 
 @objc
 public protocol SyncManagerProtocolSwift {

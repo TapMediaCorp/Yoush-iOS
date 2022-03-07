@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>
@@ -11,6 +11,8 @@ typedef NS_ENUM(NSInteger, OWSOperationState) {
     OWSOperationStateExecuting,
     OWSOperationStateFinished
 };
+
+extern NSErrorUserInfoKey const OWSOperationIsRetryableKey;
 
 // A base class for implementing retryable operations.
 // To utilize the retryable behavior:
@@ -52,9 +54,6 @@ typedef NS_ENUM(NSInteger, OWSOperationState) {
 
 // Called at most one time, once retry is no longer possible.
 - (void)didFailWithError:(NSError *)error NS_SWIFT_NAME(didFail(error:));
-
-// Called exactly once after operation has moved to OWSOperationStateFinished
-- (void)didComplete;
 
 // How long to wait before retry, if possible
 - (NSTimeInterval)retryInterval;

@@ -1,17 +1,17 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <SignalServiceKit/SSKEnvironment.h>
 
-@class AvatarBuilder;
-@class BroadcastMediaMessageJobQueue;
 @class LaunchJobs;
+@class OWSAudioSession;
+@class OWSContactsManager;
 @class OWSIncomingContactSyncJobQueue;
 @class OWSIncomingGroupSyncJobQueue;
-@class OWSOrphanDataCleaner;
 @class OWSPreferences;
 @class OWSSounds;
+@class OWSWindowManager;
 
 @protocol OWSProximityMonitoringManager;
 
@@ -28,29 +28,28 @@
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
 
-- (instancetype)initWithIncomingContactSyncJobQueue:(OWSIncomingContactSyncJobQueue *)incomingContactSyncJobQueue
-                          incomingGroupSyncJobQueue:(OWSIncomingGroupSyncJobQueue *)incomingGroupSyncJobQueue
-                                         launchJobs:(LaunchJobs *)launchJobs
-                                        preferences:(OWSPreferences *)preferences
-                         proximityMonitoringManager:(id<OWSProximityMonitoringManager>)proximityMonitoringManager
-                                             sounds:(OWSSounds *)sounds
-                      broadcastMediaMessageJobQueue:(BroadcastMediaMessageJobQueue *)broadcastMediaMessageJobQueue
-                                  orphanDataCleaner:(OWSOrphanDataCleaner *)orphanDataCleaner
-                                      avatarBuilder:(AvatarBuilder *)avatarBuilder;
+- (instancetype)initWithAudioSession:(OWSAudioSession *)audioSession
+         incomingContactSyncJobQueue:(OWSIncomingContactSyncJobQueue *)incomingContactSyncJobQueue
+           incomingGroupSyncJobQueue:(OWSIncomingGroupSyncJobQueue *)incomingGroupSyncJobQueue
+                          launchJobs:(LaunchJobs *)launchJobs
+                         preferences:(OWSPreferences *)preferences
+          proximityMonitoringManager:(id<OWSProximityMonitoringManager>)proximityMonitoringManager
+                              sounds:(OWSSounds *)sounds
+                       windowManager:(OWSWindowManager *)windowManager;
 
-@property (nonatomic, readonly) OWSIncomingContactSyncJobQueue *incomingContactSyncJobQueueRef;
-@property (nonatomic, readonly) OWSIncomingGroupSyncJobQueue *incomingGroupSyncJobQueueRef;
-@property (nonatomic, readonly) LaunchJobs *launchJobsRef;
-@property (nonatomic, readonly) id<OWSProximityMonitoringManager> proximityMonitoringManagerRef;
-@property (nonatomic, readonly) OWSPreferences *preferencesRef;
-@property (nonatomic, readonly) OWSSounds *soundsRef;
-@property (nonatomic, readonly) BroadcastMediaMessageJobQueue *broadcastMediaMessageJobQueueRef;
-@property (nonatomic, readonly) OWSOrphanDataCleaner *orphanDataCleanerRef;
-@property (nonatomic, readonly) AvatarBuilder *avatarBuilderRef;
+@property (nonatomic, readonly) OWSAudioSession *audioSession;
+@property (nonatomic, readonly) OWSContactsManager *contactsManager;
+@property (nonatomic, readonly) OWSIncomingContactSyncJobQueue *incomingContactSyncJobQueue;
+@property (nonatomic, readonly) OWSIncomingGroupSyncJobQueue *incomingGroupSyncJobQueue;
+@property (nonatomic, readonly) LaunchJobs *launchJobs;
+@property (nonatomic, readonly) id<OWSProximityMonitoringManager> proximityMonitoringManager;
+@property (nonatomic, readonly) OWSPreferences *preferences;
+@property (nonatomic, readonly) OWSSounds *sounds;
+@property (nonatomic, readonly) OWSWindowManager *windowManager;
 
 @property (class, nonatomic) Environment *shared;
 
-#ifdef TESTABLE_BUILD
+#ifdef DEBUG
 // Should only be called by tests.
 + (void)clearSharedForTests;
 #endif

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSDisappearingMessagesJob.h"
@@ -34,8 +34,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-void AssertIsOnDisappearingMessagesQueue(void);
-
 void AssertIsOnDisappearingMessagesQueue()
 {
 #ifdef DEBUG
@@ -46,6 +44,13 @@ void AssertIsOnDisappearingMessagesQueue()
 #pragma mark -
 
 @implementation OWSDisappearingMessagesJob
+
++ (instancetype)sharedJob
+{
+    OWSAssertDebug(SSKEnvironment.shared.disappearingMessagesJob);
+
+    return SSKEnvironment.shared.disappearingMessagesJob;
+}
 
 - (instancetype)init
 {
@@ -58,13 +63,15 @@ void AssertIsOnDisappearingMessagesQueue()
 
     // suspenders in case a deletion schedule is missed.
     NSTimeInterval kFallBackTimerInterval = 5 * kMinuteInterval;
-    AppReadinessRunNowOrWhenMainAppDidBecomeReadyAsync(^{
-        self.fallbackTimer = [NSTimer weakScheduledTimerWithTimeInterval:kFallBackTimerInterval
-                                                                  target:self
-                                                                selector:@selector(fallbackTimerDidFire)
-                                                                userInfo:nil
-                                                                 repeats:YES];
-    });
+    [AppReadiness runNowOrWhenAppDidBecomeReadyPolite:^{
+        if (CurrentAppContext().isMainApp) {
+            self.fallbackTimer = [NSTimer weakScheduledTimerWithTimeInterval:kFallBackTimerInterval
+                                                                      target:self
+                                                                    selector:@selector(fallbackTimerDidFire)
+                                                                    userInfo:nil
+                                                                     repeats:YES];
+        }
+    }];
 
     OWSSingletonAssert();
 
@@ -94,6 +101,20 @@ void AssertIsOnDisappearingMessagesQueue()
     });
     return queue;
 }
+
+#pragma mark - Dependencies
+
+- (id<ContactsManagerProtocol>)contactsManager
+{
+    return SSKEnvironment.shared.contactsManager;
+}
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
 
 - (NSUInteger)deleteExpiredMessages
 {
@@ -174,7 +195,7 @@ void AssertIsOnDisappearingMessagesQueue()
         [message updateWithExpireStartedAt:expirationStartedAt transaction:transaction];
     }
 
-    [transaction addAsyncCompletionOffMain:^{
+    [transaction addAsyncCompletion:^{
         // Necessary that the async expiration run happens *after* the message is saved with it's new
         // expiration configuration.
         [self scheduleRunByDate:[NSDate ows_dateWithMillisecondsSince1970:message.expiresAt]];
@@ -185,9 +206,7 @@ void AssertIsOnDisappearingMessagesQueue()
 
 - (void)startIfNecessary
 {
-    AppReadinessRunNowOrWhenAppDidBecomeReadySync(^{
-        OWSAssertIsOnMainThread();
-
+    dispatch_async(dispatch_get_main_queue(), ^{
         if (self.hasStarted) {
             return;
         }
@@ -199,7 +218,7 @@ void AssertIsOnDisappearingMessagesQueue()
             DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
                 [self cleanupMessagesWhichFailedToStartExpiringWithTransaction:transaction];
             });
-            
+
             [self runLoop];
         });
     });
@@ -207,8 +226,9 @@ void AssertIsOnDisappearingMessagesQueue()
 
 - (void)schedulePass
 {
-    AppReadinessRunNowOrWhenAppDidBecomeReadyAsync(
-        ^{ dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{ [self runLoop]; }); });
+    dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{
+        [self runLoop];
+    });
 }
 
 #ifdef TESTABLE_BUILD
@@ -227,7 +247,7 @@ void AssertIsOnDisappearingMessagesQueue()
     dispatch_once(&onceToken, ^{
         dateFormatter = [NSDateFormatter new];
         dateFormatter.dateStyle = NSDateFormatterNoStyle;
-        dateFormatter.timeStyle = NSDateFormatterMediumStyle;
+        dateFormatter.timeStyle = kCFDateFormatterMediumStyle;
         dateFormatter.locale = [NSLocale systemLocale];
     });
 
@@ -263,12 +283,11 @@ void AssertIsOnDisappearingMessagesQueue()
             (int)round(MAX(0, [newTimerScheduleDate timeIntervalSinceDate:[NSDate new]])));
         [self resetNextDisappearanceTimer];
         self.nextDisappearanceDate = newTimerScheduleDate;
-        self.nextDisappearanceTimer = [NSTimer weakTimerWithTimeInterval:delaySeconds
-                                                                  target:self
-                                                                selector:@selector(disappearanceTimerDidFire)
-                                                                userInfo:nil
-                                                                 repeats:NO];
-        [[NSRunLoop mainRunLoop] addTimer:self.nextDisappearanceTimer forMode:NSRunLoopCommonModes];
+        self.nextDisappearanceTimer = [NSTimer weakScheduledTimerWithTimeInterval:delaySeconds
+                                                                           target:self
+                                                                         selector:@selector(disappearanceTimerDidFire)
+                                                                         userInfo:nil
+                                                                          repeats:NO];
     });
 }
 
@@ -283,10 +302,10 @@ void AssertIsOnDisappearingMessagesQueue()
         return;
     }
 
-    AppReadinessRunNowOrWhenAppDidBecomeReadyAsync(^{
-        [self resetNextDisappearanceTimer];
+    [self resetNextDisappearanceTimer];
 
-        dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{ [self runLoop]; });
+    dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{
+        [self runLoop];
     });
 }
 
@@ -305,18 +324,16 @@ void AssertIsOnDisappearingMessagesQueue()
         return;
     }
 
-    AppReadinessRunNowOrWhenMainAppDidBecomeReadyAsync(^{
-        dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{
-            NSUInteger deletedCount = [self runLoop];
+    dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{
+        NSUInteger deletedCount = [self runLoop];
 
-            // Normally deletions should happen via the disappearanceTimer, to make sure that they're prompt.
-            // So, if we're deleting something via this fallback timer, something may have gone wrong. The
-            // exception is if we're in close proximity to the disappearanceTimer, in which case a race condition
-            // is inevitable.
-            if (!recentlyScheduledDisappearanceTimer && deletedCount > 0) {
-                OWSFailDebug(@"unexpectedly deleted disappearing messages via fallback timer.");
-            }
-        });
+        // Normally deletions should happen via the disappearanceTimer, to make sure that they're prompt.
+        // So, if we're deleting something via this fallback timer, something may have gone wrong. The
+        // exception is if we're in close proximity to the disappearanceTimer, in which case a race condition
+        // is inevitable.
+        if (!recentlyScheduledDisappearanceTimer && deletedCount > 0) {
+            OWSFailDebug(@"unexpectedly deleted disappearing messages via fallback timer.");
+        }
     });
 }
 
@@ -361,8 +378,11 @@ void AssertIsOnDisappearingMessagesQueue()
 {
     OWSAssertIsOnMainThread();
 
-    AppReadinessRunNowOrWhenAppDidBecomeReadyAsync(
-        ^{ dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{ [self runLoop]; }); });
+    [AppReadiness runNowOrWhenAppDidBecomeReadyPolite:^{
+        dispatch_async(OWSDisappearingMessagesJob.serialQueue, ^{
+            [self runLoop];
+        });
+    }];
 }
 
 - (void)applicationWillResignActive:(NSNotification *)notification

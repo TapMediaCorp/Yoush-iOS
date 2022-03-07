@@ -1,10 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import SignalServiceKit
 import SignalMessaging
+import PromiseKit
 
 @objc
 public class GifPickerNavigationViewController: OWSNavigationController {
@@ -27,8 +28,6 @@ public class GifPickerNavigationViewController: OWSNavigationController {
 
 extension GifPickerNavigationViewController: GifPickerViewControllerDelegate {
     func gifPickerDidSelect(attachment: SignalAttachment) {
-        AssertIsOnMainThread()
-
         let attachmentApprovalItem = AttachmentApprovalItem(attachment: attachment, canSave: false)
         let attachmentApproval = AttachmentApprovalViewController(options: [],
                                                                   sendButtonImageName: "send-solid-24",
@@ -52,8 +51,8 @@ extension GifPickerNavigationViewController: AttachmentApprovalViewControllerDel
 
     public func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController,
                                    didApproveAttachments attachments: [SignalAttachment],
-                                   messageBody: MessageBody?) {
-        approvalDelegate?.attachmentApproval(attachmentApproval, didApproveAttachments: attachments, messageBody: messageBody)
+                                   messageText: String?) {
+        approvalDelegate?.attachmentApproval(attachmentApproval, didApproveAttachments: attachments, messageText: messageText)
     }
 
     public func attachmentApprovalDidCancel(_ attachmentApproval: AttachmentApprovalViewController) {
@@ -61,8 +60,8 @@ extension GifPickerNavigationViewController: AttachmentApprovalViewControllerDel
     }
 
     public func attachmentApproval(_ attachmentApproval: AttachmentApprovalViewController,
-                                   didChangeMessageBody newMessageBody: MessageBody?) {
-        approvalDelegate?.attachmentApproval(attachmentApproval, didChangeMessageBody: newMessageBody)
+                                   didChangeMessageText newMessageText: String?) {
+        approvalDelegate?.attachmentApproval(attachmentApproval, didChangeMessageText: newMessageText)
     }
 
     public func attachmentApprovalBackButtonTitle() -> String {
@@ -76,13 +75,9 @@ extension GifPickerNavigationViewController: AttachmentApprovalViewControllerDel
     public var attachmentApprovalRecipientNames: [String] {
         return approvalDelegate?.attachmentApprovalRecipientNames ?? []
     }
-
-    public var attachmentApprovalMentionableAddresses: [SignalServiceAddress] {
-        return approvalDelegate?.attachmentApprovalMentionableAddresses ?? []
-    }
 }
 
-protocol GifPickerViewControllerDelegate: AnyObject {
+protocol GifPickerViewControllerDelegate: class {
     func gifPickerDidSelect(attachment: SignalAttachment)
     func gifPickerDidCancel()
 }
@@ -114,12 +109,7 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
     var searchErrorView: UILabel?
     var activityIndicator: UIActivityIndicatorView?
     var hasSelectedCell: Bool = false
-    var imageInfos = [GiphyImageInfo]() {
-        didSet {
-            collectionView.collectionViewLayout.invalidateLayout()
-            collectionView.reloadData()
-        }
-    }
+    var imageInfos = [GiphyImageInfo]()
 
     private let kCellReuseIdentifier = "kCellReuseIdentifier"
 
@@ -142,6 +132,12 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
         NotificationCenter.default.removeObserver(self)
 
         progressiveSearchTimer?.invalidate()
+    }
+
+    // MARK: - Dependencies
+
+    var giphyAPI: GiphyAPI {
+        return GiphyAPI.sharedInstance
     }
 
     // MARK: -
@@ -369,6 +365,9 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             searchErrorView.isHidden = true
             activityIndicator.isHidden = true
             activityIndicator.stopAnimating()
+
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            self.collectionView.reloadData()
         case .noResults:
             self.collectionView.isHidden = true
             noResultsView.isHidden = false
@@ -421,7 +420,7 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             return false
         }
 
-        guard cell.isDisplayingPreview else {
+        guard cell.stillAsset != nil || cell.animatedAsset != nil else {
             // we don't want to let the user blindly select a gray cell
             Logger.debug("ignoring selection of cell with no preview")
             return false
@@ -442,7 +441,7 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             return
         }
 
-        guard cell.isDisplayingPreview else {
+        guard cell.stillAsset != nil || cell.animatedAsset != nil else {
             // we don't want to let the user blindly select a gray cell
             Logger.debug("ignoring selection of cell with no preview")
             return
@@ -485,23 +484,17 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
         }.map(on: .global()) { [weak self] (asset: ProxiedContentAsset) -> SignalAttachment in
             guard let _ = self else { throw GetFileError.noLongerRelevant }
 
-            guard let giphyAsset = asset.assetDescription as? GiphyAsset else {
+            guard let rendition = asset.assetDescription as? GiphyRendition else {
                 throw OWSAssertionError("Invalid asset description.")
             }
 
-            let assetTypeIdentifier = giphyAsset.type.utiType
-            let assetFileExtension = giphyAsset.type.extension
             let pathForCachedAsset = asset.filePath
-
-            let pathForConsumableFile = OWSFileSystem.temporaryFilePath(fileExtension: assetFileExtension)
+            let pathForConsumableFile = OWSFileSystem.temporaryFilePath(withFileExtension: "gif")
             try FileManager.default.copyItem(atPath: pathForCachedAsset, toPath: pathForConsumableFile)
             let dataSource = try DataSourcePath.dataSource(withFilePath: pathForConsumableFile,
                                                            shouldDeleteOnDeallocation: false)
 
-            let attachment = SignalAttachment.attachment(dataSource: dataSource, dataUTI: assetTypeIdentifier)
-            attachment.isLoopingVideo = attachment.isVideo
-            return attachment
-
+            return SignalAttachment.attachment(dataSource: dataSource, dataUTI: rendition.utiType, imageQuality: .original)
         }.done { [weak self] attachment in
             guard let self = self else {
                 throw GetFileError.noLongerRelevant
@@ -515,7 +508,7 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             }
 
             let alert = ActionSheetController(title: NSLocalizedString("GIF_PICKER_FAILURE_ALERT_TITLE", comment: "Shown when selected GIF couldn't be fetched"),
-                                          message: error.userErrorDescription)
+                                          message: error.localizedDescription)
             alert.addAction(ActionSheetAction(title: CommonStrings.retryButton, style: .default) { _ in
                 self.getFileForCell(cell)
             })
@@ -602,13 +595,11 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
         assert(searchBar.text == nil || searchBar.text?.count == 0)
         assert(lastQuery == nil)
 
-        firstly {
-            GiphyAPI.trending()
-        }.done(on: .main) { [weak self] imageInfos in
+        giphyAPI.trending().done { [weak self] imageInfos in
             guard let self = self else { return }
 
             guard self.lastQuery == nil else {
-                Logger.info("not showing trending results due to subsequent searches.")
+                Logger.info("not showing trending results due to subsequent searche")
                 return
             }
 
@@ -619,15 +610,14 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             } else {
                 owsFailDebug("trending results was unexpectedly empty")
             }
-        }.catch(on: .main) { error in
+        }.catch { error in
             // Don't both showing error UI feedback for default "trending" results.
             Logger.error("error: \(error)")
         }
     }
 
     private func search(query: String) {
-        let loggableQueryString = DebugFlags.internalLogging ? query : "(\(query.count) characters)"
-        Logger.info("searching: \(loggableQueryString)")
+        Logger.info("searching: \(query)")
 
         progressiveSearchTimer?.invalidate()
         progressiveSearchTimer = nil
@@ -636,9 +626,7 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
         lastQuery = query
         self.collectionView.contentOffset = CGPoint.zero
 
-        firstly {
-            GiphyAPI.search(query: query)
-        }.done(on: .main) { [weak self] imageInfos in
+        giphyAPI.search(query: query, success: { [weak self] imageInfos in
             guard let strongSelf = self else { return }
             Logger.info("search complete")
             strongSelf.imageInfos = imageInfos
@@ -647,14 +635,13 @@ class GifPickerViewController: OWSViewController, UISearchBarDelegate, UICollect
             } else {
                 strongSelf.viewMode = .noResults
             }
-        }.catch(on: .main) { [weak self] error in
-            owsFailDebugUnlessNetworkFailure(error)
-
-            guard let strongSelf = self else { return }
-            Logger.info("search failed.")
-            // TODO: Present this error to the user.
-            strongSelf.viewMode = .error
-        }
+        },
+            failure: { [weak self] _ in
+                guard let strongSelf = self else { return }
+                Logger.info("search failed.")
+                // TODO: Present this error to the user.
+                strongSelf.viewMode = .error
+        })
     }
 
     // MARK: - GifPickerLayoutDelegate

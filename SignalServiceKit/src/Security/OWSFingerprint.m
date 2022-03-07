@@ -1,10 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSFingerprint.h"
-#import "NSData+keyVersionByte.h"
 #import "OWSError.h"
+#import <AxolotlKit/NSData+keyVersionByte.h>
 #import <CommonCrypto/CommonDigest.h>
 #import <SignalCoreKit/NSData+OWS.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
@@ -95,7 +95,7 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
 
 - (uint32_t)scannableFingerprintVersion
 {
-    if (!RemoteConfig.uuidSafetyNumbers) {
+    if (!SSKFeatureFlags.uuidSafetyNumbers) {
         return OWSFingerprintPreUUIDScannableFormatVersion;
     }
 
@@ -106,7 +106,7 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
 {
     // For now, leave safety number based on phone number unless the feature flag is enabled.
     // This prevents mismatch from occuring against old apps until we formally roll out the feature.
-    if (RemoteConfig.uuidSafetyNumbers && address.uuid != nil) {
+    if (SSKFeatureFlags.uuidSafetyNumbers) {
         // TODO UUID: Right now, uuid is nullable, but safety numbers require us to always have
         // the UUID for a user. This will need to be updated once we change this field to nonnull.
         NSUUID *uuid = address.uuid;
@@ -129,12 +129,12 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
 
     *error = nil;
     FingerprintProtoLogicalFingerprints *_Nullable logicalFingerprints;
-    logicalFingerprints = [[FingerprintProtoLogicalFingerprints alloc] initWithSerializedData:data error:error];
+    logicalFingerprints = [FingerprintProtoLogicalFingerprints parseData:data error:error];
     if (!logicalFingerprints || *error) {
         OWSFailDebug(@"fingerprint failure: %@", *error);
 
         NSString *description = NSLocalizedString(@"PRIVACY_VERIFICATION_FAILURE_INVALID_QRCODE", @"alert body");
-        *error = [OWSError withError:OWSErrorCodePrivacyVerificationFailure description:description isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodePrivacyVerificationFailure, description);
         return NO;
     }
 
@@ -142,14 +142,14 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
         OWSLogWarn(@"Verification failed. They're running an old version.");
         NSString *description
             = NSLocalizedString(@"PRIVACY_VERIFICATION_FAILED_WITH_OLD_REMOTE_VERSION", @"alert body");
-        *error = [OWSError withError:OWSErrorCodePrivacyVerificationFailure description:description isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodePrivacyVerificationFailure, description);
         return NO;
     }
 
     if (logicalFingerprints.version > self.scannableFingerprintVersion) {
         OWSLogWarn(@"Verification failed. We're running an old version.");
         NSString *description = NSLocalizedString(@"PRIVACY_VERIFICATION_FAILED_WITH_OLD_LOCAL_VERSION", @"alert body");
-        *error = [OWSError withError:OWSErrorCodePrivacyVerificationFailure description:description isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodePrivacyVerificationFailure, description);
         return NO;
     }
 
@@ -162,7 +162,7 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
         NSString *descriptionFormat = NSLocalizedString(@"PRIVACY_VERIFICATION_FAILED_I_HAVE_WRONG_KEY_FOR_THEM",
             @"Alert body when verifying with {{contact name}}");
         NSString *description = [NSString stringWithFormat:descriptionFormat, self.theirName];
-        *error = [OWSError withError:OWSErrorCodePrivacyVerificationFailure description:description isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodePrivacyVerificationFailure, description);
         return NO;
     }
 
@@ -171,7 +171,7 @@ static uint32_t const OWSFingerprintDefaultHashIterations = 5200;
         NSString *descriptionFormat = NSLocalizedString(@"PRIVACY_VERIFICATION_FAILED_THEY_HAVE_WRONG_KEY_FOR_ME",
             @"Alert body when verifying with {{contact name}}");
         NSString *description = [NSString stringWithFormat:descriptionFormat, self.theirName];
-        *error = [OWSError withError:OWSErrorCodePrivacyVerificationFailure description:description isRetryable:NO];
+        *error = OWSErrorWithCodeDescription(OWSErrorCodePrivacyVerificationFailure, description);
         return NO;
     }
 

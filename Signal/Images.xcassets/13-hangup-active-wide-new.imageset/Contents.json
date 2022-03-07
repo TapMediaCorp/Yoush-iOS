@@ -1,0 +1,23 @@
+{
+  "images" : [
+    {
+      "filename" : "13-hangup-active-wide-new.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "13-hangup-active-wide-new@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "13-hangup-active-wide-new@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

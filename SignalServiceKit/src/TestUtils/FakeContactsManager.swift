@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Contacts
@@ -26,6 +26,10 @@ public class FakeContactsManager: NSObject, ContactsManagerProtocol {
         return "Short fake name"
     }
 
+    public func nameComponents(for address: SignalServiceAddress) -> PersonNameComponents? {
+        return PersonNameComponents()
+    }
+
     public func nameComponents(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> PersonNameComponents? {
         return PersonNameComponents()
     }
@@ -38,19 +42,11 @@ public class FakeContactsManager: NSObject, ContactsManagerProtocol {
         return []
     }
 
-    public func isSystemContactWithSneakyTransaction(phoneNumber: String) -> Bool {
+    public func isSystemContact(phoneNumber: String) -> Bool {
         return true
     }
 
-    public func isSystemContact(phoneNumber: String, transaction: SDSAnyReadTransaction) -> Bool {
-        return true
-    }
-
-    public func isSystemContactWithSneakyTransaction(address: SignalServiceAddress) -> Bool {
-        return true
-    }
-
-    public func isSystemContact(address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> Bool {
+    public func isSystemContact(address: SignalServiceAddress) -> Bool {
         return true
     }
 
@@ -58,21 +54,12 @@ public class FakeContactsManager: NSObject, ContactsManagerProtocol {
         return true
     }
 
-    public func isSystemContact(withSignalAccount phoneNumber: String, transaction: SDSAnyReadTransaction) -> Bool {
+    public func hasNameInSystemContacts(for address: SignalServiceAddress) -> Bool {
         return true
     }
 
-    public func hasNameInSystemContacts(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> Bool {
-        return true
-    }
-
-    public func isSystemContactWithSignalAccount(_ address: SignalServiceAddress) -> Bool {
-        return true
-    }
-
-    public func isSystemContactWithSignalAccount(_ address: SignalServiceAddress,
-                                                 transaction: SDSAnyReadTransaction) -> Bool {
-        return true
+    public func conversationColorName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
+        ConversationColorName.indigo.rawValue
     }
 
     public func sortSignalServiceAddresses(_ addresses: [SignalServiceAddress],
@@ -82,11 +69,8 @@ public class FakeContactsManager: NSObject, ContactsManagerProtocol {
 
     public func compare(signalAccount left: SignalAccount, with right: SignalAccount) -> ComparisonResult {
         // If this method ends up being used by the tests, we should provide a better implementation.
-        owsFail("TODO")
-    }
-
-    public func comparableName(for address: SignalServiceAddress, transaction: SDSAnyReadTransaction) -> String {
-        return "Fake name"
+        assertionFailure("TODO")
+        return ComparisonResult.orderedAscending
     }
 
     public func comparableName(for signalAccount: SignalAccount, transaction: SDSAnyReadTransaction) -> String {

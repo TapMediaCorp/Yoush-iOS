@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -10,7 +10,7 @@ class ViewOnceMessageViewController: OWSViewController {
 
     class Content {
         enum ContentType {
-            case stillImage, animatedImage, video, loopingVideo
+            case stillImage, animatedImage, video
         }
 
         let messageId: String
@@ -31,6 +31,16 @@ class ViewOnceMessageViewController: OWSViewController {
                 OWSFileSystem.deleteFile(filePath)
             }
         }
+    }
+
+    // MARK: - Dependencies
+
+    static var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
     }
 
     // MARK: - Properties
@@ -119,9 +129,7 @@ class ViewOnceMessageViewController: OWSViewController {
             }
 
             let viewOnceType: Content.ContentType
-            if attachmentStream.isLoopingVideo {
-                viewOnceType = .loopingVideo
-            } else if attachmentStream.shouldBeRenderedByYY {
+            if attachmentStream.isAnimated || contentType == OWSMimeTypeImageWebp {
                 viewOnceType = .animatedImage
             } else if attachmentStream.isImage {
                 viewOnceType = .stillImage
@@ -163,7 +171,7 @@ class ViewOnceMessageViewController: OWSViewController {
                 owsFailDebug("Couldn't determine file extension.")
                 return
             }
-            let tempFilePath = OWSFileSystem.temporaryFilePath(fileExtension: fileExtension)
+            let tempFilePath = OWSFileSystem.temporaryFilePath(withFileExtension: fileExtension)
             guard OWSFileSystem.fileOrFolderExists(atPath: originalFilePath) else {
                 owsFailDebug("Missing attachment file.")
                 return
@@ -240,11 +248,6 @@ class ViewOnceMessageViewController: OWSViewController {
         let dismissButton = OWSButton(imageName: "x-24", tintColor: Theme.darkThemePrimaryColor) { [weak self] in
             self?.dismissButtonPressed()
         }
-        dismissButton.layer.shadowColor = Theme.darkThemeBackgroundColor.cgColor
-        dismissButton.layer.shadowOffset = .zero
-        dismissButton.layer.shadowOpacity = 0.7
-        dismissButton.layer.shadowRadius = 3.0
-
         dismissButton.contentEdgeInsets = UIEdgeInsets(top: vMargin, leading: hMargin, bottom: vMargin, trailing: hMargin)
         view.addSubview(dismissButton)
         dismissButton.autoPinEdge(.leading, to: .leading, of: mediaView)
@@ -258,15 +261,6 @@ class ViewOnceMessageViewController: OWSViewController {
         let filePath = content.filePath
 
         switch content.type {
-        case .loopingVideo:
-            guard let video = LoopingVideo(url: URL(fileURLWithPath: filePath)) else {
-                owsFailDebug("Could not load attachment.")
-                return nil
-            }
-            let view = LoopingVideoView()
-            view.contentMode = .scaleAspectFit
-            view.video = video
-            return view
         case .animatedImage:
             guard let image = YYImage(contentsOfFile: filePath) else {
                 owsFailDebug("Could not load attachment.")
@@ -326,7 +320,7 @@ class ViewOnceMessageViewController: OWSViewController {
 
             let label = UILabel()
             label.textColor = Theme.darkThemePrimaryColor
-            label.font = UIFont.ows_dynamicTypeBody.ows_monospaced
+            label.font = UIFont.ows_dynamicTypeBody.ows_monospaced()
             label.setShadow()
 
             videoContainer.addSubview(label)
@@ -371,7 +365,7 @@ class ViewOnceMessageViewController: OWSViewController {
     var videoPlayer: OWSVideoPlayer?
 
     func setupDatabaseObservation() {
-        databaseStorage.appendDatabaseChangeDelegate(self)
+        databaseStorage.appendUIDatabaseSnapshotDelegate(self)
 
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(applicationWillEnterForeground),
@@ -396,7 +390,7 @@ class ViewOnceMessageViewController: OWSViewController {
     private func dismissIfRemoved() {
         AssertIsOnMainThread()
 
-        let shouldDismiss: Bool = databaseStorage.read { transaction in
+        let shouldDismiss: Bool = databaseStorage.uiRead { transaction in
             let uniqueId = self.content.messageId
             guard TSInteraction.anyFetch(uniqueId: uniqueId, transaction: transaction) != nil else {
                 return true
@@ -430,21 +424,24 @@ class ViewOnceMessageViewController: OWSViewController {
 
 // MARK: -
 
-extension ViewOnceMessageViewController: DatabaseChangeDelegate {
+extension ViewOnceMessageViewController: UIDatabaseSnapshotDelegate {
+    func uiDatabaseSnapshotWillUpdate() {
+        AssertIsOnMainThread()
+    }
 
-    func databaseChangesDidUpdate(databaseChanges: DatabaseChanges) {
+    func uiDatabaseSnapshotDidUpdate(databaseChanges: UIDatabaseChanges) {
         AssertIsOnMainThread()
 
         dismissIfRemoved()
     }
 
-    func databaseChangesDidUpdateExternally() {
+    func uiDatabaseSnapshotDidUpdateExternally() {
         AssertIsOnMainThread()
 
         dismissIfRemoved()
     }
 
-    func databaseChangesDidReset() {
+    func uiDatabaseSnapshotDidReset() {
         AssertIsOnMainThread()
 
         dismissIfRemoved()

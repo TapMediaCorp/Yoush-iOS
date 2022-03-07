@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "MIMETypeUtil.h"
@@ -12,7 +12,6 @@
 #import <CoreServices/CoreServices.h>
 
 #endif
-#import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -32,17 +31,11 @@ NSString *const OWSMimeTypeOversizeTextMessage = @"text/x-signal-plain";
 NSString *const OWSMimeTypeUnknownForTests = @"unknown/mimetype";
 NSString *const OWSMimeTypeApplicationZip = @"application/zip";
 NSString *const OWSMimeTypeProtobuf = @"application/x-protobuf";
-NSString *const OWSMimeTypeJson = @"application/json";
-// TODO: We're still finalizing the MIME type.
-NSString *const OWSMimeTypeLottieSticker = @"text/x-signal-sticker-lottie";
-NSString *const OWSMimeTypeImageApng1 = @"image/apng";
-NSString *const OWSMimeTypeImageApng2 = @"image/vnd.mozilla.apng";
 
 NSString *const kOversizeTextAttachmentUTI = @"org.whispersystems.oversize-text-attachment";
 NSString *const kOversizeTextAttachmentFileExtension = @"txt";
 NSString *const kUnknownTestAttachmentUTI = @"org.whispersystems.unknown";
 NSString *const kSyncMessageFileExtension = @"bin";
-NSString *const kLottieStickerFileExtension = @"lottiesticker";
 
 @implementation MIMETypeUtil
 
@@ -101,9 +94,9 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
             @"image/x-tiff" : @"tif",
             @"image/bmp" : @"bmp",
             @"image/x-windows-bmp" : @"bmp",
+            OWSMimeTypeImageWebp : @"webp",
             OWSMimeTypeImageHeic : @"heic",
             OWSMimeTypeImageHeif : @"heif",
-            OWSMimeTypeImageWebp : @"webp",
         };
     });
     return result;
@@ -113,20 +106,9 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
     static NSDictionary *result = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSMutableDictionary<NSString *, NSString *> *value = [@ {
+        result = @{
             OWSMimeTypeImageGif : @"gif",
-        } mutableCopy];
-        if (SSKFeatureFlags.supportAnimatedStickers_AnimatedWebp) {
-            value[OWSMimeTypeImageWebp] = @"webp";
-        }
-        if (SSKFeatureFlags.supportAnimatedStickers_Lottie) {
-            value[OWSMimeTypeLottieSticker] = kLottieStickerFileExtension;
-        }
-        if (SSKFeatureFlags.supportAnimatedStickers_Apng) {
-            value[OWSMimeTypeImageApng1] = @"png";
-            value[OWSMimeTypeImageApng2] = @"png";
-        }
-        result = [value copy];
+        };
     });
     return result;
 }
@@ -197,8 +179,10 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
             @"png" : OWSMimeTypeImagePng,
             @"x-png" : OWSMimeTypeImagePng,
             @"jfif" : @"image/jpeg",
+            @"jfif" : @"image/pjpeg",
             @"jfif-tbnl" : @"image/jpeg",
             @"jpe" : @"image/jpeg",
+            @"jpe" : @"image/pjpeg",
             @"jpeg" : @"image/jpeg",
             @"jpg" : @"image/jpeg",
             @"tif" : @"image/tiff",
@@ -215,13 +199,9 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
     static NSDictionary *result = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSMutableDictionary<NSString *, NSString *> *value = [@ {
+        result = @{
             @"gif" : OWSMimeTypeImageGif,
-        } mutableCopy];
-        if (SSKFeatureFlags.supportAnimatedStickers_Lottie) {
-            value[kLottieStickerFileExtension] = OWSMimeTypeLottieSticker;
-        }
-        result = [value copy];
+        };
     });
     return result;
 }
@@ -289,8 +269,7 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
     return [[self supportedBinaryDataMIMETypesToExtensionTypes] objectForKey:supportedMIMEType];
 }
 
-#pragma mark - Full attachment utilities
-
+#pragma mark full attachment utilities
 + (BOOL)isAnimated:(NSString *)contentType {
     return [MIMETypeUtil isSupportedAnimatedMIMEType:contentType];
 }
@@ -577,8 +556,6 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         result = @ {
-            OWSMimeTypeImageApng1 : @"png",
-            OWSMimeTypeImageApng2 : @"png",
             @"application/acad" : @"dwg",
             @"application/andrew-inset" : @"ez",
             @"application/applixware" : @"aw",
@@ -1655,9 +1632,6 @@ NSString *const kLottieStickerFileExtension = @"lottiesticker";
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         result = @ {
-            // Custom MIME types.
-            kLottieStickerFileExtension : OWSMimeTypeLottieSticker,
-            // Common MIME types.
             @"123" : @"application/vnd.lotus-1-2-3",
             @"3dml" : @"text/vnd.in3d.3dml",
             @"3ds" : @"image/x-3ds",

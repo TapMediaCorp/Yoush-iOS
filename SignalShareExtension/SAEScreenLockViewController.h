@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2018 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalUI/OWSViewController.h>
-#import <SignalUI/ScreenLockViewController.h>
+#import "OWSViewController.h"
+#import <SignalMessaging/ScreenLockViewController.h>
 
 NS_ASSUME_NONNULL_BEGIN
 

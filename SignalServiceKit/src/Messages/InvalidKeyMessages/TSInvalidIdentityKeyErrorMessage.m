@@ -1,9 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSInvalidIdentityKeyErrorMessage.h"
-#import "OWSError.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -19,17 +18,6 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAbstractMethod();
 }
 
-- (BOOL)acceptNewIdentityKeyWithError:(NSError **)error
-{
-    @try {
-        [self throws_acceptNewIdentityKey];
-        return YES;
-    } @catch (NSException *exception) {
-        *error = OWSErrorMakeAssertionError(@"Error: %@", exception.debugDescription);
-        return NO;
-    }
-}
-
 - (nullable NSData *)throws_newIdentityKey
 {
     OWSAbstractMethod();
@@ -40,6 +28,11 @@ NS_ASSUME_NONNULL_BEGIN
 {
     OWSAbstractMethod();
     return nil;
+}
+
+- (BOOL)isSpecialMessage
+{
+    return YES;
 }
 
 @end

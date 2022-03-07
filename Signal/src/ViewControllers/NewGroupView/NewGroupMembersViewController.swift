@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -25,15 +25,7 @@ public class NewGroupMembersViewController: BaseGroupMemberViewController {
         title = NSLocalizedString("NEW_GROUP_SELECT_MEMBERS_VIEW_TITLE",
                                   comment: "The title for the 'select members for new group' view.")
 
-        updateBarButtons()
-    }
-
-    private func updateBarButtons() {
-        let hasMembers = !newGroupState.recipientSet.isEmpty
-        let buttonTitle = (hasMembers
-                            ? CommonStrings.nextButton
-                            : CommonStrings.skipButton)
-        let rightBarButtonItem = UIBarButtonItem(title: buttonTitle,
+        let rightBarButtonItem = UIBarButtonItem(title: CommonStrings.nextButton,
                                                  style: .plain,
                                                  target: self,
                                                  action: #selector(nextButtonPressed),
@@ -60,25 +52,23 @@ public class NewGroupMembersViewController: BaseGroupMemberViewController {
 extension NewGroupMembersViewController: GroupMemberViewDelegate {
 
     var groupMemberViewRecipientSet: OrderedSet<PickedRecipient> {
-        newGroupState.recipientSet
+        return newGroupState.recipientSet
     }
 
     var groupMemberViewHasUnsavedChanges: Bool {
-        newGroupState.hasUnsavedChanges
+        return newGroupState.hasUnsavedChanges
     }
 
     var shouldTryToEnableGroupsV2ForMembers: Bool {
-        true
+        return true
     }
 
     func groupMemberViewRemoveRecipient(_ recipient: PickedRecipient) {
         newGroupState.recipientSet.remove(recipient)
-        updateBarButtons()
     }
 
     func groupMemberViewAddRecipient(_ recipient: PickedRecipient) {
         newGroupState.recipientSet.append(recipient)
-        updateBarButtons()
     }
 
     func groupMemberViewCanAddRecipient(_ recipient: PickedRecipient) -> Bool {
@@ -86,49 +76,43 @@ extension NewGroupMembersViewController: GroupMemberViewDelegate {
         // since we'll failover to using a v1 group if any members don't
         // support v2 groups.  Eventually, we'll want to reject certain
         // users.
-        true
+        return true
     }
 
     func groupMemberViewShouldShowMemberCount() -> Bool {
-        true
+        return RemoteConfig.groupsV2CreateGroups
     }
 
     func groupMemberViewGroupMemberCountForDisplay() -> Int {
-        groupMemberViewGroupMemberCount(withSelf: false)
+        return groupMemberViewGroupMemberCount(withSelf: false)
     }
 
     func groupMemberViewGroupMemberCount(withSelf: Bool) -> Int {
         // We sometimes add one for the local user.
-        newGroupState.recipientSet.count + (withSelf ? 1 : 0)
+        return newGroupState.recipientSet.count + (withSelf ? 1 : 0)
     }
 
-    func groupMemberViewIsGroupFull_HardLimit() -> Bool {
-        groupMemberViewGroupMemberCount(withSelf: true) >= GroupManager.groupsV2MaxGroupSizeHardLimit
+    func groupMemberViewIsGroupFull() -> Bool {
+        guard RemoteConfig.groupsV2CreateGroups else {
+            return false
+        }
+        return groupMemberViewGroupMemberCount(withSelf: true) >= GroupManager.maxGroupMemberCount
     }
 
-    func groupMemberViewIsGroupFull_RecommendedLimit() -> Bool {
-        groupMemberViewGroupMemberCount(withSelf: true) >= GroupManager.groupsV2MaxGroupSizeRecommended
-    }
-
-    func groupMemberViewIsPreExistingMember(_ recipient: PickedRecipient,
-                                            transaction: SDSAnyReadTransaction) -> Bool {
-        false
+    func groupMemberViewIsPreExistingMember(_ recipient: PickedRecipient) -> Bool {
+        return false
     }
 
     func groupMemberViewIsGroupsV2Required() -> Bool {
         // No, we can fail over to creating v1 groups.
-        false
+        return false
     }
 
     func groupMemberViewDismiss() {
-        dismiss(animated: true)
-    }
-
-    var isNewGroup: Bool {
-        true
-    }
-
-    var groupThreadForGroupMemberView: TSGroupThread? {
-        nil
+        if self.presentedViewController != nil{
+            dismiss(animated: true)
+        }else {
+            navigationController?.popToRootViewController(animated: true)
+        }
     }
 }

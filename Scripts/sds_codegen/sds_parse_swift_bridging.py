@@ -86,8 +86,6 @@ def process_file(file_path, namespace, intermediates):
     filename = os.path.basename(file_path)
     if not filename.endswith('.swift'):
         return
-    if filename == 'EmojiWithSkinTones+String.swift':
-        return
 
     command = [
         'which',
@@ -157,7 +155,7 @@ def generate_swift_bridging_header(namespace, swift_bridging_path):
 
     header = '''
 //
-//  Copyright (c) 2021 Signal. All rights reserved.
+//  Copyright (c) 2019 Signal. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>

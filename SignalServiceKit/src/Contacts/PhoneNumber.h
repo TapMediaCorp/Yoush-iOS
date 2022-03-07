@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
@@ -28,10 +28,13 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSArray<PhoneNumber *> *)tryParsePhoneNumbersFromUserSpecifiedText:(NSString *)text
                                                      clientPhoneNumber:(NSString *)clientPhoneNumber;
 
++ (NSString *)removeFormattingCharacters:(NSString *)inputString;
 + (NSString *)bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:(NSString *)input;
 + (NSString *)bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:(NSString *)input
                                               withSpecifiedCountryCodeString:(NSString *)countryCodeString;
 + (NSString *)bestEffortLocalizedPhoneNumberWithE164:(NSString *)phoneNumber;
+
++ (NSString *)regionCodeFromCountryCodeString:(NSString *)countryCodeString;
 
 - (NSURL *)toSystemDialerURL;
 - (NSString *)toE164;
@@ -42,8 +45,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSComparisonResult)compare:(PhoneNumber *)other;
 
 + (NSString *)defaultCountryCode;
-
-+ (BOOL)resemblesE164:(NSString *)text;
 
 @end
 

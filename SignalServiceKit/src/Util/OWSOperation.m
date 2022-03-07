@@ -1,14 +1,17 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSOperation.h"
+#import "NSError+OWSOperation.h"
 #import "NSTimer+OWS.h"
 #import "OWSBackgroundTask.h"
 #import "OWSError.h"
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
+
+NSErrorUserInfoKey const OWSOperationIsRetryableKey = @"OWSOperationIsRetryableKey";
 
 NSString *const OWSOperationKeyIsExecuting = @"isExecuting";
 NSString *const OWSOperationKeyIsFinished = @"isFinished";
@@ -111,13 +114,6 @@ NSString *const OWSOperationKeyIsFinished = @"isFinished";
     // Override in subclass if necessary
 }
 
-// Called exactly once after the operation is marked complete, either with success, failure, or cancellation
-- (void)didComplete
-{
-    // no-op
-    // Override in subclass if necessary
-}
-
 #pragma mark - NSOperation overrides
 
 - (NSString *)eventId
@@ -183,7 +179,7 @@ NSString *const OWSOperationKeyIsFinished = @"isFinished";
 {
     OWSLogDebug(@"reportError: %@, fatal?: %d, retryable?: %d, remainingRetries: %lu",
         error,
-        error.isFatalError,
+        error.isFatal,
         error.isRetryable,
         (unsigned long)self.remainingRetries);
 
@@ -191,7 +187,7 @@ NSString *const OWSOperationKeyIsFinished = @"isFinished";
 
     [self didReportError:error];
 
-    if (error.isFatalError) {
+    if (error.isFatal) {
         [self failOperationWithError:error];
         return;
     }
@@ -278,7 +274,6 @@ NSString *const OWSOperationKeyIsFinished = @"isFinished";
 
     [self didChangeValueForKey:OWSOperationKeyIsExecuting];
     [self didChangeValueForKey:OWSOperationKeyIsFinished];
-    [self didComplete];
 
     [BenchManager completeEventWithEventId:self.eventId];
 }

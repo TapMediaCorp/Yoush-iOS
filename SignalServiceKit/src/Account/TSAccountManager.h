@@ -1,11 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/TSConstants.h>
+#import "TSConstants.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
+extern NSString *const TSRegistrationErrorDomain;
+extern NSString *const TSRegistrationErrorUserInfoHTTPStatus;
 extern NSNotificationName const NSNotificationNameRegistrationStateDidChange;
 extern NSString *const TSRemoteAttestationAuthErrorKey;
 extern NSString *const kNSNotificationName_LocalNumberDidChange;
@@ -15,6 +17,7 @@ extern NSString *const kNSNotificationName_LocalNumberDidChange;
 @class SDSAnyWriteTransaction;
 @class SDSKeyValueStore;
 @class SignalServiceAddress;
+@class TSNetworkManager;
 @class TSRequest;
 
 typedef NS_ENUM(NSUInteger, OWSRegistrationState) {
@@ -25,8 +28,6 @@ typedef NS_ENUM(NSUInteger, OWSRegistrationState) {
     OWSRegistrationState_Reregistering,
 };
 
-NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
-
 @interface TSAccountManager : NSObject
 
 @property (nonatomic, readonly) SDSKeyValueStore *keyValueStore;
@@ -35,6 +36,8 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 @property (nonatomic, nullable) NSUUID *uuidAwaitingVerification;
 
 #pragma mark - Initializers
+
++ (TSAccountManager *)sharedInstance;
 
 - (void)warmCaches;
 
@@ -74,8 +77,6 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 - (nullable SignalServiceAddress *)localAddressWithTransaction:(SDSAnyReadTransaction *)transaction
     NS_SWIFT_NAME(localAddress(with:));
 
-- (nullable NSDate *)registrationDateWithTransaction:(SDSAnyReadTransaction *)transaction;
-
 /**
  *  Symmetric key that's used to encrypt message payloads from the server,
  *
@@ -105,20 +106,16 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 - (void)setStoredDeviceName:(NSString *)deviceName transaction:(SDSAnyWriteTransaction *)transaction;
 
 - (UInt32)storedDeviceId;
-- (UInt32)storedDeviceIdWithTransaction:(SDSAnyReadTransaction *)transaction;
 
 /// Onboarding state
 - (BOOL)isOnboarded;
-- (BOOL)isOnboardedWithTransaction:(SDSAnyReadTransaction *)transaction;
 - (void)setIsOnboarded:(BOOL)isOnboarded transaction:(SDSAnyWriteTransaction *)transaction;
 
-- (BOOL)isDiscoverableByPhoneNumber;
-- (BOOL)hasDefinedIsDiscoverableByPhoneNumber;
-- (void)setIsDiscoverableByPhoneNumber:(BOOL)isDiscoverableByPhoneNumber
-                  updateStorageService:(BOOL)updateStorageService
-                           transaction:(SDSAnyWriteTransaction *)transaction;
-
 #pragma mark - Register with phone number
+
+- (void)verifyAccountWithRequest:(TSRequest *)request
+                         success:(void (^)(_Nullable id responseObject))successBlock
+                         failure:(void (^)(NSError *error))failureBlock;
 
 // Called once registration is complete - meaning the following have succeeded:
 // - obtained signal server credentials
@@ -126,6 +123,23 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 // - uploaded push tokens
 - (void)didRegister;
 - (void)recordUuidForLegacyUser:(NSUUID *)uuid NS_SWIFT_NAME(recordUuidForLegacyUser(_:));
+
+#if TARGET_OS_IPHONE
+
+/**
+ *  Register's the device's push notification token with the server
+ *
+ *  @param pushToken Apple's Push Token
+ */
+- (void)registerForPushNotificationsWithPushToken:(NSString *)pushToken
+                                        voipToken:(NSString *)voipToken
+                                          success:(void (^)(void))successHandler
+                                          failure:(void (^)(NSError *error))failureHandler
+    NS_SWIFT_NAME(registerForPushNotifications(pushToken:voipToken:success:failure:));
+
+#endif
+
++ (void)unregisterTextSecureWithSuccess:(void (^)(void))success failure:(void (^)(NSError *error))failureBlock;
 
 #pragma mark - De-Registration
 
@@ -143,6 +157,11 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 @property (nonatomic) BOOL isTransferInProgress;
 @property (nonatomic) BOOL wasTransferred;
 
+#pragma mark - Backup
+
+- (BOOL)hasPendingBackupRestoreDecision;
+- (void)setHasPendingBackupRestoreDecision:(BOOL)value;
+
 #pragma mark - Re-registration
 
 // Re-registration is the process of re-registering _with the same phone number_.
@@ -150,7 +169,6 @@ NSString *NSStringForOWSRegistrationState(OWSRegistrationState value);
 // Returns YES on success.
 - (BOOL)resetForReregistration;
 - (nullable NSString *)reregistrationPhoneNumber;
-- (nullable NSUUID *)reregistrationUUID;
 @property (nonatomic, readonly) BOOL isReregistering;
 
 #pragma mark - Manual Message Fetch

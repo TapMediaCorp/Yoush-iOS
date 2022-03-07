@@ -411,8 +411,6 @@ class TypeInfo:
             value_statement = 'let %s: %s = %s(%s)' % ( value_name, initializer_param_type, initializer_param_type, value_expr, )
         elif value_name == 'conversationColorName':
             value_statement = 'let %s: %s = ConversationColorName(rawValue: %s)' % ( value_name, "ConversationColorName", value_expr, )
-        elif value_name == 'mentionNotificationMode':
-            value_statement = 'let %s: %s = TSThreadMentionNotificationMode(rawValue: %s) ?? .default' % ( value_name, "TSThreadMentionNotificationMode", value_expr, )
         elif self.is_codable:
             value_statement = 'let %s: %s = %s' % ( value_name, initializer_param_type, value_expr, )
         elif self.should_use_blob:
@@ -444,6 +442,7 @@ class TypeInfo:
         elif self._objc_type == 'NSDate *':
             # Persist dates as NSTimeInterval timeIntervalSince1970.
 
+            value_expr = 'record.%s' % ( property.column_source(), )
             interval_name = '%sInterval' % ( str(value_name), )
             if did_force_optional:
                 serialized_statements = [
@@ -904,7 +903,7 @@ def generate_swift_extensions_for_model(clazz):
     # TODO: We'll need to import SignalServiceKit for non-SSK models.
 
     swift_body = '''//
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -933,12 +932,10 @@ public struct %s: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        %sSerializer.table
+        return %sSerializer.table
     }
 
-    public static var databaseTableName: String { 
-        %sSerializer.table.tableName 
-    }
+    public static let databaseTableName: String = %sSerializer.table.tableName
 
     public var id: Int64?
 
@@ -992,13 +989,8 @@ public struct %s: SDSRecord {
 
         for property in persisted_properties:
             custom_column_name = custom_column_name_for_property(property)
-            was_property_renamed = was_property_renamed_for_property(property)            
             if custom_column_name is not None:
-                if was_property_renamed:
-                    swift_body += '''        case %s
-''' % ( custom_column_name, )
-                else:
-                    swift_body += '''        case %s = "%s"
+                swift_body += '''        case %s = "%s"
 ''' % ( custom_column_name, property.swift_identifier(), )
             else:
                 swift_body += '''        case %s
@@ -1009,7 +1001,7 @@ public struct %s: SDSRecord {
 '''
         swift_body += '''
     public static func columnName(_ column: %s.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -1027,7 +1019,7 @@ public struct %s: SDSRecord {
 
 public extension %s {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {''' % (record_name)
@@ -1271,15 +1263,15 @@ extension %s: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        %s.databaseTableName
+        return %s.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        %sSerializer.table
+        return %sSerializer.table
     }
 }
 ''' % ( str(clazz.name), record_name, str(clazz.name), )
@@ -1385,7 +1377,7 @@ extension %sSerializer {
                 database_column_type = '.primaryKey'
 
             # TODO: Use skipSelect.
-            return '''    static var %sColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "%s", columnType: %s%s%s) }
+            return '''    static let %sColumn = SDSColumnMetadata(columnName: "%s", columnType: %s%s%s)
 ''' % ( str(column_name), str(column_name), database_column_type, optional_split, is_unique_split )
 
         for property in sds_properties:
@@ -1400,17 +1392,15 @@ extension %sSerializer {
         swift_body += '''
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata { 
-        SDSTableMetadata(collection: %s.collection(),
-                         tableName: "%s",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: %s.collection(),
+                                               tableName: "%s",
+                                               columns: [
 ''' % ( str(clazz.name), database_table_name, )
 
         for column_property_name in column_property_names:
             swift_body += '''        %sColumn,
 ''' % ( str(column_property_name) )
-        swift_body += '''        ]) 
-    }
+        swift_body += '''        ])
 }
 '''
 
@@ -1625,12 +1615,14 @@ public extension %(class_name)s {
 
         swift_body += '''
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return %(class_name)s.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(%(record_name)s.databaseTableName) WHERE \(%(record_identifier)sColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
         }
     }
-''' % { "record_name": record_name, "record_identifier": record_identifier(clazz.name) }
+''' % { "class_name": str(clazz.name), "record_name": record_name, "record_identifier": record_identifier(clazz.name) }
 
         swift_body += '''
     // Traverses all records.
@@ -1657,23 +1649,31 @@ public extension %(class_name)s {
                             batchSize: UInt,
                             block: @escaping (%s, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            %s.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? %s else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = %s.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = %s.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
-''' % ( ( str(clazz.name), ) * 4 )
+''' % ( ( str(clazz.name), ) * 6 )
 
         swift_body += '''
     // Traverses all records' unique ids.
@@ -1700,6 +1700,10 @@ public extension %(class_name)s {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: %s.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -1710,7 +1714,7 @@ public extension %(class_name)s {
                 block: block)
         }
     }
-''' % ( record_identifier(clazz.name), record_name, )
+''' % ( str(clazz.name), record_identifier(clazz.name), record_name, )
 
         swift_body += '''
     // Does not order the results.
@@ -1737,11 +1741,13 @@ public extension %(class_name)s {
         swift_body += '''
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: %s.collection())
         case .grdbRead(let grdbTransaction):
             return %s.ows_fetchCount(grdbTransaction.database)
         }
     }
-''' % ( record_name, )
+''' % ( str(clazz.name),  record_name, )
 
         # ---- Remove All ----
 
@@ -1750,6 +1756,8 @@ public extension %(class_name)s {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: %s.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try %s.deleteAll(grdbTransaction.database)
@@ -1769,20 +1777,24 @@ public extension %(class_name)s {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -1794,6 +1806,8 @@ public extension %(class_name)s {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: %s.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(%s.databaseTableName) WHERE \(%sColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -1801,7 +1815,7 @@ public extension %(class_name)s {
         }
     }
 }
-''' % ( record_name, record_name, record_identifier(clazz.name), )
+''' % ( str(clazz.name), record_name, str(clazz.name), record_name, record_identifier(clazz.name), )
 
         # ---- Fetch ----
 
@@ -1817,7 +1831,7 @@ public extension %(class_name)s {
             let cursor = try %(record_name)s.fetchCursor(transaction.database, sqlRequest)
             return %(class_name)sCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return %(class_name)sCursor(transaction: transaction, cursor: nil)
         }
@@ -2072,7 +2086,7 @@ def update_record_type_map(record_type_swift_path, record_type_json_path):
     # TODO: We'll need to import SignalServiceKit for non-SSK classes.
 
     swift_body = '''//
-//  Copyright © 2021 Signal. All rights reserved.
+//  Copyright © 2019 Signal. All rights reserved.
 //
 
 import Foundation
@@ -2083,22 +2097,16 @@ import SignalCoreKit
 // Do not manually edit it, instead run `sds_codegen.sh`.
 
 @objc
-public enum SDSRecordType: UInt, CaseIterable {
+public enum SDSRecordType: UInt {
 ''' % ( sds_common.pretty_module_path(__file__), )
-
-    record_type_pairs = []
-    for key in record_type_map.keys():
+    for key in sorted(record_type_map.keys()):
         if key.startswith('#'):
             # Ignore comments
             continue
         enum_name = get_record_type_enum_name(key)
-        record_type_pairs.append((str(enum_name), record_type_map[key]))
-        
-    record_type_pairs.sort(key=lambda value: value[1])
-    for (enum_name, record_type_id) in record_type_pairs:
         # print 'enum_name', enum_name
         swift_body += '''    case %s = %s
-''' % ( enum_name, str(record_type_id), )
+''' % ( str(enum_name), str(record_type_map[key]), )
 
     swift_body += '''}
 '''
@@ -2334,7 +2342,6 @@ def accessor_name_for_property(property):
     return custom_accessors.get(key, property.name)
 
 
-# include_renamed_columns
 def custom_column_name_for_property(property):
     custom_column_names = configuration_json.get('custom_column_names')
     if custom_column_names is None:
@@ -2342,15 +2349,6 @@ def custom_column_name_for_property(property):
     key = property.class_name + '.' + property.name
     # print '--?--', key, custom_accessors.get(key, property.name)
     return custom_column_names.get(key)
-
-
-def was_property_renamed_for_property(property):
-    renamed_column_names = configuration_json.get('renamed_column_names')
-    if renamed_column_names is None:
-        fail('Configuration JSON is missing list of renamed column names.')
-    key = property.class_name + '.' + property.name
-    # print '--?--', key, custom_accessors.get(key, property.name)
-    return renamed_column_names.get(key) is not None
 
 
 # ---- Config JSON

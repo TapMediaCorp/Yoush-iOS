@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 //
@@ -46,7 +46,7 @@ struct DeviceTransferProtos_Default {
   var key: String = String()
 
   /// @required
-  var encodedValue: Data = Data()
+  var encodedValue: Data = SwiftProtobuf.Internal.emptyData
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -59,7 +59,7 @@ struct DeviceTransferProtos_Database {
   // methods supported on all messages.
 
   /// @required
-  var key: Data = Data()
+  var key: Data = SwiftProtobuf.Internal.emptyData
 
   /// @required
   var database: DeviceTransferProtos_File {
@@ -135,13 +135,10 @@ extension DeviceTransferProtos_File: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.identifier) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.relativePath) }()
-      case 3: try { try decoder.decodeSingularUInt64Field(value: &self.estimatedSize) }()
+      case 1: try decoder.decodeSingularStringField(value: &self.identifier)
+      case 2: try decoder.decodeSingularStringField(value: &self.relativePath)
+      case 3: try decoder.decodeSingularUInt64Field(value: &self.estimatedSize)
       default: break
       }
     }
@@ -178,12 +175,9 @@ extension DeviceTransferProtos_Default: SwiftProtobuf.Message, SwiftProtobuf._Me
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self.encodedValue) }()
+      case 1: try decoder.decodeSingularStringField(value: &self.key)
+      case 2: try decoder.decodeSingularBytesField(value: &self.encodedValue)
       default: break
       }
     }
@@ -217,32 +211,25 @@ extension DeviceTransferProtos_Database: SwiftProtobuf.Message, SwiftProtobuf._M
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.key) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._database) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._wal) }()
+      case 1: try decoder.decodeSingularBytesField(value: &self.key)
+      case 2: try decoder.decodeSingularMessageField(value: &self._database)
+      case 3: try decoder.decodeSingularMessageField(value: &self._wal)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.key.isEmpty {
       try visitor.visitSingularBytesField(value: self.key, fieldNumber: 1)
     }
-    try { if let v = self._database {
+    if let v = self._database {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._wal {
+    }
+    if let v = self._wal {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -268,32 +255,25 @@ extension DeviceTransferProtos_Manifest: SwiftProtobuf.Message, SwiftProtobuf._M
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.grdbSchemaVersion) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._database) }()
-      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.appDefaults) }()
-      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.standardDefaults) }()
-      case 5: try { try decoder.decodeRepeatedMessageField(value: &self.files) }()
-      case 6: try { try decoder.decodeSingularUInt64Field(value: &self.estimatedTotalSize) }()
+      case 1: try decoder.decodeSingularUInt64Field(value: &self.grdbSchemaVersion)
+      case 2: try decoder.decodeSingularMessageField(value: &self._database)
+      case 3: try decoder.decodeRepeatedMessageField(value: &self.appDefaults)
+      case 4: try decoder.decodeRepeatedMessageField(value: &self.standardDefaults)
+      case 5: try decoder.decodeRepeatedMessageField(value: &self.files)
+      case 6: try decoder.decodeSingularUInt64Field(value: &self.estimatedTotalSize)
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if self.grdbSchemaVersion != 0 {
       try visitor.visitSingularUInt64Field(value: self.grdbSchemaVersion, fieldNumber: 1)
     }
-    try { if let v = self._database {
+    if let v = self._database {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
+    }
     if !self.appDefaults.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.appDefaults, fieldNumber: 3)
     }

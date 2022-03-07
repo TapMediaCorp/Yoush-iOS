@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSBroadcastMediaMessageJobRecord.h"
@@ -39,7 +39,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (instancetype)initWithGrdbId:(int64_t)grdbId
                       uniqueId:(NSString *)uniqueId
-      exclusiveProcessIdentifier:(nullable NSString *)exclusiveProcessIdentifier
                     failureCount:(NSUInteger)failureCount
                            label:(NSString *)label
                           sortId:(unsigned long long)sortId
@@ -48,7 +47,6 @@ NS_ASSUME_NONNULL_BEGIN
 {
     self = [super initWithGrdbId:grdbId
                         uniqueId:uniqueId
-        exclusiveProcessIdentifier:exclusiveProcessIdentifier
                       failureCount:failureCount
                              label:label
                             sortId:sortId

@@ -30,8 +30,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-               BuildableName = "Signal.app"
-               BlueprintName = "Signal"
+               BuildableName = "Yoush.app"
+               BlueprintName = "Yoush"
                ReferencedContainer = "container:Signal.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -52,16 +52,6 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "34A954B0271A471300B05242"
-               BuildableName = "SignalUITests.xctest"
-               BlueprintName = "SignalUITests"
-               ReferencedContainer = "container:Signal.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -81,8 +71,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-            BuildableName = "Signal.app"
-            BlueprintName = "Signal"
+            BuildableName = "Yoush.app"
+            BlueprintName = "Yoush"
             ReferencedContainer = "container:Signal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -99,8 +89,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-            BuildableName = "Signal.app"
-            BlueprintName = "Signal"
+            BuildableName = "Yoush.app"
+            BlueprintName = "Yoush"
             ReferencedContainer = "container:Signal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

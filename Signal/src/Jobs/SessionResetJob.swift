@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 
 @objc(OWSSessionResetJobQueue)
@@ -24,14 +25,13 @@ public class SessionResetJobQueue: NSObject, JobQueue {
     }
     public static let maxRetries: UInt = 10
     public let requiresInternet: Bool = true
-    public var isEnabled: Bool { CurrentAppContext().isMainApp }
     public var runningOperations = AtomicArray<SessionResetOperation>()
 
     @objc
     public override init() {
         super.init()
 
-        AppReadiness.runNowOrWhenAppDidBecomeReadySync {
+        AppReadiness.runNowOrWhenAppDidBecomeReady {
             self.setup()
         }
     }
@@ -91,6 +91,20 @@ public class SessionResetOperation: OWSOperation, DurableOperation {
         self.jobRecord = jobRecord
     }
 
+    // MARK: Dependencies
+
+    var sessionStore: SSKSessionStore {
+        return SSKEnvironment.shared.sessionStore
+    }
+
+    var messageSender: MessageSender {
+        return SSKEnvironment.shared.messageSender
+    }
+
+    var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
+    }
+
     // MARK: 
 
     var firstAttempt = true
@@ -100,23 +114,17 @@ public class SessionResetOperation: OWSOperation, DurableOperation {
 
         if firstAttempt {
             self.databaseStorage.write { transaction in
-                Logger.info("archiving sessions for recipient: \(self.recipientAddress)")
-                self.sessionStore.archiveAllSessions(for: self.recipientAddress, transaction: transaction)
+                Logger.info("deleting sessions for recipient: \(self.recipientAddress)")
+                self.sessionStore.deleteAllSessions(for: self.recipientAddress, transaction: transaction)
             }
             firstAttempt = false
         }
 
         let endSessionMessage = EndSessionMessage(thread: self.contactThread)
 
-        firstly(on: .global()) {
-            self.databaseStorage.write { transaction in
-                ThreadUtil.enqueueMessagePromise(
-                    message: endSessionMessage,
-                    isHighPriority: true,
-                    transaction: transaction
-                )
-            }
-        }.done(on: .global()) {
+        firstly {
+            return self.messageSender.sendMessage(.promise, endSessionMessage.asPreparer)
+        }.done {
             Logger.info("successfully sent EndSessionMessage.")
             self.databaseStorage.write { transaction in
                 // Archive the just-created session since the recipient should delete their corresponding
@@ -130,7 +138,7 @@ public class SessionResetOperation: OWSOperation, DurableOperation {
             }
             self.reportSuccess()
         }.catch { error in
-            Logger.error("sending error: \(error.userErrorDescription)")
+            Logger.error("sending error: \(error.localizedDescription)")
             self.reportError(withUndefinedRetry: error)
         }
     }
@@ -150,11 +158,24 @@ public class SessionResetOperation: OWSOperation, DurableOperation {
     }
 
     override public func retryInterval() -> TimeInterval {
-        return OWSOperation.retryIntervalForExponentialBackoff(failureCount: jobRecord.failureCount)
+        // Arbitrary backoff factor...
+        // With backOffFactor of 1.9
+        // try  1 delay:  0.00s
+        // try  2 delay:  0.19s
+        // ...
+        // try  5 delay:  1.30s
+        // ...
+        // try 11 delay: 61.31s
+        let backoffFactor = 1.9
+        let maxBackoff = kHourInterval
+
+        let seconds = 0.1 * min(maxBackoff, pow(backoffFactor, Double(self.jobRecord.failureCount)))
+
+        return seconds
     }
 
     override public func didFail(error: Error) {
-        Logger.error("failed to send EndSessionMessage with error: \(error.userErrorDescription)")
+        Logger.error("failed to send EndSessionMessage with error: \(error.localizedDescription)")
         self.databaseStorage.write { transaction in
             self.durableOperationDelegate?.durableOperation(self, didFailWithError: error, transaction: transaction)
 

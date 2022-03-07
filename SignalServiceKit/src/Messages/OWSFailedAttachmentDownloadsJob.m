@@ -1,14 +1,49 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSFailedAttachmentDownloadsJob.h"
+#import "OWSPrimaryStorage.h"
 #import "TSAttachmentPointer.h"
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
+#import <YapDatabase/YapDatabase.h>
+#import <YapDatabase/YapDatabaseQuery.h>
+#import <YapDatabase/YapDatabaseSecondaryIndex.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
+static NSString *const OWSFailedAttachmentDownloadsJobAttachmentStateColumn = @"state";
+static NSString *const OWSFailedAttachmentDownloadsJobAttachmentStateIndex = @"index_attachment_downloads_on_state";
+
 @implementation OWSFailedAttachmentDownloadsJob
+
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
++ (NSArray<NSString *> *)unfailedAttachmentPointerIdsWithTransaction:(YapDatabaseReadTransaction *)transaction
+{
+    OWSAssertDebug(transaction);
+
+    NSMutableArray<NSString *> *attachmentIds = [NSMutableArray new];
+
+    NSString *formattedString = [NSString stringWithFormat:@"WHERE %@ != %d",
+                                          OWSFailedAttachmentDownloadsJobAttachmentStateColumn,
+                                          (int)TSAttachmentPointerStateFailed];
+    YapDatabaseQuery *query = [YapDatabaseQuery queryWithFormat:formattedString];
+    [[transaction ext:OWSFailedAttachmentDownloadsJobAttachmentStateIndex]
+        enumerateKeysMatchingQuery:query
+                        usingBlock:^void(NSString *collection, NSString *key, BOOL *stop) {
+                            [attachmentIds addObject:key];
+                        }];
+
+    return [attachmentIds copy];
+}
 
 - (void)enumerateAttemptingOutAttachmentsWithBlock:(void (^_Nonnull)(TSAttachmentPointer *attachment))block
                                        transaction:(SDSAnyReadTransaction *)transaction
@@ -51,14 +86,16 @@ NS_ASSUME_NONNULL_BEGIN
                         break;
                     case TSAttachmentPointerStateEnqueued:
                     case TSAttachmentPointerStateDownloading:
-                        [attachment updateWithAttachmentPointerState:TSAttachmentPointerStateFailed
-                                                         transaction:transaction];
+                        [attachment anyUpdateAttachmentPointerWithTransaction:transaction
+                                                                        block:^(TSAttachmentPointer *attachment) {
+                                                                            attachment.state
+                                                                                = TSAttachmentPointerStateFailed;
+                                                                        }];
                         count++;
                         return;
-                    case TSAttachmentPointerStatePendingManualDownload:
-                        // Do nothing. We don't want to mark this attachment as failed.
-                        break;
                 }
+
+
             }
                                                  transaction:transaction];
         });
@@ -66,6 +103,41 @@ NS_ASSUME_NONNULL_BEGIN
     if (count > 0) {
         OWSLogDebug(@"Marked %u attachments as failed", count);
     }
+}
+
+#pragma mark - YapDatabaseExtension
+
++ (YapDatabaseSecondaryIndex *)indexDatabaseExtension
+{
+    YapDatabaseSecondaryIndexSetup *setup = [YapDatabaseSecondaryIndexSetup new];
+    [setup addColumn:OWSFailedAttachmentDownloadsJobAttachmentStateColumn
+            withType:YapDatabaseSecondaryIndexTypeInteger];
+
+    YapDatabaseSecondaryIndexHandler *handler =
+        [YapDatabaseSecondaryIndexHandler withObjectBlock:^(YapDatabaseReadTransaction *transaction,
+            NSMutableDictionary *dict,
+            NSString *collection,
+            NSString *key,
+            id object) {
+            if (![object isKindOfClass:[TSAttachmentPointer class]]) {
+                return;
+            }
+            TSAttachmentPointer *attachment = (TSAttachmentPointer *)object;
+            dict[OWSFailedAttachmentDownloadsJobAttachmentStateColumn] = @(attachment.state);
+        }];
+
+    return [[YapDatabaseSecondaryIndex alloc] initWithSetup:setup handler:handler versionTag:nil];
+}
+
++ (NSString *)databaseExtensionName
+{
+    return OWSFailedAttachmentDownloadsJobAttachmentStateIndex;
+}
+
++ (void)asyncRegisterDatabaseExtensionsWithPrimaryStorage:(OWSStorage *)storage
+{
+    [storage asyncRegisterExtension:[self indexDatabaseExtension]
+                           withName:OWSFailedAttachmentDownloadsJobAttachmentStateIndex];
 }
 
 @end

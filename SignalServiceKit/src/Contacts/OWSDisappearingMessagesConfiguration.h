@@ -1,12 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <SignalServiceKit/BaseModel.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-#define OWSDisappearingMessagesConfigurationDefaultExpirationDuration 0
+#define OWSDisappearingMessagesConfigurationDefaultExpirationDuration kDayInterval
 
 @class SDSAnyReadTransaction;
 @class TSThread;
@@ -42,15 +42,14 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:durationSeconds:ena
 
 @property (nonatomic, readonly, getter=isEnabled) BOOL enabled;
 @property (nonatomic, readonly) uint32_t durationSeconds;
+@property (nonatomic, readonly) NSUInteger durationIndex;
 @property (nonatomic, readonly) NSString *durationString;
 
 // These methods are the only correct way to load configurations
 // for a given thread; do not use anyFetchWithUniqueId.
 + (instancetype)fetchOrBuildDefaultWithThread:(TSThread *)thread transaction:(SDSAnyReadTransaction *)transaction;
 
-+ (instancetype)fetchOrBuildDefaultUniversalConfigurationWithTransaction:(SDSAnyReadTransaction *)transaction;
-
-+ (NSArray<NSNumber *> *)presetDurationsSeconds;
++ (NSArray<NSNumber *> *)validDurationsSeconds;
 + (uint32_t)maxDurationSeconds;
 
 - (BOOL)hasChangedWithTransaction:(SDSAnyReadTransaction *)transaction;

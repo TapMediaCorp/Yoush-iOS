@@ -1,11 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugUIMessagesAssetLoader.h"
+#import <AFNetworking/AFHTTPSessionManager.h>
+#import <PromiseKit/AnyPromise.h>
 #import <SignalCoreKit/Randomness.h>
-#import <SignalCoreKit/SignalCoreKit-Swift.h>
-#import <SignalMessaging/SignalMessaging-Swift.h>
 #import <SignalServiceKit/MIMETypeUtil.h>
 #import <SignalServiceKit/OWSFileSystem.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
@@ -14,8 +14,6 @@
 #ifdef DEBUG
 
 NS_ASSUME_NONNULL_BEGIN
-
-typedef void (^OWSImageDrawBlock)(CGContextRef context);
 
 @implementation DebugUIMessagesAssetLoader
 
@@ -61,24 +59,15 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
         return success();
     }
 
-    OWSURLSession *urlSession =
-        [[OWSURLSession alloc] initWithBaseUrl:nil
-                                  frontingInfo:nil
-                                securityPolicy:OWSURLSession.defaultSecurityPolicy
-                                 configuration:NSURLSessionConfiguration.ephemeralSessionConfiguration
-                                  extraHeaders:[NSDictionary new]];
-    [urlSession dataTask:fileUrl
-        method:HTTPMethodGet
-        headers:nil
-        body:nil
-        success:^(id<HTTPResponse> response) {
-            NSData *_Nullable data = response.responseBodyData;
-            if (data.length < 1) {
-                OWSFailDebug(@"Error write url response [%@]: %@", fileUrl, filePath);
-                failure();
-                return;
-            }
-            if ([data writeToFile:filePath atomically:YES]) {
+    NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration defaultSessionConfiguration];
+    AFHTTPSessionManager *sessionManager = [[AFHTTPSessionManager alloc] initWithSessionConfiguration:configuration];
+    sessionManager.responseSerializer = [AFHTTPResponseSerializer serializer];
+    OWSAssertDebug(sessionManager.responseSerializer);
+    [sessionManager GET:fileUrl
+        parameters:nil
+        progress:nil
+        success:^(NSURLSessionDataTask *task, NSData *_Nullable responseObject) {
+            if ([responseObject writeToFile:filePath atomically:YES]) {
                 self.filePath = filePath;
                 OWSAssertDebug([NSFileManager.defaultManager fileExistsAtPath:filePath]);
                 success();
@@ -87,8 +76,8 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
                 failure();
             }
         }
-        failure:^(NSError *error) {
-            OWSFailDebug(@"Error downloading url[%@]: %@", fileUrl, error);
+        failure:^(NSURLSessionDataTask *_Nullable task, NSError *requestError) {
+            OWSFailDebug(@"Error downloading url[%@]: %@", fileUrl, requestError);
             failure();
         }];
 }
@@ -144,104 +133,14 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
 
     @autoreleasepool {
         NSString *filePath = [OWSFileSystem temporaryFilePathWithFileExtension:@"png"];
-        UIImage *image = [self createRandomPngWithSize:imageSize
-                                       backgroundColor:backgroundColor
-                                             textColor:textColor
-                                                 label:label];
+        UIImage *image =
+            [self createRandomPngWithSize:imageSize backgroundColor:backgroundColor textColor:textColor label:label];
         NSData *pngData = UIImagePNGRepresentation(image);
         [pngData writeToFile:filePath atomically:YES];
         self.filePath = filePath;
         OWSAssertDebug([NSFileManager.defaultManager fileExistsAtPath:filePath]);
         success();
     }
-}
-
-+ (DebugUIMessagesAssetLoader *)fakeNoisePngAssetLoaderWithSize:(NSUInteger)size
-{
-    OWSAssertDebug(size > 0);
-
-    DebugUIMessagesAssetLoader *instance = [DebugUIMessagesAssetLoader new];
-    instance.mimeType = OWSMimeTypeImagePng;
-    instance.filename = @"image.png";
-    __weak DebugUIMessagesAssetLoader *weakSelf = instance;
-    instance.prepareBlock = ^(ActionSuccessBlock success, ActionFailureBlock failure) {
-        [weakSelf ensureNoisePngAssetLoaded:size success:success failure:failure];
-    };
-    return instance;
-}
-
-- (void)ensureNoisePngAssetLoaded:(NSUInteger)size
-                          success:(ActionSuccessBlock)success
-                          failure:(ActionFailureBlock)failure
-{
-    OWSAssertDebug(success);
-    OWSAssertDebug(failure);
-    OWSAssertDebug(self.filename.length > 0);
-    OWSAssertDebug(self.mimeType.length > 0);
-    OWSAssertDebug(size > 0);
-
-    if (self.filePath) {
-        success();
-        return;
-    }
-
-    @autoreleasepool {
-        NSString *filePath = [OWSFileSystem temporaryFilePathWithFileExtension:@"png"];
-        UIImage *image = [self buildNoiseImageWithSize:size];
-        NSData *pngData = UIImagePNGRepresentation(image);
-        [pngData writeToFile:filePath atomically:YES];
-        self.filePath = filePath;
-        OWSAssertDebug([NSFileManager.defaultManager fileExistsAtPath:filePath]);
-        success();
-    }
-}
-
-- (nullable UIImage *)buildNoiseImageWithSize:(NSUInteger)size
-{
-    UIColor *backgroundColor = [UIColor colorWithRGBHex:0xaca6633];
-    return [self imageWithSize:size
-               backgroundColor:backgroundColor
-                     drawBlock:^(CGContextRef context) {
-                         const NSUInteger stride = 1;
-                         for (NSUInteger x = 0; x < size; x += stride) {
-                             for (NSUInteger y = 0; y < size; y += stride) {
-                                 UIColor *color = [UIColor ows_randomColorWithIsAlphaRandom:NO];
-                                 CGContextSetFillColorWithColor(context, color.CGColor);
-                                 CGRect frame = CGRectMake(x, y, stride, stride);
-                                 CGContextFillRect(context, frame);
-                             }
-                         }
-                     }];
-}
-
-- (nullable UIImage *)imageWithSize:(NSUInteger)size
-                    backgroundColor:(UIColor *)backgroundColor
-                          drawBlock:(OWSImageDrawBlock)drawBlock
-{
-    OWSAssertDebug(drawBlock);
-    OWSAssertDebug(backgroundColor);
-    OWSAssertDebug(size > 0);
-
-    CGRect frame = CGRectMake(0.0f, 0.0f, size, size);
-
-    UIGraphicsBeginImageContextWithOptions(frame.size, NO, [UIScreen mainScreen].scale);
-    CGContextRef _Nullable context = UIGraphicsGetCurrentContext();
-    if (!context) {
-        return nil;
-    }
-
-    CGContextSetFillColorWithColor(context, backgroundColor.CGColor);
-    CGContextFillRect(context, frame);
-
-    CGContextSaveGState(context);
-    drawBlock(context);
-    CGContextRestoreGState(context);
-
-    UIImage *_Nullable image = UIGraphicsGetImageFromCurrentImageContext();
-
-    UIGraphicsEndImageContext();
-
-    return image;
 }
 
 - (nullable UIImage *)createRandomPngWithSize:(CGSize)imageSize
@@ -621,14 +520,6 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
                                                                  label:label];
 }
 
-+ (instancetype)mediumFilesizePngInstance
-{
-    static DebugUIMessagesAssetLoader *instance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ instance = [DebugUIMessagesAssetLoader fakeNoisePngAssetLoaderWithSize:1000]; });
-    return instance;
-}
-
 + (instancetype)tinyPdfInstance
 {
     static DebugUIMessagesAssetLoader *instance = nil;
@@ -644,8 +535,8 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
     static DebugUIMessagesAssetLoader *instance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        instance = [DebugUIMessagesAssetLoader fakeRandomAssetLoaderWithLength:4 * 1024 * 1024
-                                                                      mimeType:@"application/pdf"];
+        instance =
+            [DebugUIMessagesAssetLoader fakeRandomAssetLoaderWithLength:4 * 1024 * 1024 mimeType:@"application/pdf"];
     });
     return instance;
 }
@@ -702,30 +593,35 @@ typedef void (^OWSImageDrawBlock)(CGContextRef context);
 
     for (DebugUIMessagesAssetLoader *assetLoader in assetLoaders) {
         // Use chained promises to make the code more readable.
-        AnyPromise *promise = AnyPromise.withFuture(^(AnyFuture *future) {
+        AnyPromise *promise = [AnyPromise promiseWithResolverBlock:^(PMKResolver resolve) {
             assetLoader.prepareBlock(
                 ^{
                     // The value doesn't matter, we just need any non-NSError value.
-                    [future resolveWithValue:@1];
+                    resolve(@(1));
                 },
                 ^{
                     NSError *error =
                         [NSError errorWithDomain:@"DebugUI"
                                             code:0
-                                        userInfo:@ { NSLocalizedDescriptionKey : @"Could not prepare fake assets." }];
+                                        userInfo:@{ NSLocalizedDescriptionKey : @"Could not prepare fake assets." }];
                     @synchronized(errors) {
                         [errors addObject:error];
                     }
-                    [future rejectWithError:error];
+                    resolve(error);
                 });
-        });
+        }];
         [promises addObject:promise];
     }
 
-    [AnyPromise whenResolved:promises].done(^(id value) { success(); }).catch(^(id error) {
-        OWSLogError(@"Could not prepare fake asset loaders: %@.", error);
-        failure();
-    });
+    // We could use PMKJoin() or PMKWhen().
+    PMKJoin(promises)
+        .then(^(id value) {
+            success();
+        })
+        .catch(^(id error) {
+            OWSLogError(@"Could not prepare fake asset loaders: %@.", error);
+            failure();
+        });
 }
 
 @end

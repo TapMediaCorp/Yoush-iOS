@@ -1,11 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSMessageUtils.h"
 #import "AppContext.h"
 #import "MIMETypeUtil.h"
-#import "MessageSender.h"
+#import "OWSMessageSender.h"
 #import "TSAccountManager.h"
 #import "TSAttachment.h"
 #import "TSAttachmentStream.h"
@@ -21,7 +21,39 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation OWSMessageUtils
 
-+ (NSUInteger)unreadMessagesCount
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
++ (instancetype)sharedManager
+{
+    static OWSMessageUtils *sharedMyManager = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedMyManager = [self new];
+    });
+    return sharedMyManager;
+}
+
+- (instancetype)init
+{
+    self = [super init];
+
+    if (!self) {
+        return self;
+    }
+
+    OWSSingletonAssert();
+
+    return self;
+}
+
+- (NSUInteger)unreadMessagesCount
 {
     __block NSUInteger numberOfItems;
     [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
@@ -31,7 +63,7 @@ NS_ASSUME_NONNULL_BEGIN
     return numberOfItems;
 }
 
-+ (NSUInteger)unreadMessagesCountExcept:(TSThread *)thread
+- (NSUInteger)unreadMessagesCountExcept:(TSThread *)thread
 {
     __block NSUInteger numberOfItems;
     [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
@@ -42,6 +74,16 @@ NS_ASSUME_NONNULL_BEGIN
     }];
 
     return numberOfItems;
+}
+
+- (void)updateApplicationBadgeCount
+{
+    if (!CurrentAppContext().isMainApp) {
+        return;
+    }
+
+    NSUInteger numberOfItems = [self unreadMessagesCount];
+    [CurrentAppContext() setMainAppBadgeNumber:numberOfItems];
 }
 
 @end

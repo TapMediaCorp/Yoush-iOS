@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,6 +8,12 @@ import XCTest
 @testable import SignalServiceKit
 
 class ViewOnceMessagesTest: SSKBaseTestSwift {
+
+    private var tsAccountManager: TSAccountManager {
+        return TSAccountManager.sharedInstance()
+    }
+
+    // MARK: -
 
     override func setUp() {
         super.setUp()

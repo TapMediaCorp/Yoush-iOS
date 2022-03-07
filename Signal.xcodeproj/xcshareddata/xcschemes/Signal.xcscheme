@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-               BuildableName = "Signal.app"
-               BlueprintName = "Signal"
+               BuildableName = "Yoush.app"
+               BlueprintName = "Yoush"
                ReferencedContainer = "container:Signal.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -34,20 +34,6 @@
                ReferencedContainer = "container:Pods/Pods.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4C10B17F23176D250099396B"
-               BuildableName = "SignalPerformanceTests.xctest"
-               BlueprintName = "SignalPerformanceTests"
-               ReferencedContainer = "container:Signal.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -59,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-            BuildableName = "Signal.app"
-            BlueprintName = "Signal"
+            BuildableName = "Yoush.app"
+            BlueprintName = "Yoush"
             ReferencedContainer = "container:Signal.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -91,11 +77,6 @@
                BlueprintName = "SignalServiceKit-Unit-Tests"
                ReferencedContainer = "container:Pods/Pods.xcodeproj">
             </BuildableReference>
-            <SkippedTests>
-               <Test
-                  Identifier = "MessageSendLogTests/testPlaintextMismatchFails()">
-               </Test>
-            </SkippedTests>
          </TestableReference>
          <TestableReference
             skipped = "NO">
@@ -104,6 +85,16 @@
                BlueprintIdentifier = "5C9F6BA9ADC4724B2612C9F20FBE2076"
                BuildableName = "SignalCoreKit-Unit-Tests.xctest"
                BlueprintName = "SignalCoreKit-Unit-Tests"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "BF2BCB29C9D47F15FB156F1EC64E5CC2"
+               BuildableName = "AxolotlKit-Unit-Tests.xctest"
+               BlueprintName = "AxolotlKit-Unit-Tests"
                ReferencedContainer = "container:Pods/Pods.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -121,36 +112,26 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B086B0C72F8A5814FF48795531F21635"
-               BuildableName = "SignalMetadataKit-Unit-Tests.xctest"
-               BlueprintName = "SignalMetadataKit-Unit-Tests"
+               BlueprintIdentifier = "AF7FC2C93AA68E33600807F168BD483A"
+               BuildableName = "HKDFKit-Unit-Tests.xctest"
+               BlueprintName = "HKDFKit-Unit-Tests"
                ReferencedContainer = "container:Pods/Pods.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4C10B17F23176D250099396B"
-               BuildableName = "SignalPerformanceTests.xctest"
-               BlueprintName = "SignalPerformanceTests"
-               ReferencedContainer = "container:Signal.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "34A954B0271A471300B05242"
-               BuildableName = "SignalUITests.xctest"
-               BlueprintName = "SignalUITests"
-               ReferencedContainer = "container:Signal.xcodeproj">
+               BlueprintIdentifier = "B086B0C72F8A5814FF48795531F21635"
+               BuildableName = "SignalMetadataKit-Unit-Tests.xctest"
+               BlueprintName = "SignalMetadataKit-Unit-Tests"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
-      buildConfiguration = "Debug"
+      buildConfiguration = "Testable Release"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       disableMainThreadChecker = "YES"
@@ -167,8 +148,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-            BuildableName = "Signal.app"
-            BlueprintName = "Signal"
+            BuildableName = "Yoush.app"
+            BlueprintName = "Yoush"
             ReferencedContainer = "container:Signal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -196,7 +177,7 @@
       </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction
-      buildConfiguration = "Profiling"
+      buildConfiguration = "App Store Release"
       shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
@@ -206,8 +187,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D221A088169C9E5E00537ABF"
-            BuildableName = "Signal.app"
-            BlueprintName = "Signal"
+            BuildableName = "Yoush.app"
+            BlueprintName = "Yoush"
             ReferencedContainer = "container:Signal.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -217,6 +198,7 @@
    </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "App Store Release"
+      customArchiveName = "Yoush"
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>

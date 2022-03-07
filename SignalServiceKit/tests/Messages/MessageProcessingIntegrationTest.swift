@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
@@ -8,14 +8,34 @@ import GRDB
 
 class MessageProcessingIntegrationTest: SSKBaseTestSwift {
 
+    // MARK: - Dependencies
+
+    var messageReceiver: OWSMessageReceiver {
+        return SSKEnvironment.shared.messageReceiver
+    }
+
+    var tsAccountManager: TSAccountManager {
+        return SSKEnvironment.shared.tsAccountManager
+    }
+
+    var identityManager: OWSIdentityManager {
+        return SSKEnvironment.shared.identityManager
+    }
+
+    var storageCoordinator: StorageCoordinator {
+        return SSKEnvironment.shared.storageCoordinator
+    }
+
+    // MARK: -
+
     let localE164Identifier = "+13235551234"
     let localUUID = UUID()
 
     let aliceE164Identifier = "+14715355555"
-    var aliceClient: TestSignalClient!
+    var aliceClient: SignalClient!
 
     let bobE164Identifier = "+18083235555"
-    var bobClient: TestSignalClient!
+    var bobClient: SignalClient!
 
     let localClient = LocalSignalClient()
     let runner = TestProtocolRunner()
@@ -26,9 +46,9 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
     override func setUp() {
         super.setUp()
 
-        // Use DatabaseChangeObserver to be notified of DB writes so we
-        // can verify the expected changes occur.
-        try! databaseStorage.grdbStorage.setupDatabaseChangeObserver()
+        // use the uiDatabase to be notified of DB writes so we can verify the expected
+        // changes occur
+        try! databaseStorage.grdbStorage.setupUIDatabase()
 
         // ensure local client has necessary "registered" state
         identityManager.generateNewIdentityKey()
@@ -36,28 +56,30 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
 
         bobClient = FakeSignalClient.generate(e164Identifier: bobE164Identifier)
         aliceClient = FakeSignalClient.generate(e164Identifier: aliceE164Identifier)
+
+        // for unit tests, we must manually start the decryptJobQueue
+        SSKEnvironment.shared.messageDecryptJobQueue.setup()
     }
 
     override func tearDown() {
-        databaseStorage.grdbStorage.testing_tearDownDatabaseChangeObserver()
+        databaseStorage.grdbStorage.testing_tearDownUIDatabase()
 
         super.tearDown()
     }
 
     // MARK: - Tests
 
-    func test_contactMessage_e164AndUuidEnvelope() {
+    func test_contactMessage_e164Envelope() {
+        storageCoordinator.useGRDBForTests()
+
+        // Re-initialize this state now that we've just switched databases.
+        identityManager.generateNewIdentityKey()
+        tsAccountManager.registerForTests(withLocalNumber: localE164Identifier, uuid: localUUID)
+
         write { transaction in
             try! self.runner.initialize(senderClient: self.bobClient,
                                         recipientClient: self.localClient,
                                         transaction: transaction)
-        }
-
-        // Wait until message processing has completed, otherwise future
-        // tests may break as we try and drain the processing queue.
-        let expectFlushNotification = expectation(description: "queue flushed")
-        NotificationCenter.default.observe(once: MessageProcessor.messageProcessorDidFlushQueue).done { _ in
-            expectFlushNotification.fulfill()
         }
 
         let expectMessageProcessed = expectation(description: "message processed")
@@ -89,7 +111,7 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
                 }
             }
         }
-        guard let observer = databaseStorage.grdbStorage.databaseChangeObserver else {
+        guard let observer = databaseStorage.grdbStorage.uiDatabaseObserver else {
             owsFailDebug("observer was unexpectedly nil")
             return
         }
@@ -97,39 +119,23 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
 
         let envelopeBuilder = try! fakeService.envelopeBuilder(fromSenderClient: bobClient, bodyText: "Those who stands for nothing will fall for anything")
         envelopeBuilder.setSourceE164(bobClient.e164Identifier!)
-        envelopeBuilder.setSourceUuid(bobClient.uuidIdentifier)
-        envelopeBuilder.setServerTimestamp(NSDate.ows_millisecondTimeStamp())
-        envelopeBuilder.setServerGuid(UUID().uuidString)
         let envelopeData = try! envelopeBuilder.buildSerializedData()
-        messageProcessor.processEncryptedEnvelopeData(envelopeData,
-                                                      serverDeliveryTimestamp: NSDate.ows_millisecondTimeStamp(),
-                                                      envelopeSource: .tests) { error in
-            switch error {
-            case MessageProcessingError.duplicatePendingEnvelope?:
-                XCTFail("duplicatePendingEnvelope")
-            case .some(_):
-                XCTFail("failure")
-            case nil:
-                break
-            }
-        }
+        messageReceiver.handleReceivedEnvelopeData(envelopeData)
 
         waitForExpectations(timeout: 1.0)
     }
 
-    func test_contactMessage_UuidOnlyEnvelope() {
+    func test_contactMessage_UUIDEnvelope() {
+        guard FeatureFlags.allowUUIDOnlyContacts else {
+            // This test is known to be failing.
+            // It's intended as TDD for the upcoming UUID work.
+            return
+        }
 
         write { transaction in
             try! self.runner.initialize(senderClient: self.bobClient,
                                         recipientClient: self.localClient,
                                         transaction: transaction)
-        }
-
-        // Wait until message processing has completed, otherwise future
-        // tests may break as we try and drain the processing queue.
-        let expectFlushNotification = expectation(description: "queue flushed")
-        NotificationCenter.default.observe(once: MessageProcessor.messageProcessorDidFlushQueue).done { _ in
-            expectFlushNotification.fulfill()
         }
 
         let expectMessageProcessed = expectation(description: "message processed")
@@ -162,7 +168,7 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
                 }
             }
         }
-        guard let observer = databaseStorage.grdbStorage.databaseChangeObserver else {
+        guard let observer = databaseStorage.grdbStorage.uiDatabaseObserver else {
             owsFailDebug("observer was unexpectedly nil")
             return
         }
@@ -170,21 +176,9 @@ class MessageProcessingIntegrationTest: SSKBaseTestSwift {
 
         let envelopeBuilder = try! fakeService.envelopeBuilder(fromSenderClient: bobClient, bodyText: "Those who stands for nothing will fall for anything")
         envelopeBuilder.setSourceUuid(bobClient.uuidIdentifier)
-        envelopeBuilder.setServerTimestamp(NSDate.ows_millisecondTimeStamp())
-        envelopeBuilder.setServerGuid(UUID().uuidString)
         let envelopeData = try! envelopeBuilder.buildSerializedData()
-        messageProcessor.processEncryptedEnvelopeData(envelopeData,
-                                                      serverDeliveryTimestamp: NSDate.ows_millisecondTimeStamp(),
-                                                      envelopeSource: .tests) { error in
-            switch error {
-            case MessageProcessingError.duplicatePendingEnvelope?:
-                XCTFail("duplicatePendingEnvelope")
-            case .some(_):
-                XCTFail("failure")
-            case nil:
-                break
-            }
-        }
+        messageReceiver.handleReceivedEnvelopeData(envelopeData)
+
         waitForExpectations(timeout: 1.0)
     }
 }

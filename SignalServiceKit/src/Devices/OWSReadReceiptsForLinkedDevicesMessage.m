@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSReadReceiptsForLinkedDevicesMessage.h"
@@ -53,18 +53,6 @@ NS_ASSUME_NONNULL_BEGIN
     }
     return syncMessageBuilder;
 }
-
-- (NSSet<NSString *> *)relatedUniqueIds
-{
-    NSMutableArray<NSString *> *messageUniqueIds = [[NSMutableArray alloc] init];
-    for (OWSLinkedDeviceReadReceipt *readReceipt in self.readReceipts) {
-        if (readReceipt.messageUniqueId) {
-            [messageUniqueIds addObject:readReceipt.messageUniqueId];
-        }
-    }
-    return [[super relatedUniqueIds] setByAddingObjectsFromArray:messageUniqueIds];
-}
-
 
 @end
 

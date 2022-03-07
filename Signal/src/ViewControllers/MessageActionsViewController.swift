@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -9,8 +9,6 @@ public class MessageAction: NSObject {
     @objc
     let block: (_ sender: Any?) -> Void
     let accessibilityIdentifier: String
-    let contextMenuTitle: String
-    let contextMenuAttributes: ContextMenuAction.Attributes
 
     public enum MessageActionType {
         case reply
@@ -20,6 +18,7 @@ public class MessageAction: NSObject {
         case share
         case forward
         case select
+        case pin
     }
 
     let actionType: MessageActionType
@@ -27,13 +26,9 @@ public class MessageAction: NSObject {
     public init(_ actionType: MessageActionType,
                 accessibilityLabel: String,
                 accessibilityIdentifier: String,
-                contextMenuTitle: String,
-                contextMenuAttributes: ContextMenuAction.Attributes,
                 block: @escaping (_ sender: Any?) -> Void) {
         self.actionType = actionType
         self.accessibilityIdentifier = accessibilityIdentifier
-        self.contextMenuTitle = contextMenuTitle
-        self.contextMenuAttributes = contextMenuAttributes
         self.block = block
         super.init()
         self.accessibilityLabel = accessibilityLabel
@@ -46,11 +41,7 @@ public class MessageAction: NSObject {
         case .copy:
             return Theme.iconImage(.messageActionCopy)
         case .info:
-            if FeatureFlags.contextMenus {
-                return Theme.iconImage(.contextMenuInfo)
-            } else {
-                return Theme.iconImage(.info)
-            }
+            return Theme.iconImage(.info)
         case .delete:
             return Theme.iconImage(.messageActionDelete)
         case .share:
@@ -58,35 +49,29 @@ public class MessageAction: NSObject {
         case .forward:
             return Theme.iconImage(.messageActionForward)
         case .select:
-            if FeatureFlags.contextMenus {
-                return Theme.iconImage(.contextMenuSelect)
-            } else {
-                return Theme.iconImage(.messageActionSelect)
-            }
+            return Theme.iconImage(.messageActionSelect)
+        case .pin:
+            return Theme.iconImage(.messageActionPin)
         }
     }
 }
 
 @objc
-public protocol MessageActionsViewControllerDelegate: AnyObject {
+protocol MessageActionsViewControllerDelegate: class {
     func messageActionsViewControllerRequestedDismissal(_ messageActionsViewController: MessageActionsViewController, withAction: MessageAction?)
     func messageActionsViewControllerRequestedDismissal(_ messageActionsViewController: MessageActionsViewController, withReaction: String, isRemoving: Bool)
     func messageActionsViewController(_ messageActionsViewController: MessageActionsViewController,
                                       shouldShowReactionPickerForInteraction: TSInteraction) -> Bool
-    func messageActionsViewControllerRequestedKeyboardDismissal(_ messageActionsViewController: MessageActionsViewController, focusedView: UIView)
-    func messageActionsViewControllerLongPressGestureRecognizer(_ messageActionsViewController: MessageActionsViewController) -> UILongPressGestureRecognizer
+    func messageActionsViewControllerRequestedKeyboardDismissal(_ messageActionsViewController: MessageActionsViewController, focusedView: ConversationViewCell)
 }
 
 @objc
-public class MessageActionsViewController: UIViewController {
-
-    private let itemViewModel: CVItemViewModelImpl
+class MessageActionsViewController: UIViewController {
     @objc
-    public var focusedInteraction: TSInteraction { itemViewModel.interaction }
-    var thread: TSThread { itemViewModel.thread }
-    public var reactionState: InteractionReactionState? { itemViewModel.reactionState }
-
-    let focusedView: UIView
+    let focusedViewItem: ConversationViewItem
+    @objc
+    var focusedInteraction: TSInteraction { return focusedViewItem.interaction }
+    let focusedView: ConversationViewCell
     private let actionsToolbar: MessageActionsToolbar
 
     @objc
@@ -99,12 +84,10 @@ public class MessageActionsViewController: UIViewController {
     public weak var delegate: MessageActionsViewControllerDelegate?
 
     @objc
-    init(itemViewModel: CVItemViewModelImpl, focusedView: UIView, actions: [MessageAction]) {
-        self.itemViewModel = itemViewModel
+    init(focusedViewItem: ConversationViewItem, focusedView: ConversationViewCell, actions: [MessageAction]) {
+        self.focusedViewItem = focusedViewItem
         self.focusedView = focusedView
-
-        let toolbarMode = MessageActionsToolbar.Mode.normal(messagesActions: actions)
-        self.actionsToolbar = MessageActionsToolbar(mode: toolbarMode)
+        self.actionsToolbar = MessageActionsToolbar(actions: actions)
 
         super.init(nibName: nil, bundle: nil)
 
@@ -117,7 +100,7 @@ public class MessageActionsViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func loadView() {
+    override func loadView() {
         view = UIView()
 
         backdropView.backgroundColor = Theme.backdropColor
@@ -142,7 +125,7 @@ public class MessageActionsViewController: UIViewController {
         snapshotFocusedView?.removeFromSuperview()
         snapshotFocusedView = nil
 
-        guard let snapshotView = focusedView.snapshotView(afterScreenUpdates: true) else {
+        guard let snapshotView = focusedView.snapshotView(afterScreenUpdates: false) else {
             return owsFailDebug("snapshotView was unexpectedly nil")
         }
         view.insertSubview(snapshotView, belowSubview: bottomBar)
@@ -204,8 +187,6 @@ public class MessageActionsViewController: UIViewController {
         guard view.superview == nil else {
             return owsFailDebug("trying to dismiss when already presented")
         }
-
-        ImpactHapticFeedback.impactOccured(style: .light)
 
         window.addSubview(view)
         prepareConstraints()
@@ -270,17 +251,16 @@ public class MessageActionsViewController: UIViewController {
 
     // MARK: - Reaction handling
 
-    var canAddReact: Bool {
-        guard thread.canSendReactionToThread else { return false }
+    var interactionAllowsReactions: Bool {
         guard let delegate = delegate else { return false }
         return delegate.messageActionsViewController(self, shouldShowReactionPickerForInteraction: focusedInteraction)
     }
 
     private var quickReactionPicker: MessageReactionPicker?
     private func addReactionPickerIfNecessary() {
-        guard canAddReact, quickReactionPicker == nil else { return }
+        guard interactionAllowsReactions, quickReactionPicker == nil else { return }
 
-        let picker = MessageReactionPicker(selectedEmoji: reactionState?.localUserEmoji, delegate: self)
+        let picker = MessageReactionPicker(selectedEmoji: focusedViewItem.reactionState?.localUserEmoji, delegate: self)
         view.addSubview(picker)
 
         view.setNeedsLayout()
@@ -319,12 +299,12 @@ public class MessageActionsViewController: UIViewController {
 
     private lazy var initialTouchLocation = currentTouchLocation
     private var currentTouchLocation: CGPoint {
-        guard let delegate = delegate else {
-            owsFailDebug("unexpectedly missing delegate")
+        guard let cell = focusedView as? OWSMessageCell else {
+            owsFailDebug("unexpected cell type")
             return view.center
         }
 
-        return delegate.messageActionsViewControllerLongPressGestureRecognizer(self).location(in: view)
+        return cell.longPressGestureRecognizer.location(in: view)
     }
 
     private var gestureExitedDeadZone = false
@@ -333,7 +313,7 @@ public class MessageActionsViewController: UIViewController {
     @objc
     func didChangeLongpress() {
         // Do nothing if reactions aren't enabled.
-        guard canAddReact else { return }
+        guard interactionAllowsReactions else { return }
 
         guard let reactionPicker = quickReactionPicker else {
             return owsFailDebug("unexpectedly missing reaction picker")
@@ -357,7 +337,10 @@ public class MessageActionsViewController: UIViewController {
     func didEndLongpress() {
         // If the long press never moved, do nothing when we release.
         // The menu should continue to display until the user dismisses.
-        guard gestureExitedDeadZone else { return }
+        guard gestureExitedDeadZone else {
+            ImpactHapticFeedback.impactOccured(style: .light)
+            return
+        }
 
         // If there's not a focused reaction, dismiss the menu with no action
         guard let focusedEmoji = quickReactionPicker?.focusedEmoji else {
@@ -372,7 +355,7 @@ public class MessageActionsViewController: UIViewController {
             delegate?.messageActionsViewControllerRequestedDismissal(
                 self,
                 withReaction: focusedEmoji,
-                isRemoving: focusedEmoji == reactionState?.localUserEmoji
+                isRemoving: focusedEmoji == focusedViewItem.reactionState?.localUserEmoji
             )
         }
     }
@@ -390,10 +373,10 @@ public class MessageActionsViewController: UIViewController {
             self.delegate?.messageActionsViewControllerRequestedDismissal(
                 self,
                 withReaction: emojiString,
-                isRemoving: emojiString == self.reactionState?.localUserEmoji
+                isRemoving: emojiString == self.focusedViewItem.reactionState?.localUserEmoji
             )
         }
-        picker.externalBackdropView = backdropView
+        picker.backdropView = backdropView
         anyReactionPicker = picker
 
         // Presenting the emoji picker causes the conversation view controller
@@ -430,34 +413,24 @@ extension MessageActionsViewController: MessageActionsToolbarDelegate {
     public func messageActionsToolbar(_ messageActionsToolbar: MessageActionsToolbar, executedAction: MessageAction) {
         delegate?.messageActionsViewControllerRequestedDismissal(self, withAction: executedAction)
     }
-
-    public var messageActionsToolbarSelectedInteractionCount: Int {
-        0
-    }
 }
 
-public protocol MessageActionsToolbarDelegate: AnyObject {
+public protocol MessageActionsToolbarDelegate: class {
     func messageActionsToolbar(_ messageActionsToolbar: MessageActionsToolbar, executedAction: MessageAction)
-    var messageActionsToolbarSelectedInteractionCount: Int { get }
 }
 
 public class MessageActionsToolbar: UIToolbar {
 
     weak var actionDelegate: MessageActionsToolbarDelegate?
 
-    enum Mode {
-        case normal(messagesActions: [MessageAction])
-        case selection(deleteMessagesAction: MessageAction,
-                       forwardMessagesAction: MessageAction)
-    }
-    private let mode: Mode
+    let actions: [MessageAction]
 
     deinit {
         Logger.verbose("")
     }
 
-    required init(mode: Mode) {
-        self.mode = mode
+    required init(actions: [MessageAction]) {
+        self.actions = actions
 
         super.init(frame: .zero)
 
@@ -466,12 +439,10 @@ public class MessageActionsToolbar: UIToolbar {
 
         autoresizingMask = .flexibleHeight
         translatesAutoresizingMaskIntoConstraints = false
+        barTintColor = Theme.isDarkThemeEnabled ? .ows_gray75 : .ows_white
         setShadowImage(UIImage(), forToolbarPosition: .any)
 
         buildItems()
-
-        NotificationCenter.default.addObserver(self, selector: #selector(applyTheme), name: .ThemeDidChange, object: nil)
-        applyTheme()
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -480,45 +451,27 @@ public class MessageActionsToolbar: UIToolbar {
 
     // MARK: -
 
-    @objc
-    private func applyTheme() {
-        AssertIsOnMainThread()
-
-        barTintColor = Theme.isDarkThemeEnabled ? .ows_gray75 : .ows_white
-
-        buildItems()
-    }
-
-    public func updateContent() {
-        buildItems()
-    }
-
+    private var itemToAction = [UIBarButtonItem: MessageAction]()
+    private var actionToItem = [MessageAction: UIBarButtonItem]()
     private func buildItems() {
-        switch mode {
-        case .normal(let messagesActions):
-            buildNormalItems(messagesActions: messagesActions)
-        case .selection(let deleteMessagesAction, let forwardMessagesAction):
-            buildSelectionItems(deleteMessagesAction: deleteMessagesAction,
-                                forwardMessagesAction: forwardMessagesAction)
-        }
-    }
-
-    var actionItems = [MessageActionsToolbarButton]()
-
-    private func buildNormalItems(messagesActions: [MessageAction]) {
         var newItems = [UIBarButtonItem]()
 
-        var actionItems = [MessageActionsToolbarButton]()
-        for action in messagesActions {
-            if !newItems.isEmpty {
-                newItems.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
-            }
-
-            let actionItem = MessageActionsToolbarButton(actionsToolbar: self, messageAction: action)
+        for action in actions {
+            let actionItem = UIBarButtonItem(
+                image: action.image.withRenderingMode(.alwaysTemplate),
+                style: .plain,
+                target: self,
+                action: #selector(didTapItem(_:))
+            )
             actionItem.tintColor = Theme.primaryIconColor
             actionItem.accessibilityLabel = action.accessibilityLabel
             newItems.append(actionItem)
-            actionItems.append(actionItem)
+            itemToAction[actionItem] = action
+            actionToItem[action] = actionItem
+
+            if action != actions.last {
+                newItems.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
+            }
         }
 
         // If we only have a single button, center it.
@@ -528,95 +481,21 @@ public class MessageActionsToolbar: UIToolbar {
         }
 
         items = newItems
-        self.actionItems = actionItems
-    }
-
-    private func buildSelectionItems(deleteMessagesAction: MessageAction,
-                                     forwardMessagesAction: MessageAction) {
-
-        let deleteItem = MessageActionsToolbarButton(actionsToolbar: self, messageAction: deleteMessagesAction)
-        let forwardItem = MessageActionsToolbarButton(actionsToolbar: self, messageAction: forwardMessagesAction)
-
-        let selectedCount: Int = actionDelegate?.messageActionsToolbarSelectedInteractionCount ?? 0
-        let labelTitle: String
-        if selectedCount == 0 {
-            labelTitle = NSLocalizedString("MESSAGE_ACTIONS_TOOLBAR_LABEL_0",
-                                           comment: "Label for the toolbar used in the multi-select mode of conversation view when 0 items are selected.")
-        } else if selectedCount == 1 {
-            labelTitle = NSLocalizedString("MESSAGE_ACTIONS_TOOLBAR_LABEL_1",
-                                           comment: "Label for the toolbar used in the multi-select mode of conversation view when 1 item is selected.")
-        } else {
-            let labelFormat = NSLocalizedString("MESSAGE_ACTIONS_TOOLBAR_LABEL_N_FORMAT",
-                                                comment: "Format for the toolbar used in the multi-select mode of conversation view. Embeds: {{ %@ the number of currently selected items }}.")
-            labelTitle = String(format: labelFormat, OWSFormat.formatInt(selectedCount))
-        }
-        let label = UILabel()
-        label.text = labelTitle
-        label.font = UIFont.ows_dynamicTypeBodyClamped
-        label.textColor = Theme.primaryTextColor
-        label.sizeToFit()
-        let labelItem = UIBarButtonItem(customView: label)
-
-        var newItems = [UIBarButtonItem]()
-        newItems.append(deleteItem)
-        newItems.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
-        newItems.append(labelItem)
-        newItems.append(UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil))
-        newItems.append(forwardItem)
-
-        items = newItems
-        self.actionItems = [ deleteItem, forwardItem ]
     }
 
     public func buttonItem(for actionType: MessageAction.MessageActionType) -> UIBarButtonItem? {
-        for actionItem in actionItems {
-            if let messageAction = actionItem.messageAction,
-               messageAction.actionType == actionType {
-                return actionItem
-            }
+        guard let action = (actions.first { $0.actionType == actionType }) else {
+            return nil
         }
-        owsFailDebug("Missing action item: \(actionType).")
-        return nil
-    }
-}
-
-// MARK: -
-
-class MessageActionsToolbarButton: UIBarButtonItem {
-    private weak var actionsToolbar: MessageActionsToolbar?
-    fileprivate var messageAction: MessageAction?
-
-    required override init() {
-        super.init()
+        assert(actionToItem[action] != nil)
+        return actionToItem[action]
     }
 
-    required init(actionsToolbar: MessageActionsToolbar, messageAction: MessageAction) {
-        self.actionsToolbar = actionsToolbar
-        self.messageAction = messageAction
-
-        super.init()
-
-        self.image = messageAction.image.withRenderingMode(.alwaysTemplate)
-        self.style = .plain
-        self.target = self
-        self.action = #selector(didTapItem(_:))
-        self.tintColor = Theme.primaryIconColor
-        self.accessibilityLabel = messageAction.accessibilityLabel
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    @objc
-    private func didTapItem(_ item: UIBarButtonItem) {
-        AssertIsOnMainThread()
-
-        guard let messageAction = messageAction,
-              let actionsToolbar = actionsToolbar,
-              let actionDelegate = actionsToolbar.actionDelegate else {
-            return
+    @objc func didTapItem(_ item: UIBarButtonItem) {
+        guard let action = itemToAction[item] else {
+            return owsFailDebug("missing action for item")
         }
-        actionDelegate.messageActionsToolbar(actionsToolbar, executedAction: messageAction)
+
+        actionDelegate?.messageActionsToolbar(self, executedAction: action)
     }
 }

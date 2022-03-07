@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct DeviceRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        OWSDeviceSerializer.table
+        return OWSDeviceSerializer.table
     }
 
-    public static var databaseTableName: String {
-        OWSDeviceSerializer.table.tableName
-    }
+    public static let databaseTableName: String = OWSDeviceSerializer.table.tableName
 
     public var id: Int64?
 
@@ -46,7 +44,7 @@ public struct DeviceRecord: SDSRecord {
     }
 
     public static func columnName(_ column: DeviceRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -62,7 +60,7 @@ public struct DeviceRecord: SDSRecord {
 
 public extension DeviceRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -139,15 +137,15 @@ extension OWSDevice: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        DeviceRecord.databaseTableName
+        return DeviceRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        OWSDeviceSerializer.table
+        return OWSDeviceSerializer.table
     }
 }
 
@@ -189,30 +187,28 @@ extension OWSDeviceSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var createdAtColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "createdAt", columnType: .double) }
-    static var deviceIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "deviceId", columnType: .int64) }
-    static var lastSeenAtColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "lastSeenAt", columnType: .double) }
-    static var nameColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "name", columnType: .unicodeString, isOptional: true) }
+    static let createdAtColumn = SDSColumnMetadata(columnName: "createdAt", columnType: .double)
+    static let deviceIdColumn = SDSColumnMetadata(columnName: "deviceId", columnType: .int64)
+    static let lastSeenAtColumn = SDSColumnMetadata(columnName: "lastSeenAt", columnType: .double)
+    static let nameColumn = SDSColumnMetadata(columnName: "name", columnType: .unicodeString, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: OWSDevice.collection(),
-                         tableName: "model_OWSDevice",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: OWSDevice.collection(),
+                                               tableName: "model_OWSDevice",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
         createdAtColumn,
         deviceIdColumn,
         lastSeenAtColumn,
-        nameColumn
+        nameColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -380,6 +376,8 @@ public extension OWSDevice {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return OWSDevice.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(DeviceRecord.databaseTableName) WHERE \(deviceColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -410,20 +408,28 @@ public extension OWSDevice {
                             batchSize: UInt,
                             block: @escaping (OWSDevice, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            OWSDevice.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? OWSDevice else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = OWSDevice.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = OWSDevice.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -451,6 +457,10 @@ public extension OWSDevice {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: OWSDevice.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -482,6 +492,8 @@ public extension OWSDevice {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: OWSDevice.collection())
         case .grdbRead(let grdbTransaction):
             return DeviceRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -491,6 +503,8 @@ public extension OWSDevice {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: OWSDevice.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try DeviceRecord.deleteAll(grdbTransaction.database)
@@ -510,20 +524,24 @@ public extension OWSDevice {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -535,6 +553,8 @@ public extension OWSDevice {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: OWSDevice.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(DeviceRecord.databaseTableName) WHERE \(deviceColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -554,7 +574,7 @@ public extension OWSDevice {
             let cursor = try DeviceRecord.fetchCursor(transaction.database, sqlRequest)
             return OWSDeviceCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return OWSDeviceCursor(transaction: transaction, cursor: nil)
         }
@@ -624,3 +644,4 @@ public extension OWSDevice {
     }
 }
 #endif
+         

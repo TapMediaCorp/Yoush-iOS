@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "ProtoUtils.h"
@@ -13,6 +13,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation ProtoUtils
 
+#pragma mark - Dependencies
+
++ (id<ProfileManagerProtocol>)profileManager {
+    return SSKEnvironment.shared.profileManager;
+}
+
 + (OWSAES256Key *)localProfileKey
 {
     return self.profileManager.localProfileKey;
@@ -21,17 +27,28 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark -
 
 + (BOOL)shouldMessageHaveLocalProfileKey:(TSThread *)thread
+                                 address:(SignalServiceAddress *_Nullable)address
                              transaction:(SDSAnyReadTransaction *)transaction
 {
     OWSAssertDebug(thread);
     OWSAssertDebug(transaction);
 
-    // Group threads will return YES if the group is in the whitelist
-    // Contact threads will return YES if the contact is in the whitelist.
-    return [self.profileManager isThreadInProfileWhitelist:thread transaction:transaction];
+    // For 1:1 threads, we want to include the profile key IFF the
+    // contact is in the whitelist.
+    //
+    // For Group threads, we want to include the profile key IFF the
+    // recipient OR the group is in the whitelist.
+    if (address.isValid && [self.profileManager isUserInProfileWhitelist:address transaction:transaction]) {
+        return YES;
+    } else if ([self.profileManager isThreadInProfileWhitelist:thread transaction:transaction]) {
+        return YES;
+    }
+
+    return NO;
 }
 
 + (void)addLocalProfileKeyIfNecessary:(TSThread *)thread
+                              address:(SignalServiceAddress *_Nullable)address
                    dataMessageBuilder:(SSKProtoDataMessageBuilder *)dataMessageBuilder
                           transaction:(SDSAnyReadTransaction *)transaction
 {
@@ -39,7 +56,7 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertDebug(dataMessageBuilder);
     OWSAssertDebug(transaction);
 
-    if ([self shouldMessageHaveLocalProfileKey:thread transaction:transaction]) {
+    if ([self shouldMessageHaveLocalProfileKey:thread address:address transaction:transaction]) {
         [dataMessageBuilder setProfileKey:self.localProfileKey.keyData];
     }
 }
@@ -52,36 +69,18 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 + (void)addLocalProfileKeyIfNecessary:(TSThread *)thread
+                              address:(SignalServiceAddress *)address
                    callMessageBuilder:(SSKProtoCallMessageBuilder *)callMessageBuilder
                           transaction:(SDSAnyReadTransaction *)transaction
 {
     OWSAssertDebug(thread);
+    OWSAssertDebug(address.isValid);
     OWSAssertDebug(callMessageBuilder);
     OWSAssertDebug(transaction);
 
-    if ([self shouldMessageHaveLocalProfileKey:thread transaction:transaction]) {
+    if ([self shouldMessageHaveLocalProfileKey:thread address:address transaction:transaction]) {
         [callMessageBuilder setProfileKey:self.localProfileKey.keyData];
     }
-}
-
-+ (nullable NSString *)parseProtoE164:(nullable NSString *)value name:(NSString *)name
-{
-    if (value == nil) {
-        OWSFailDebug(@"%@ was unexpectedly nil.", name);
-        return nil;
-    }
-    if (value.length == 0) {
-        OWSFailDebug(@"%@ was unexpectedly empty.", name);
-        return nil;
-    }
-    if (![PhoneNumber resemblesE164:value]) {
-        if (SSKDebugFlags.internalLogging) {
-            OWSFailDebug(@"%@ was unexpectedly invalid: %@.", name, value);
-        }
-        OWSFailDebug(@"%@ was unexpectedly invalid.", name);
-        return nil;
-    }
-    return value;
 }
 
 @end

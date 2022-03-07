@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/BaseModel.h>
-#import <SignalServiceKit/StickerInfo.h>
+#import "BaseModel.h"
+#import "StickerInfo.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

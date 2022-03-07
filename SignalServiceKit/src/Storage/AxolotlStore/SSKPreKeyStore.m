@@ -1,18 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "SSKPreKeyStore.h"
-#import "AxolotlExceptions.h"
-#import "PreKeyRecord.h"
 #import "SDSKeyValueStore+ObjC.h"
 #import "TSStorageKeys.h"
+#import <AxolotlKit/AxolotlExceptions.h>
+#import <AxolotlKit/SessionBuilder.h>
 #import <SignalCoreKit/Cryptography.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 #define BATCH_SIZE 100
-
-static const int kPreKeyOfLastResortId = 0xFFFFFF;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -30,7 +28,7 @@ NSString *const TSNextPrekeyIdKey = @"TSStorageInternalSettingsNextPreKeyId";
 
 @implementation SDSKeyValueStore (SSKPreKeyStore)
 
-- (nullable PreKeyRecord *)preKeyRecordForKey:(NSString *)key transaction:(SDSAnyReadTransaction *)transaction
+- (nullable PreKeyRecord *)preKeyRecordForKey:(NSString *)key transaction:(SDSAnyReadTransaction *)transaction;
 {
     return [self.asObjC objectForKey:key ofExpectedType:PreKeyRecord.class transaction:transaction];
 }
@@ -65,6 +63,13 @@ NSString *const TSNextPrekeyIdKey = @"TSStorageInternalSettingsNextPreKeyId";
     _metadataStore = [[SDSKeyValueStore alloc] initWithCollection:TSStorageInternalSettingsCollection];
 
     return self;
+}
+
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
 }
 
 #pragma mark -
@@ -106,22 +111,27 @@ NSString *const TSNextPrekeyIdKey = @"TSStorageInternalSettingsNextPreKeyId";
 }
 
 - (nullable PreKeyRecord *)loadPreKey:(int)preKeyId
-                          transaction:(SDSAnyReadTransaction *)transaction
 {
-    return [self.keyStore preKeyRecordForKey:[SDSKeyValueStore keyWithInt:preKeyId] transaction:transaction];
+    __block PreKeyRecord *_Nullable result;
+    [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
+        result = [self.keyStore preKeyRecordForKey:[SDSKeyValueStore keyWithInt:preKeyId] transaction:transaction];
+    }];
+    return result;
 }
 
 - (void)storePreKey:(int)preKeyId preKeyRecord:(PreKeyRecord *)record
-        transaction:(SDSAnyWriteTransaction *)transaction
 {
-    [self.keyStore setPreKeyRecord:record forKey:[SDSKeyValueStore keyWithInt:preKeyId] transaction:transaction];
+    DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
+        [self.keyStore setPreKeyRecord:record forKey:[SDSKeyValueStore keyWithInt:preKeyId] transaction:transaction];
+    });
 }
 
 - (void)removePreKey:(int)preKeyId
-         transaction:(SDSAnyWriteTransaction *)transaction
+     protocolContext:(nullable id<SPKProtocolWriteContext>)protocolContext
 {
-    OWSLogInfo(@"Removing prekeyID: %lu", (unsigned long)preKeyId);
-
+    OWSAssertDebug([protocolContext isKindOfClass:[SDSAnyWriteTransaction class]]);
+    SDSAnyWriteTransaction *transaction = (SDSAnyWriteTransaction *)protocolContext;
+    
     [self.keyStore removeValueForKey:[SDSKeyValueStore keyWithInt:preKeyId] transaction:transaction];
 }
 
@@ -144,16 +154,6 @@ NSString *const TSNextPrekeyIdKey = @"TSStorageInternalSettingsNextPreKeyId";
 
     return lastPreKeyId;
 }
-
-#if TESTABLE_BUILD
-- (void)removeAll:(SDSAnyWriteTransaction *)transaction
-{
-    OWSLogWarn(@"");
-
-    [self.keyStore removeAllWithTransaction:transaction];
-    [self.metadataStore removeAllWithTransaction:transaction];
-}
-#endif
 
 @end
 

@@ -7,21 +7,26 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:signal.art</string>
-		<string>applinks:signal.group</string>
-		<string>applinks:signal.me</string>
 	</array>
 	<key>com.apple.developer.default-data-protection</key>
 	<string>NSFileProtectionComplete</string>
-	<key>com.apple.developer.in-app-payments</key>
+	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
-		<string>merchant.org.signalfoundation</string>
+		<string>iCloud.com.tapofthink.yoush</string>
 	</array>
-	<key>com.apple.developer.usernotifications.communication</key>
-	<true/>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.com.tapofthink.yoush</string>
+	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.org.whispersystems.signal.group</string>
-		<string>group.org.whispersystems.signal.group.staging</string>
+		<string>group.com.tapofthink.yoush.group</string>
+		<string>group.com.tapofthink.yoush.group.staging</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>

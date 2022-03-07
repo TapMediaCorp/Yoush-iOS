@@ -1,14 +1,15 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSInvalidIdentityKeySendingErrorMessage.h"
-#import "NSData+keyVersionByte.h"
 #import "OWSFingerprint.h"
 #import "OWSIdentityManager.h"
 #import "PreKeyBundle+jsonDict.h"
+#import "SSKSessionStore.h"
 #import "TSContactThread.h"
 #import "TSOutgoingMessage.h"
+#import <AxolotlKit/NSData+keyVersionByte.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -47,7 +48,6 @@ NS_ASSUME_NONNULL_BEGIN
                   uniqueThreadId:(NSString *)uniqueThreadId
                    attachmentIds:(NSArray<NSString *> *)attachmentIds
                             body:(nullable NSString *)body
-                      bodyRanges:(nullable MessageBodyRanges *)bodyRanges
                     contactShare:(nullable OWSContact *)contactShare
                  expireStartedAt:(uint64_t)expireStartedAt
                        expiresAt:(uint64_t)expiresAt
@@ -62,8 +62,6 @@ NS_ASSUME_NONNULL_BEGIN
                        errorType:(TSErrorMessageType)errorType
                             read:(BOOL)read
                 recipientAddress:(nullable SignalServiceAddress *)recipientAddress
-                          sender:(nullable SignalServiceAddress *)sender
-             wasIdentityVerified:(BOOL)wasIdentityVerified
                        messageId:(NSString *)messageId
                     preKeyBundle:(PreKeyBundle *)preKeyBundle
 {
@@ -75,7 +73,6 @@ NS_ASSUME_NONNULL_BEGIN
                     uniqueThreadId:uniqueThreadId
                      attachmentIds:attachmentIds
                               body:body
-                        bodyRanges:bodyRanges
                       contactShare:contactShare
                    expireStartedAt:expireStartedAt
                          expiresAt:expiresAt
@@ -89,9 +86,7 @@ NS_ASSUME_NONNULL_BEGIN
                 wasRemotelyDeleted:wasRemotelyDeleted
                          errorType:errorType
                               read:read
-                  recipientAddress:recipientAddress
-                            sender:sender
-               wasIdentityVerified:wasIdentityVerified];
+                  recipientAddress:recipientAddress];
 
     if (!self) {
         return self;
@@ -119,7 +114,7 @@ NS_ASSUME_NONNULL_BEGIN
         return;
     }
 
-    [[OWSIdentityManager shared] saveRemoteIdentity:newIdentityKey address:self.recipientAddress];
+    [[OWSIdentityManager sharedManager] saveRemoteIdentity:newIdentityKey address:self.recipientAddress];
 }
 
 - (nullable NSData *)throws_newIdentityKey
@@ -129,8 +124,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (SignalServiceAddress *)theirSignalAddress
 {
-    OWSAssertDebug(self.recipientAddress != nil);
-
     return self.recipientAddress;
 }
 

@@ -1,38 +1,24 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSOutgoingReceiptManager.h"
 #import "AppReadiness.h"
-#import "MessageSender.h"
 #import "OWSError.h"
+#import "OWSMessageSender.h"
 #import "OWSReceiptsForSenderMessage.h"
 #import "SSKEnvironment.h"
 #import "TSContactThread.h"
 #import "TSYapDatabaseObject.h"
+#import <PromiseKit/AnyPromise.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^ReceiptProcessCompletion)(void);
-
-NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType);
-
-NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
-{
-    switch (receiptType) {
-        case OWSReceiptType_Delivery:
-            return @"Delivery";
-        case OWSReceiptType_Read:
-            return @"Read";
-        case OWSReceiptType_Viewed:
-            return @"Viewed";
-        default:
-            return @"Unknown";
-    }
-}
-
-#pragma mark -
+typedef NS_ENUM(NSUInteger, OWSReceiptType) {
+    OWSReceiptType_Delivery,
+    OWSReceiptType_Read,
+};
 
 @interface OWSOutgoingReceiptManager ()
 
@@ -45,6 +31,15 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
 
 @implementation OWSOutgoingReceiptManager
 
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
 + (SDSKeyValueStore *)deliveryReceiptStore
 {
     return [[SDSKeyValueStore alloc] initWithCollection:@"kOutgoingDeliveryReceiptManagerCollection"];
@@ -55,12 +50,14 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
     return [[SDSKeyValueStore alloc] initWithCollection:@"kOutgoingReadReceiptManagerCollection"];
 }
 
-+ (SDSKeyValueStore *)viewedReceiptStore
-{
-    return [[SDSKeyValueStore alloc] initWithCollection:@"kOutgoingViewedReceiptManagerCollection"];
-}
-
 #pragma mark -
+
++ (instancetype)sharedManager
+{
+    OWSAssert(SSKEnvironment.shared.outgoingReceiptManager);
+
+    return SSKEnvironment.shared.outgoingReceiptManager;
+}
 
 - (instancetype)init
 {
@@ -72,21 +69,15 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
 
     OWSSingletonAssert();
 
-    _pendingTasks = [[PendingTasks alloc] initWithLabel:@"Receipt Sends"];
-
-    // We skip any sends to untrusted identities since we know they'll fail anyway. If an identity state changes
-    // we should recheck our pendingReceipts to re-attempt a send to formerly untrusted recipients.
     [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(process)
-                                                 name:kNSNotificationNameIdentityStateDidChange
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(process)
+                                             selector:@selector(reachabilityChanged)
                                                  name:SSKReachability.owsReachabilityDidChange
                                                object:nil];
 
     // Start processing.
-    AppReadinessRunNowOrWhenAppDidBecomeReadyAsync(^{ [self process]; });
+    [AppReadiness runNowOrWhenAppDidBecomeReadyPolite:^{
+        [self process];
+    }];
 
     return self;
 }
@@ -95,6 +86,22 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
 {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
+
+#pragma mark - Dependencies
+
+- (OWSMessageSender *)messageSender
+{
+    OWSAssertDebug(SSKEnvironment.shared.messageSender);
+
+    return SSKEnvironment.shared.messageSender;
+}
+
+- (id<SSKReachabilityManager>)reachabilityManager
+{
+    return SSKEnvironment.shared.reachabilityManager;
+}
+
+#pragma mark -
 
 - (dispatch_queue_t)serialQueue
 {
@@ -109,26 +116,10 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
 
 // Schedules a processing pass, unless one is already scheduled.
 - (void)process {
-    [self processWithCompletion:nil];
-}
-
-// Schedules a processing pass, unless one is already scheduled.
-- (void)processWithCompletion:(nullable ReceiptProcessCompletion)completion
-{
-    if (!AppReadiness.isAppReady && !CurrentAppContext().isRunningTests) {
-        OWSFailDebug(@"Outgoing receipts require app is ready");
-        if (completion) {
-            completion();
-        }
-        return;
-    }
+    OWSAssertDebug(AppReadiness.isAppReady);
 
     dispatch_async(self.serialQueue, ^{
         if (self.isProcessing) {
-            if (completion) {
-                completion();
-            }
-            [self logMemoryUsage];
             return;
         }
 
@@ -139,33 +130,21 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
         if (!self.reachabilityManager.isReachable) {
             // No network availability; abort.
             self.isProcessing = NO;
-            if (completion) {
-                completion();
-            }
-            [self logMemoryUsage];
             return;
         }
 
         NSMutableArray<AnyPromise *> *sendPromises = [NSMutableArray array];
         [sendPromises addObjectsFromArray:[self sendReceiptsForReceiptType:OWSReceiptType_Delivery]];
         [sendPromises addObjectsFromArray:[self sendReceiptsForReceiptType:OWSReceiptType_Read]];
-        [sendPromises addObjectsFromArray:[self sendReceiptsForReceiptType:OWSReceiptType_Viewed]];
 
         if (sendPromises.count < 1) {
             // No work to do; abort.
             self.isProcessing = NO;
-            if (completion) {
-                completion();
-            }
-            [self logMemoryUsage];
             return;
         }
 
-        AnyPromise *completionPromise = [AnyPromise whenResolved:sendPromises];
+        AnyPromise *completionPromise = PMKJoin(sendPromises);
         completionPromise.ensure(^() {
-            if (completion) {
-                completion();
-            }
             // Wait N seconds before conducting another pass.
             // This allows time for a batch to accumulate.
             //
@@ -184,169 +163,220 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
     });
 }
 
-- (void)logMemoryUsage {
-    if (SSKDebugFlags.internalLogging) {
-        dispatch_async(self.serialQueue, ^{
-            OWSLogVerbose(@"memoryUsage: %@", LocalDevice.memoryUsage);
-        });
+- (SignalServiceAddress *)addressForIdentifier:(NSString *)identifier
+{
+    // The identifier could be either a UUID or a phone number,
+    // check if it's a valid UUID. If not, assume it's a phone number.
+
+    NSUUID *_Nullable uuid = [[NSUUID alloc] initWithUUIDString:identifier];
+    if (uuid) {
+        return [[SignalServiceAddress alloc] initWithUuid:uuid phoneNumber:nil];
+    } else {
+        return [[SignalServiceAddress alloc] initWithPhoneNumber:identifier];
     }
 }
 
 - (NSArray<AnyPromise *> *)sendReceiptsForReceiptType:(OWSReceiptType)receiptType {
-    __block NSDictionary<SignalServiceAddress *, MessageReceiptSet *> *queuedReceiptMap;
+    SDSKeyValueStore *store = [self storeForReceiptType:receiptType];
+
+    NSMutableDictionary<NSString *, NSSet<NSNumber *> *> *queuedReceiptMap = [NSMutableDictionary new];
     [self.databaseStorage readWithBlock:^(SDSAnyReadTransaction *transaction) {
-        queuedReceiptMap = [self fetchAllReceiptSetsWithType:receiptType transaction:transaction];
+        [store enumerateKeysAndObjectsWithTransaction:transaction
+                                                block:^(NSString *key, id object, BOOL *stop) {
+                                                    NSString *recipientId = key;
+                                                    NSSet<NSNumber *> *timestamps = object;
+                                                    queuedReceiptMap[recipientId] = [timestamps copy];
+                                                }];
     }];
 
     NSMutableArray<AnyPromise *> *sendPromises = [NSMutableArray array];
 
-    for (SignalServiceAddress *address in queuedReceiptMap) {
+    for (NSString *identifier in queuedReceiptMap) {
+        // The identifier could be either a UUID or a phone number,
+        // check if it's a valid UUID. If not, assume it's a phone number.
+
+        SignalServiceAddress *address = [self addressForIdentifier:identifier];
+
         if (!address.isValid) {
             OWSFailDebug(@"Unexpected identifier.");
             continue;
         }
 
-        MessageReceiptSet *receiptSet = queuedReceiptMap[address];
-        if (receiptSet.timestamps.count < 1) {
+        NSSet<NSNumber *> *timestamps = queuedReceiptMap[identifier];
+        if (timestamps.count < 1) {
             OWSFailDebug(@"Missing timestamps.");
-            continue;
-        }
-
-        if ([self.blockingManager isAddressBlocked:address]) {
-            OWSLogWarn(@"Skipping send for blocked address: %@", address);
-            [self dequeueReceiptsForAddress:address receiptSet:receiptSet receiptType:receiptType];
-            continue;
-        }
-
-        if ([self.identityManager untrustedIdentityForSendingToAddress:address]) {
-            OWSLogWarn(@"%@ is untrusted. Deferring sending of receipts.", address);
             continue;
         }
 
         TSThread *thread = [TSContactThread getOrCreateThreadWithContactAddress:address];
         OWSReceiptsForSenderMessage *message;
-        NSString *receiptName = NSStringForOWSReceiptType(receiptType);
+        NSString *receiptName;
         switch (receiptType) {
             case OWSReceiptType_Delivery:
-                message = [OWSReceiptsForSenderMessage deliveryReceiptsForSenderMessageWithThread:thread
-                                                                                       receiptSet:receiptSet];
+                message =
+                    [OWSReceiptsForSenderMessage deliveryReceiptsForSenderMessageWithThread:thread
+                                                                          messageTimestamps:timestamps.allObjects];
+                receiptName = @"Delivery";
                 break;
             case OWSReceiptType_Read:
                 message = [OWSReceiptsForSenderMessage readReceiptsForSenderMessageWithThread:thread
-                                                                                   receiptSet:receiptSet];
-                break;
-            case OWSReceiptType_Viewed:
-                message = [OWSReceiptsForSenderMessage viewedReceiptsForSenderMessageWithThread:thread
-                                                                                     receiptSet:receiptSet];
+                                                                            messageTimestamps:timestamps.allObjects];
+                receiptName = @"Read";
                 break;
         }
 
-        __block AnyPromise *sendPromise;
-        DatabaseStorageWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-            sendPromise =
-                [self.messageSenderJobQueue addPromiseWithMessage:message.asPreparer
-                                        removeMessageAfterSending:NO
-                                    limitToCurrentProcessLifetime:YES
-                                                   isHighPriority:NO
-                                                      transaction:transaction]
-                    .doneInBackground(^(id value) {
-                        OWSLogInfo(@"Successfully sent %lu %@ receipts to sender.",
-                            (unsigned long)receiptSet.timestamps.count,
-                            receiptName);
+        AnyPromise *sendPromise = [AnyPromise promiseWithResolverBlock:^(PMKResolver resolve) {
+            [self.messageSender sendMessage:message.asPreparer
+                success:^{
+                    OWSLogInfo(
+                        @"Successfully sent %lu %@ receipts to sender.", (unsigned long)timestamps.count, receiptName);
 
-                        // DURABLE CLEANUP - we could replace the custom durability logic in this class
-                        // with a durable JobQueue.
-                        [self dequeueReceiptsForAddress:address receiptSet:receiptSet receiptType:receiptType];
-                    })
-                    .catchInBackground(^(NSError *error) {
-                        OWSLogError(@"Failed to send %@ receipts to sender with error: %@", receiptName, error);
+                    // DURABLE CLEANUP - we could replace the custom durability logic in this class
+                    // with a durable JobQueue.
+                    [self dequeueReceiptsForAddress:address timestamps:timestamps receiptType:receiptType];
 
-                        if ([MessageSenderNoSuchSignalRecipientError isNoSuchSignalRecipientError:error]) {
-                            [self dequeueReceiptsForAddress:address receiptSet:receiptSet receiptType:receiptType];
-                        }
-                    });
-        });
+                    // The value doesn't matter, we just need any non-NSError value.
+                    resolve(@(1));
+                }
+                failure:^(NSError *error) {
+                    OWSLogError(@"Failed to send %@ receipts to sender with error: %@", receiptName, error);
 
+                    if (error.domain == OWSSignalServiceKitErrorDomain
+                        && error.code == OWSErrorCodeNoSuchSignalRecipient) {
+                        [self dequeueReceiptsForAddress:address timestamps:timestamps receiptType:receiptType];
+                    }
+
+                    resolve(error);
+                }];
+        }];
         [sendPromises addObject:sendPromise];
     }
 
     return [sendPromises copy];
 }
 
-- (void)enqueueDeliveryReceiptForEnvelope:(SSKProtoEnvelope *)envelope
-                          messageUniqueId:(nullable NSString *)messageUniqueId
-                              transaction:(SDSAnyWriteTransaction *)transaction
+- (void)enqueueDeliveryReceiptForEnvelope:(SSKProtoEnvelope *)envelope transaction:(SDSAnyWriteTransaction *)transaction
 {
     [self enqueueReceiptForAddress:envelope.sourceAddress
                          timestamp:envelope.timestamp
-                   messageUniqueId:messageUniqueId
                        receiptType:OWSReceiptType_Delivery
                        transaction:transaction];
 }
 
 - (void)enqueueReadReceiptForAddress:(SignalServiceAddress *)address
                            timestamp:(uint64_t)timestamp
-                     messageUniqueId:(nullable NSString *)messageUniqueId
                          transaction:(SDSAnyWriteTransaction *)transaction
 {
-    [self enqueueReceiptForAddress:address
-                         timestamp:timestamp
-                   messageUniqueId:messageUniqueId
-                       receiptType:OWSReceiptType_Read
-                       transaction:transaction];
-}
-
-- (void)enqueueViewedReceiptForAddress:(SignalServiceAddress *)address
-                             timestamp:(uint64_t)timestamp
-                       messageUniqueId:(nullable NSString *)messageUniqueId
-                           transaction:(SDSAnyWriteTransaction *)transaction
-{
-    [self enqueueReceiptForAddress:address
-                         timestamp:timestamp
-                   messageUniqueId:messageUniqueId
-                       receiptType:OWSReceiptType_Viewed
-                       transaction:transaction];
+    [self enqueueReceiptForAddress:address timestamp:timestamp receiptType:OWSReceiptType_Read transaction:transaction];
 }
 
 - (void)enqueueReceiptForAddress:(SignalServiceAddress *)address
                        timestamp:(uint64_t)timestamp
-                 messageUniqueId:(nullable NSString *)messageUniqueId
                      receiptType:(OWSReceiptType)receiptType
                      transaction:(SDSAnyWriteTransaction *)transaction
 {
-    if (receiptType == OWSReceiptType_Viewed && !RemoteConfig.viewedReceiptSending) {
-        return;
-    }
+    SDSKeyValueStore *store = [self storeForReceiptType:receiptType];
+
     OWSAssertDebug(address.isValid);
     if (timestamp < 1) {
         OWSFailDebug(@"Invalid timestamp.");
         return;
     }
 
-    NSString *label = [NSString stringWithFormat:@"Receipt Send: %@", NSStringForOWSReceiptType(receiptType)];
-    PendingTask *pendingTask = [self.pendingTasks buildPendingTaskWithLabel:label];
+    NSString *identifier = address.uuidString ?: address.phoneNumber;
 
-    MessageReceiptSet *persistedSet = [self fetchReceiptSetWithType:receiptType
-                                                            address:address
-                                                        transaction:transaction];
-    [persistedSet insertWithTimestamp:timestamp messageUniqueId:messageUniqueId];
-    [self storeReceiptSet:persistedSet type:receiptType address:address transaction:transaction];
+    NSSet<NSNumber *> *_Nullable oldUUIDTimestamps;
+    if (address.uuidString) {
+        oldUUIDTimestamps = [store getObjectForKey:address.uuidString transaction:transaction];
+    }
+
+    NSSet<NSNumber *> *_Nullable oldPhoneNumberTimestamps;
+    if (address.phoneNumber) {
+        oldPhoneNumberTimestamps = [store getObjectForKey:address.phoneNumber transaction:transaction];
+    }
+
+    NSSet<NSNumber *> *_Nullable oldTimestamps;
+
+    // Unexpectedly have entries both on phone number and UUID, defer to UUID
+    if (oldUUIDTimestamps && oldPhoneNumberTimestamps) {
+        oldTimestamps = [oldUUIDTimestamps setByAddingObjectsFromSet:oldPhoneNumberTimestamps];
+        [store removeValueForKey:address.phoneNumber transaction:transaction];
+
+        // If we have timestamps only under phone number, but know the UUID, migrate them lazily
+    } else if (oldPhoneNumberTimestamps && address.uuidString) {
+        oldTimestamps = oldPhoneNumberTimestamps;
+        [store removeValueForKey:address.phoneNumber transaction:transaction];
+    } else {
+        oldTimestamps = oldUUIDTimestamps ?: oldPhoneNumberTimestamps;
+    }
+
+    NSMutableSet<NSNumber *> *newTimestamps = (oldTimestamps ? [oldTimestamps mutableCopy] : [NSMutableSet new]);
+    [newTimestamps addObject:@(timestamp)];
+
+    [store setObject:newTimestamps key:identifier transaction:transaction];
+
     [transaction addAsyncCompletionWithQueue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)
-                                       block:^{ [self processWithCompletion:^{ [pendingTask complete]; }]; }];
+                                       block:^{
+                                           [self process];
+                                       }];
 }
 
 - (void)dequeueReceiptsForAddress:(SignalServiceAddress *)address
-                       receiptSet:(MessageReceiptSet *)dequeueSet
+                       timestamps:(NSSet<NSNumber *> *)timestamps
                       receiptType:(OWSReceiptType)receiptType
 {
+    SDSKeyValueStore *store = [self storeForReceiptType:receiptType];
+
     OWSAssertDebug(address.isValid);
+    if (timestamps.count < 1) {
+        OWSFailDebug(@"Invalid timestamps.");
+        return;
+    }
     DatabaseStorageAsyncWrite(self.databaseStorage, ^(SDSAnyWriteTransaction *transaction) {
-        MessageReceiptSet *persistedSet = [self fetchReceiptSetWithType:receiptType
-                                                                address:address
-                                                            transaction:transaction];
-        [persistedSet subtract:dequeueSet];
-        [self storeReceiptSet:persistedSet type:receiptType address:address transaction:transaction];
+        NSString *identifier = address.uuidString ?: address.phoneNumber;
+
+        NSSet<NSNumber *> *_Nullable oldUUIDTimestamps;
+        if (address.uuidString) {
+            oldUUIDTimestamps = [store getObjectForKey:address.uuidString transaction:transaction];
+        }
+
+        NSSet<NSNumber *> *_Nullable oldPhoneNumberTimestamps;
+        if (address.phoneNumber) {
+            oldPhoneNumberTimestamps = [store getObjectForKey:address.phoneNumber transaction:transaction];
+        }
+
+        NSSet<NSNumber *> *_Nullable oldTimestamps = oldUUIDTimestamps;
+
+        // Unexpectedly have entries both on phone number and UUID, defer to UUID
+        if (oldUUIDTimestamps && oldPhoneNumberTimestamps) {
+            [store removeValueForKey:address.phoneNumber transaction:transaction];
+
+            // If we have timestamps only under phone number, but know the UUID, migrate them lazily
+        } else if (oldPhoneNumberTimestamps && address.uuidString) {
+            oldTimestamps = oldPhoneNumberTimestamps;
+            [store removeValueForKey:address.phoneNumber transaction:transaction];
+
+            // We don't know the UUID, just use the phone number timestamps.
+        } else if (oldPhoneNumberTimestamps) {
+            oldTimestamps = oldPhoneNumberTimestamps;
+        }
+
+        NSMutableSet<NSNumber *> *newTimestamps = (oldTimestamps ? [oldTimestamps mutableCopy] : [NSMutableSet new]);
+        [newTimestamps minusSet:timestamps];
+
+        if (newTimestamps.count > 0) {
+            [store setObject:newTimestamps key:identifier transaction:transaction];
+        } else {
+            [store removeValueForKey:identifier transaction:transaction];
+        }
     });
+}
+
+- (void)reachabilityChanged
+{
+    OWSAssertIsOnMainThread();
+
+    [self process];
 }
 
 - (SDSKeyValueStore *)storeForReceiptType:(OWSReceiptType)receiptType
@@ -356,8 +386,6 @@ NSString *NSStringForOWSReceiptType(OWSReceiptType receiptType)
             return OWSOutgoingReceiptManager.deliveryReceiptStore;
         case OWSReceiptType_Read:
             return OWSOutgoingReceiptManager.readReceiptStore;
-        case OWSReceiptType_Viewed:
-            return OWSOutgoingReceiptManager.viewedReceiptStore;
     }
 }
 

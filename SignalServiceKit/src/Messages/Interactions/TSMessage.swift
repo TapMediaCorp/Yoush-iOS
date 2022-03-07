@@ -1,58 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 public extension TSMessage {
-
-    @objc
-    var isIncoming: Bool { self as? TSIncomingMessage != nil }
-
-    @objc
-    var isOutgoing: Bool { self as? TSOutgoingMessage != nil }
-
-    // MARK: - Attachments
-
-    func failedAttachments(transaction: SDSAnyReadTransaction) -> [TSAttachmentPointer] {
-        let attachments: [TSAttachment] = allAttachments(with: transaction.unwrapGrdbRead)
-        let states: [TSAttachmentPointerState] = [.failed]
-        return Self.onlyAttachmentPointers(attachments: attachments, withStateIn: Set(states))
-    }
-
-    func failedOrPendingAttachments(transaction: SDSAnyReadTransaction) -> [TSAttachmentPointer] {
-        let attachments: [TSAttachment] = allAttachments(with: transaction.unwrapGrdbRead)
-        let states: [TSAttachmentPointerState] = [.failed, .pendingMessageRequest, .pendingManualDownload]
-        return Self.onlyAttachmentPointers(attachments: attachments, withStateIn: Set(states))
-    }
-
-    func failedBodyAttachments(transaction: SDSAnyReadTransaction) -> [TSAttachmentPointer] {
-        let attachments: [TSAttachment] = bodyAttachments(with: transaction.unwrapGrdbRead)
-        let states: [TSAttachmentPointerState] = [.failed]
-        return Self.onlyAttachmentPointers(attachments: attachments, withStateIn: Set(states))
-    }
-
-    func pendingBodyAttachments(transaction: SDSAnyReadTransaction) -> [TSAttachmentPointer] {
-        let attachments: [TSAttachment] = bodyAttachments(with: transaction.unwrapGrdbRead)
-        let states: [TSAttachmentPointerState] = [.pendingMessageRequest, .pendingManualDownload]
-        return Self.onlyAttachmentPointers(attachments: attachments, withStateIn: Set(states))
-    }
-
-    private static func onlyAttachmentPointers(attachments: [TSAttachment],
-                                               withStateIn states: Set<TSAttachmentPointerState>) -> [TSAttachmentPointer] {
-        return attachments.compactMap { attachment -> TSAttachmentPointer? in
-            guard let attachmentPointer = attachment as? TSAttachmentPointer else {
-                return nil
-            }
-            guard states.contains(attachmentPointer.state) else {
-                return nil
-            }
-            return attachmentPointer
-        }
-    }
-
-    // MARK: - Reactions
-
     var reactionFinder: ReactionFinder {
         return ReactionFinder(uniqueMessageId: uniqueId)
     }
@@ -115,7 +67,7 @@ public extension TSMessage {
         // out. Everything else can be automatically read.
         if !(self is TSOutgoingMessage) { reaction.markAsRead(transaction: transaction) }
 
-        databaseStorage.touch(interaction: self, shouldReindex: false, transaction: transaction)
+        databaseStorage.touch(interaction: self, transaction: transaction)
 
         return reaction
     }
@@ -127,9 +79,11 @@ public extension TSMessage {
         guard let reaction = reaction(for: reactor, transaction: transaction) else { return }
 
         reaction.anyRemove(transaction: transaction)
-        databaseStorage.touch(interaction: self, shouldReindex: false, transaction: transaction)
+        databaseStorage.touch(interaction: self, transaction: transaction)
 
-        Self.notificationsManager?.cancelNotifications(reactionId: reaction.uniqueId)
+        DispatchQueue.main.async {
+            SSKEnvironment.shared.notificationsManager.cancelNotifications(reactionId: reaction.uniqueId)
+        }
     }
 
     // MARK: - Remote Delete
@@ -193,6 +147,8 @@ public extension TSMessage {
     private func markMessageAsRemotelyDeleted(transaction: SDSAnyWriteTransaction) {
         updateWithRemotelyDeletedAndRemoveRenderableContent(with: transaction)
 
-        Self.notificationsManager?.cancelNotifications(messageId: self.uniqueId)
+        DispatchQueue.main.async {
+            SSKEnvironment.shared.notificationsManager.cancelNotifications(messageId: self.uniqueId)
+        }
     }
 }

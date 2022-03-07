@@ -1,10 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import XCTest
 @testable import Signal
-@testable import SignalUI
+@testable import SignalMessaging
 
 extension ImageEditorModel {
     func itemIds() -> [String] {
@@ -52,7 +52,7 @@ class ImageEditorTest: SignalBaseTest {
         guard let data = image.pngData() else {
             owsFail("Couldn't export dummy image.")
         }
-        let filePath = OWSFileSystem.temporaryFilePath(fileExtension: "png")
+        let filePath = OWSFileSystem.temporaryFilePath(withFileExtension: "png")
         try! data.write(to: URL(fileURLWithPath: filePath))
         return filePath
     }

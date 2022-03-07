@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
@@ -7,6 +7,7 @@ import MultipeerConnectivity
 
 @objc
 public class OnboardingTransferProgressViewController: OnboardingBaseViewController {
+    var deviceTransferService: DeviceTransferService { .shared }
 
     let progressView: TransferProgressView
 
@@ -22,7 +23,7 @@ public class OnboardingTransferProgressViewController: OnboardingBaseViewControl
 
         view.backgroundColor = Theme.backgroundColor
 
-        let titleLabel = self.createTitleLabel(
+        let titleLabel = self.titleLabel(
             text: NSLocalizedString("DEVICE_TRANSFER_RECEIVING_TITLE",
                                     comment: "The title on the view that shows receiving progress")
         )
@@ -30,7 +31,7 @@ public class OnboardingTransferProgressViewController: OnboardingBaseViewControl
         titleLabel.accessibilityIdentifier = "onboarding.transferProgress.titleLabel"
         titleLabel.setContentHuggingHigh()
 
-        let explanationLabel = self.createExplanationLabel(
+        let explanationLabel = self.explanationLabel(
             explanationText: NSLocalizedString("DEVICE_TRANSFER_RECEIVING_EXPLANATION",
                                                comment: "The explanation on the view that shows receiving progress")
         )

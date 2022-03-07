@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct KnownStickerPackRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        KnownStickerPackSerializer.table
+        return KnownStickerPackSerializer.table
     }
 
-    public static var databaseTableName: String {
-        KnownStickerPackSerializer.table.tableName
-    }
+    public static let databaseTableName: String = KnownStickerPackSerializer.table.tableName
 
     public var id: Int64?
 
@@ -44,7 +42,7 @@ public struct KnownStickerPackRecord: SDSRecord {
     }
 
     public static func columnName(_ column: KnownStickerPackRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -60,7 +58,7 @@ public struct KnownStickerPackRecord: SDSRecord {
 
 public extension KnownStickerPackRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -134,15 +132,15 @@ extension KnownStickerPack: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        KnownStickerPackRecord.databaseTableName
+        return KnownStickerPackRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        KnownStickerPackSerializer.table
+        return KnownStickerPackSerializer.table
     }
 }
 
@@ -184,28 +182,26 @@ extension KnownStickerPackSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var dateCreatedColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "dateCreated", columnType: .double) }
-    static var infoColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "info", columnType: .blob) }
-    static var referenceCountColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "referenceCount", columnType: .int64) }
+    static let dateCreatedColumn = SDSColumnMetadata(columnName: "dateCreated", columnType: .double)
+    static let infoColumn = SDSColumnMetadata(columnName: "info", columnType: .blob)
+    static let referenceCountColumn = SDSColumnMetadata(columnName: "referenceCount", columnType: .int64)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: KnownStickerPack.collection(),
-                         tableName: "model_KnownStickerPack",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: KnownStickerPack.collection(),
+                                               tableName: "model_KnownStickerPack",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
         dateCreatedColumn,
         infoColumn,
-        referenceCountColumn
+        referenceCountColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -373,6 +369,8 @@ public extension KnownStickerPack {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return KnownStickerPack.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(KnownStickerPackRecord.databaseTableName) WHERE \(knownStickerPackColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -403,20 +401,28 @@ public extension KnownStickerPack {
                             batchSize: UInt,
                             block: @escaping (KnownStickerPack, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            KnownStickerPack.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? KnownStickerPack else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = KnownStickerPack.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = KnownStickerPack.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -444,6 +450,10 @@ public extension KnownStickerPack {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: KnownStickerPack.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -475,6 +485,8 @@ public extension KnownStickerPack {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: KnownStickerPack.collection())
         case .grdbRead(let grdbTransaction):
             return KnownStickerPackRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -484,6 +496,8 @@ public extension KnownStickerPack {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: KnownStickerPack.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try KnownStickerPackRecord.deleteAll(grdbTransaction.database)
@@ -503,20 +517,24 @@ public extension KnownStickerPack {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -528,6 +546,8 @@ public extension KnownStickerPack {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: KnownStickerPack.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(KnownStickerPackRecord.databaseTableName) WHERE \(knownStickerPackColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -547,7 +567,7 @@ public extension KnownStickerPack {
             let cursor = try KnownStickerPackRecord.fetchCursor(transaction.database, sqlRequest)
             return KnownStickerPackCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return KnownStickerPackCursor(transaction: transaction, cursor: nil)
         }
@@ -616,3 +636,4 @@ public extension KnownStickerPack {
     }
 }
 #endif
+         

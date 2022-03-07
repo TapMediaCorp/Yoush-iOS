@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -15,12 +15,10 @@ public struct SignalAccountRecord: SDSRecord {
     public weak var delegate: SDSRecordDelegate?
 
     public var tableMetadata: SDSTableMetadata {
-        SignalAccountSerializer.table
+        return SignalAccountSerializer.table
     }
 
-    public static var databaseTableName: String {
-        SignalAccountSerializer.table.tableName
-    }
+    public static let databaseTableName: String = SignalAccountSerializer.table.tableName
 
     public var id: Int64?
 
@@ -50,7 +48,7 @@ public struct SignalAccountRecord: SDSRecord {
     }
 
     public static func columnName(_ column: SignalAccountRecord.CodingKeys, fullyQualified: Bool = false) -> String {
-        fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
+        return fullyQualified ? "\(databaseTableName).\(column.rawValue)" : column.rawValue
     }
 
     public func didInsert(with rowID: Int64, for column: String?) {
@@ -66,7 +64,7 @@ public struct SignalAccountRecord: SDSRecord {
 
 public extension SignalAccountRecord {
     static var databaseSelection: [SQLSelectable] {
-        CodingKeys.allCases
+        return CodingKeys.allCases
     }
 
     init(row: Row) {
@@ -113,7 +111,7 @@ extension SignalAccount {
             let contactSerialized: Data? = record.contact
             let contact: Contact? = try SDSDeserialization.optionalUnarchive(contactSerialized, name: "contact")
             let contactAvatarHash: Data? = SDSDeserialization.optionalData(record.contactAvatarHash, name: "contactAvatarHash")
-            let contactAvatarJpegDataObsolete: Data? = SDSDeserialization.optionalData(record.contactAvatarJpegData, name: "contactAvatarJpegDataObsolete")
+            let contactAvatarJpegData: Data? = SDSDeserialization.optionalData(record.contactAvatarJpegData, name: "contactAvatarJpegData")
             let multipleAccountLabelText: String = record.multipleAccountLabelText
             let recipientPhoneNumber: String? = record.recipientPhoneNumber
             let recipientUUID: String? = record.recipientUUID
@@ -122,7 +120,7 @@ extension SignalAccount {
                                  uniqueId: uniqueId,
                                  contact: contact,
                                  contactAvatarHash: contactAvatarHash,
-                                 contactAvatarJpegDataObsolete: contactAvatarJpegDataObsolete,
+                                 contactAvatarJpegData: contactAvatarJpegData,
                                  multipleAccountLabelText: multipleAccountLabelText,
                                  recipientPhoneNumber: recipientPhoneNumber,
                                  recipientUUID: recipientUUID)
@@ -148,15 +146,15 @@ extension SignalAccount: SDSModel {
     }
 
     public func asRecord() throws -> SDSRecord {
-        try serializer.asRecord()
+        return try serializer.asRecord()
     }
 
     public var sdsTableName: String {
-        SignalAccountRecord.databaseTableName
+        return SignalAccountRecord.databaseTableName
     }
 
     public static var table: SDSTableMetadata {
-        SignalAccountSerializer.table
+        return SignalAccountSerializer.table
     }
 }
 
@@ -190,7 +188,7 @@ extension SignalAccount: DeepCopyable {
                contact = nil
             }
             let contactAvatarHash: Data? = modelToCopy.contactAvatarHash
-            let contactAvatarJpegDataObsolete: Data? = modelToCopy.contactAvatarJpegDataObsolete
+            let contactAvatarJpegData: Data? = modelToCopy.contactAvatarJpegData
             let multipleAccountLabelText: String = modelToCopy.multipleAccountLabelText
             let recipientPhoneNumber: String? = modelToCopy.recipientPhoneNumber
             let recipientUUID: String? = modelToCopy.recipientUUID
@@ -199,7 +197,7 @@ extension SignalAccount: DeepCopyable {
                                  uniqueId: uniqueId,
                                  contact: contact,
                                  contactAvatarHash: contactAvatarHash,
-                                 contactAvatarJpegDataObsolete: contactAvatarJpegDataObsolete,
+                                 contactAvatarJpegData: contactAvatarJpegData,
                                  multipleAccountLabelText: multipleAccountLabelText,
                                  recipientPhoneNumber: recipientPhoneNumber,
                                  recipientUUID: recipientUUID)
@@ -214,34 +212,32 @@ extension SignalAccountSerializer {
 
     // This defines all of the columns used in the table
     // where this model (and any subclasses) are persisted.
-    static var idColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "id", columnType: .primaryKey) }
-    static var recordTypeColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recordType", columnType: .int64) }
-    static var uniqueIdColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true) }
+    static let idColumn = SDSColumnMetadata(columnName: "id", columnType: .primaryKey)
+    static let recordTypeColumn = SDSColumnMetadata(columnName: "recordType", columnType: .int64)
+    static let uniqueIdColumn = SDSColumnMetadata(columnName: "uniqueId", columnType: .unicodeString, isUnique: true)
     // Properties
-    static var contactColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "contact", columnType: .blob, isOptional: true) }
-    static var contactAvatarHashColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "contactAvatarHash", columnType: .blob, isOptional: true) }
-    static var contactAvatarJpegDataObsoleteColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "contactAvatarJpegDataObsolete", columnType: .blob, isOptional: true) }
-    static var multipleAccountLabelTextColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "multipleAccountLabelText", columnType: .unicodeString) }
-    static var recipientPhoneNumberColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientPhoneNumber", columnType: .unicodeString, isOptional: true) }
-    static var recipientUUIDColumn: SDSColumnMetadata { SDSColumnMetadata(columnName: "recipientUUID", columnType: .unicodeString, isOptional: true) }
+    static let contactColumn = SDSColumnMetadata(columnName: "contact", columnType: .blob, isOptional: true)
+    static let contactAvatarHashColumn = SDSColumnMetadata(columnName: "contactAvatarHash", columnType: .blob, isOptional: true)
+    static let contactAvatarJpegDataColumn = SDSColumnMetadata(columnName: "contactAvatarJpegData", columnType: .blob, isOptional: true)
+    static let multipleAccountLabelTextColumn = SDSColumnMetadata(columnName: "multipleAccountLabelText", columnType: .unicodeString)
+    static let recipientPhoneNumberColumn = SDSColumnMetadata(columnName: "recipientPhoneNumber", columnType: .unicodeString, isOptional: true)
+    static let recipientUUIDColumn = SDSColumnMetadata(columnName: "recipientUUID", columnType: .unicodeString, isOptional: true)
 
     // TODO: We should decide on a naming convention for
     //       tables that store models.
-    public static var table: SDSTableMetadata {
-        SDSTableMetadata(collection: SignalAccount.collection(),
-                         tableName: "model_SignalAccount",
-                         columns: [
+    public static let table = SDSTableMetadata(collection: SignalAccount.collection(),
+                                               tableName: "model_SignalAccount",
+                                               columns: [
         idColumn,
         recordTypeColumn,
         uniqueIdColumn,
         contactColumn,
         contactAvatarHashColumn,
-        contactAvatarJpegDataObsoleteColumn,
+        contactAvatarJpegDataColumn,
         multipleAccountLabelTextColumn,
         recipientPhoneNumberColumn,
-        recipientUUIDColumn
+        recipientUUIDColumn,
         ])
-    }
 }
 
 // MARK: - Save/Remove/Update
@@ -366,7 +362,7 @@ public class SignalAccountCursor: NSObject {
             return nil
         }
         let value = try SignalAccount.fromRecord(record)
-        Self.modelReadCaches.signalAccountReadCache.didReadSignalAccount(value, transaction: transaction.asAnyRead)
+        SSKEnvironment.shared.modelReadCaches.signalAccountReadCache.didReadSignalAccount(value, transaction: transaction.asAnyRead)
         return value
     }
 
@@ -411,6 +407,8 @@ public extension SignalAccount {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return SignalAccount.ydb_fetch(uniqueId: uniqueId, transaction: ydbTransaction)
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT * FROM \(SignalAccountRecord.databaseTableName) WHERE \(signalAccountColumn: .uniqueId) = ?"
             return grdbFetchOne(sql: sql, arguments: [uniqueId], transaction: grdbTransaction)
@@ -441,20 +439,28 @@ public extension SignalAccount {
                             batchSize: UInt,
                             block: @escaping (SignalAccount, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            SignalAccount.ydb_enumerateCollectionObjects(with: ydbTransaction) { (object, stop) in
+                guard let value = object as? SignalAccount else {
+                    owsFailDebug("unexpected object: \(type(of: object))")
+                    return
+                }
+                block(value, stop)
+            }
         case .grdbRead(let grdbTransaction):
-            let cursor = SignalAccount.grdbFetchCursor(transaction: grdbTransaction)
-            Batching.loop(batchSize: batchSize,
-                          loopBlock: { stop in
-                                do {
-                                    guard let value = try cursor.next() else {
+            do {
+                let cursor = SignalAccount.grdbFetchCursor(transaction: grdbTransaction)
+                try Batching.loop(batchSize: batchSize,
+                                  loopBlock: { stop in
+                                      guard let value = try cursor.next() else {
                                         stop.pointee = true
                                         return
-                                    }
-                                    block(value, stop)
-                                } catch let error {
-                                    owsFailDebug("Couldn't fetch model: \(error)")
-                                }
-                              })
+                                      }
+                                      block(value, stop)
+                })
+            } catch let error {
+                owsFailDebug("Couldn't fetch models: \(error)")
+            }
         }
     }
 
@@ -482,6 +488,10 @@ public extension SignalAccount {
                                      batchSize: UInt,
                                      block: @escaping (String, UnsafeMutablePointer<ObjCBool>) -> Void) {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            ydbTransaction.enumerateKeys(inCollection: SignalAccount.collection()) { (uniqueId, stop) in
+                block(uniqueId, stop)
+            }
         case .grdbRead(let grdbTransaction):
             grdbEnumerateUniqueIds(transaction: grdbTransaction,
                                    sql: """
@@ -513,6 +523,8 @@ public extension SignalAccount {
 
     class func anyCount(transaction: SDSAnyReadTransaction) -> UInt {
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.numberOfKeys(inCollection: SignalAccount.collection())
         case .grdbRead(let grdbTransaction):
             return SignalAccountRecord.ows_fetchCount(grdbTransaction.database)
         }
@@ -522,6 +534,8 @@ public extension SignalAccount {
     //          in their anyWillRemove(), anyDidRemove() methods.
     class func anyRemoveAllWithoutInstantation(transaction: SDSAnyWriteTransaction) {
         switch transaction.writeTransaction {
+        case .yapWrite(let ydbTransaction):
+            ydbTransaction.removeAllObjects(inCollection: SignalAccount.collection())
         case .grdbWrite(let grdbTransaction):
             do {
                 try SignalAccountRecord.deleteAll(grdbTransaction.database)
@@ -541,20 +555,24 @@ public extension SignalAccount {
         let uniqueIds = anyAllUniqueIds(transaction: transaction)
 
         var index: Int = 0
-        Batching.loop(batchSize: Batching.kDefaultBatchSize,
-                      loopBlock: { stop in
-            guard index < uniqueIds.count else {
-                stop.pointee = true
-                return
-            }
-            let uniqueId = uniqueIds[index]
-            index = index + 1
-            guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
-                owsFailDebug("Missing instance.")
-                return
-            }
-            instance.anyRemove(transaction: transaction)
-        })
+        do {
+            try Batching.loop(batchSize: Batching.kDefaultBatchSize,
+                              loopBlock: { stop in
+                                  guard index < uniqueIds.count else {
+                                    stop.pointee = true
+                                    return
+                                  }
+                                  let uniqueId = uniqueIds[index]
+                                  index = index + 1
+                                  guard let instance = anyFetch(uniqueId: uniqueId, transaction: transaction) else {
+                                      owsFailDebug("Missing instance.")
+                                      return
+                                  }
+                                  instance.anyRemove(transaction: transaction)
+            })
+        } catch {
+            owsFailDebug("Error: \(error)")
+        }
 
         if shouldBeIndexedForFTS {
             FullTextSearchFinder.allModelsWereRemoved(collection: collection(), transaction: transaction)
@@ -566,6 +584,8 @@ public extension SignalAccount {
         assert(uniqueId.count > 0)
 
         switch transaction.readTransaction {
+        case .yapRead(let ydbTransaction):
+            return ydbTransaction.hasObject(forKey: uniqueId, inCollection: SignalAccount.collection())
         case .grdbRead(let grdbTransaction):
             let sql = "SELECT EXISTS ( SELECT 1 FROM \(SignalAccountRecord.databaseTableName) WHERE \(signalAccountColumn: .uniqueId) = ? )"
             let arguments: StatementArguments = [uniqueId]
@@ -585,7 +605,7 @@ public extension SignalAccount {
             let cursor = try SignalAccountRecord.fetchCursor(transaction.database, sqlRequest)
             return SignalAccountCursor(transaction: transaction, cursor: cursor)
         } catch {
-            Logger.verbose("sql: \(sql)")
+            Logger.error("sql: \(sql)")
             owsFailDebug("Read failed: \(error)")
             return SignalAccountCursor(transaction: transaction, cursor: nil)
         }
@@ -603,7 +623,7 @@ public extension SignalAccount {
             }
 
             let value = try SignalAccount.fromRecord(record)
-            Self.modelReadCaches.signalAccountReadCache.didReadSignalAccount(value, transaction: transaction.asAnyRead)
+            SSKEnvironment.shared.modelReadCaches.signalAccountReadCache.didReadSignalAccount(value, transaction: transaction.asAnyRead)
             return value
         } catch {
             owsFailDebug("error: \(error)")
@@ -634,7 +654,7 @@ class SignalAccountSerializer: SDSSerializer {
         // Properties
         let contact: Data? = optionalArchive(model.contact)
         let contactAvatarHash: Data? = model.contactAvatarHash
-        let contactAvatarJpegData: Data? = model.contactAvatarJpegDataObsolete
+        let contactAvatarJpegData: Data? = model.contactAvatarJpegData
         let multipleAccountLabelText: String = model.multipleAccountLabelText
         let recipientPhoneNumber: String? = model.recipientPhoneNumber
         let recipientUUID: String? = model.recipientUUID
@@ -659,3 +679,4 @@ public extension SignalAccount {
     }
 }
 #endif
+                                                                   

@@ -1,58 +1,29 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
 @objc(OWSReactionManager)
 public class ReactionManager: NSObject {
+    static var databaseStorage: SDSDatabaseStorage {
+        return .shared
+    }
+
+    static var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
 
     public static let emojiSet = ["❤️", "👍", "👎", "😂", "😮", "😢"]
 
-    @discardableResult
-    public class func localUserReacted(
-        to message: TSMessage,
-        emoji: String,
-        isRemoving: Bool,
-        isHighPriority: Bool = false,
-        transaction: SDSAnyWriteTransaction
-    ) -> Promise<Void> {
-        let outgoingMessage: TSOutgoingMessage
-        do {
-            outgoingMessage = try _localUserReacted(to: message, emoji: emoji, isRemoving: isRemoving, transaction: transaction)
-        } catch {
-            owsFailDebug("Error: \(error)")
-            return Promise(error: error)
-        }
-        let messagePreparer = outgoingMessage.asPreparer
-        return Self.messageSenderJobQueue.add(
-            .promise,
-            message: messagePreparer,
-            isHighPriority: isHighPriority,
-            transaction: transaction
-        )
-    }
-
-    // This helper method DRYs up the logic shared by the above methods.
-    private class func _localUserReacted(to message: TSMessage,
-                                         emoji: String,
-                                         isRemoving: Bool,
-                                         transaction: SDSAnyWriteTransaction) throws -> OWSOutgoingReactionMessage {
+    @objc(localUserReactedToMessage:emoji:isRemoving:transaction:)
+    public class func localUserReacted(to message: TSMessage, emoji: String, isRemoving: Bool, transaction: SDSAnyWriteTransaction) {
         assert(emoji.isSingleEmoji)
 
-        let thread = message.thread(transaction: transaction)
-        guard thread.canSendReactionToThread else {
-            throw OWSAssertionError("Cannot send to thread.")
-        }
-
-        if DebugFlags.internalLogging {
-            Logger.info("Sending reaction: \(emoji) isRemoving: \(isRemoving), message.timestamp: \(message.timestamp)")
-        } else {
-            Logger.info("Sending reaction, isRemoving: \(isRemoving)")
-        }
+        Logger.info("Sending reaction: \(emoji) isRemoving: \(isRemoving)")
 
         guard let localAddress = tsAccountManager.localAddress else {
-            throw OWSAssertionError("missing local address")
+            return owsFailDebug("missing local address")
         }
 
         // Though we generally don't parse the expiration timer from
@@ -94,7 +65,7 @@ public class ReactionManager: NSObject {
             outgoingMessage.createdReaction?.markAsRead(transaction: transaction)
         }
 
-        return outgoingMessage
+        SSKEnvironment.shared.messageSenderJobQueue.add(message: outgoingMessage.asPreparer, transaction: transaction)
     }
 
     @objc(OWSReactionProcessingResult)
@@ -105,22 +76,14 @@ public class ReactionManager: NSObject {
     }
 
     @objc
-    public class func processIncomingReaction(
+    class func processIncomingReaction(
         _ reaction: SSKProtoDataMessageReaction,
         threadId: String,
         reactor: SignalServiceAddress,
         timestamp: UInt64,
         transaction: SDSAnyWriteTransaction
     ) -> ReactionProcessingResult {
-        guard let emoji = reaction.emoji.strippedOrNil else {
-            owsFailDebug("Received invalid emoji")
-            return .invalidReaction
-        }
-        if DebugFlags.internalLogging {
-            let base64 = emoji.data(using: .utf8)?.base64EncodedString() ?? "?"
-            Logger.info("Processing reaction: \(emoji), \(base64), message.timestamp: \(reaction.timestamp)")
-        }
-        guard emoji.isSingleEmoji else {
+        guard reaction.emoji.isSingleEmoji else {
             owsFailDebug("Received invalid emoji")
             return .invalidReaction
         }
@@ -148,12 +111,12 @@ public class ReactionManager: NSObject {
 
         // If this is a reaction removal, we want to remove *any* reaction from this author
         // on this message, regardless of the specified emoji.
-        if reaction.hasRemove, reaction.remove {
+        if reaction.remove {
             message.removeReaction(for: reactor, transaction: transaction)
         } else {
             let reaction = message.recordReaction(
                 for: reactor,
-                emoji: emoji,
+                emoji: reaction.emoji,
                 sentAtTimestamp: timestamp,
                 receivedAtTimestamp: NSDate.ows_millisecondTimeStamp(),
                 transaction: transaction
@@ -166,10 +129,7 @@ public class ReactionManager: NSObject {
                     return .success
                 }
 
-                self.notificationsManager?.notifyUser(forReaction: reaction,
-                                                      onOutgoingMessage: message,
-                                                      thread: thread,
-                                                      transaction: transaction)
+                SSKEnvironment.shared.notificationsManager.notifyUser(for: reaction, on: message, thread: thread, transaction: transaction)
             }
         }
 

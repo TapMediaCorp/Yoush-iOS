@@ -1,24 +1,20 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 class MediaDismissAnimationController: NSObject {
-    private let item: Media
+    private let galleryItem: MediaGalleryItem
     public let interactionController: MediaInteractiveDismiss?
 
     var transitionView: UIView?
     var fromMediaFrame: CGRect?
-    var pendingCompletion: (() -> Void)?
+    var pendingCompletion: (() -> Promise<Void>)?
 
     init(galleryItem: MediaGalleryItem, interactionController: MediaInteractiveDismiss? = nil) {
-        self.item = .gallery(galleryItem)
-        self.interactionController = interactionController
-    }
-
-    init(image: UIImage, interactionController: MediaInteractiveDismiss? = nil) {
-        self.item = .image(image)
+        self.galleryItem = galleryItem
         self.interactionController = interactionController
     }
 }
@@ -54,7 +50,7 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
             return
         }
 
-        guard let fromMediaContext = fromContextProvider.mediaPresentationContext(item: item, in: containerView) else {
+        guard let fromMediaContext = fromContextProvider.mediaPresentationContext(galleryItem: galleryItem, in: containerView) else {
             owsFailDebug("fromPresentationContext was unexpectedly nil")
             transitionContext.completeTransition(false)
             return
@@ -90,7 +86,7 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
                 return
             }
             toContextProvider = contextProvider
-        case let splitViewController as ConversationSplitViewController:
+        case let splitViewController as FLTabbarViewController:
             guard let contextProvider = splitViewController.topViewController as? MediaPresentationContextProvider else {
                 owsFailDebug("unexpected context: \(String(describing: splitViewController.topViewController))")
                 transitionContext.completeTransition(false)
@@ -103,9 +99,9 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
             return
         }
 
-        let toMediaContext = toContextProvider.mediaPresentationContext(item: item, in: containerView)
+        let toMediaContext = toContextProvider.mediaPresentationContext(galleryItem: galleryItem, in: containerView)
 
-        guard let presentationImage = item.image else {
+        guard let presentationImage = galleryItem.attachmentStream.originalImage else {
             owsFailDebug("presentationImage was unexpectedly nil")
             // Complete transition immediately.
             fromContextProvider.mediaWillPresent(fromContext: fromMediaContext)
@@ -137,6 +133,7 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
             containerView.addSubview(overlayView)
             overlayView.frame = overlayViewFrame
         } else {
+            owsFailDebug("expected overlay while dismissing media view")
             fromTransitionalOverlayView = nil
         }
 
@@ -149,7 +146,8 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
 
         let duration = transitionDuration(using: transitionContext)
 
-        let completion = {
+        let completion = { () -> Promise<Void> in
+
             let destinationFrame: CGRect
             let destinationCornerRadius: CGFloat
             if transitionContext.transitionWasCancelled {
@@ -167,7 +165,7 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
                 destinationCornerRadius = fromMediaContext.cornerRadius
             }
 
-            UIView.animate(.promise,
+            return UIView.animate(.promise,
                                   duration: duration,
                                   delay: 0.0,
                                   options: [.beginFromCurrentState, .curveEaseInOut]) {
@@ -214,24 +212,21 @@ extension MediaDismissAnimationController: UIViewControllerAnimatedTransitioning
                        options: [.beginFromCurrentState, .curveEaseInOut]) {
                 fromTransitionalOverlayView?.alpha = 0.0
                 fromView.alpha = 0.0
-        }.done { _ in
+        }.then { (_: Bool) -> Promise<Void> in
             guard let pendingCompletion = self.pendingCompletion else {
                 Logger.verbose("pendingCompletion already ran by the time fadeout completed.")
-                return
+                return Promise.value(())
             }
 
             Logger.verbose("ran pendingCompletion after fadeout")
             self.pendingCompletion = nil
-            pendingCompletion()
+            return pendingCompletion()
         }
     }
 }
 
 extension MediaDismissAnimationController: InteractiveDismissDelegate {
-    func interactiveDismissDidBegin(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
-    }
-
-    func interactiveDismissUpdate(_ interactiveDismiss: UIPercentDrivenInteractiveTransition, didChangeTouchOffset offset: CGPoint) {
+    func interactiveDismiss(_ interactiveDismiss: MediaInteractiveDismiss, didChangeTouchOffset offset: CGPoint) {
         guard let transitionView = transitionView else {
             // transition hasn't started yet.
             return
@@ -245,14 +240,11 @@ extension MediaDismissAnimationController: InteractiveDismissDelegate {
         transitionView.center = fromMediaFrame.offsetBy(dx: offset.x, dy: offset.y).center
     }
 
-    func interactiveDismissDidFinish(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
+    func interactiveDismissDidFinish(_ interactiveDismiss: MediaInteractiveDismiss) {
         if let pendingCompletion = pendingCompletion {
             Logger.verbose("interactive gesture started pendingCompletion during fadeout")
             self.pendingCompletion = nil
             pendingCompletion()
         }
-    }
-
-    func interactiveDismissDidCancel(_ interactiveDismiss: UIPercentDrivenInteractiveTransition) {
     }
 }

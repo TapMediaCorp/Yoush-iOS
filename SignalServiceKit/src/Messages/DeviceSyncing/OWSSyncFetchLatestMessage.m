@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSSyncFetchLatestMessage.h"
@@ -33,12 +33,10 @@ NS_ASSUME_NONNULL_BEGIN
             return SSKProtoSyncMessageFetchLatestTypeLocalProfile;
         case OWSSyncFetchType_StorageManifest:
             return SSKProtoSyncMessageFetchLatestTypeStorageManifest;
-        case OWSSyncFetchType_SubscriptionStatus:
-            return SSKProtoSyncMessageFetchLatestTypeSubscriptionStatus;
     }
 }
 
-- (nullable SSKProtoSyncMessageBuilder *)syncMessageBuilderWithTransaction:(SDSAnyReadTransaction *)transaction
+- (nullable SSKProtoSyncMessageBuilder *)syncMessageBuilderWithTransaction:(SDSAnyReadTransaction *)transaction;
 {
     SSKProtoSyncMessageFetchLatestBuilder *fetchLatestBuilder = [SSKProtoSyncMessageFetchLatest builder];
     fetchLatestBuilder.type = self.protoFetchType;
@@ -53,11 +51,6 @@ NS_ASSUME_NONNULL_BEGIN
     SSKProtoSyncMessageBuilder *syncMessageBuilder = [SSKProtoSyncMessage builder];
     syncMessageBuilder.fetchLatest = fetchLatest;
     return syncMessageBuilder;
-}
-
-- (SealedSenderContentHint)contentHint
-{
-    return SealedSenderContentHintImplicit;
 }
 
 @end

@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "SSKBaseTestObjC.h"
@@ -22,6 +22,15 @@
 #pragma mark -
 
 @implementation TSMessageStorageTests
+
+// MARK: - Dependencies
+
+- (TSAccountManager *)tsAccountManager
+{
+    return SSKEnvironment.shared.tsAccountManager;
+}
+
+// MARK: -
 
 - (SignalServiceAddress *)localAddress
 {
@@ -146,8 +155,7 @@
 
         NSMutableArray<TSIncomingMessage *> *messages = [NSMutableArray new];
         for (uint64_t i = 0; i < 10; i++) {
-            NSUInteger memberIdx = (i % thread.groupModel.groupMembers.count);
-            SignalServiceAddress *authorAddress = thread.groupModel.groupMembers[memberIdx];
+            SignalServiceAddress *authorAddress = [[SignalServiceAddress alloc] initWithPhoneNumber:@"+fakephone"];
             TSIncomingMessageBuilder *incomingMessageBuilder =
                 [TSIncomingMessageBuilder incomingMessageBuilderWithThread:thread messageBody:body];
             incomingMessageBuilder.timestamp = i + 1;

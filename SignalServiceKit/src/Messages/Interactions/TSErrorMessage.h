@@ -1,17 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/OWSReadTracking.h>
-#import <SignalServiceKit/TSMessage.h>
+#import "OWSReadTracking.h"
+#import "TSMessage.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class SSKProtoEnvelope;
 @class SignalServiceAddress;
-@class TSErrorMessageBuilder;
 
-typedef NS_CLOSED_ENUM(int32_t, TSErrorMessageType) {
+typedef NS_ENUM(int32_t, TSErrorMessageType) {
     TSErrorMessageNoSession,
     // DEPRECATED: We no longer create TSErrorMessageWrongTrustedIdentityKey, but
     // persisted legacy messages could exist indefinitly.
@@ -26,11 +25,7 @@ typedef NS_CLOSED_ENUM(int32_t, TSErrorMessageType) {
     TSErrorMessageNonBlockingIdentityChange,
     TSErrorMessageUnknownContactBlockOffer,
     TSErrorMessageGroupCreationFailed,
-    TSErrorMessageSessionRefresh,
-    TSErrorMessageDecryptionFailure,
 };
-
-extern NSUInteger TSErrorMessageSchemaVersion;
 
 @interface ThreadlessErrorMessage : NSObject <OWSPreviewText>
 
@@ -64,10 +59,24 @@ extern NSUInteger TSErrorMessageSchemaVersion;
     storedShouldStartExpireTimer:(BOOL)storedShouldStartExpireTimer
               wasRemotelyDeleted:(BOOL)wasRemotelyDeleted NS_UNAVAILABLE;
 
-- (instancetype)initErrorMessageWithBuilder:(TSErrorMessageBuilder *)errorMessageBuilder NS_DESIGNATED_INITIALIZER
-    NS_SWIFT_NAME(init(errorMessageWithBuilder:));
-
 - (nullable instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
+
+// Convenience initializer which is neither "designated" nor "unavailable".
+- (instancetype)initWithThread:(TSThread *)thread failedMessageType:(TSErrorMessageType)errorMessageType;
+
+// Convenience initializer which is neither "designated" nor "unavailable".
+- (instancetype)initWithEnvelope:(SSKProtoEnvelope *)envelope
+                 withTransaction:(SDSAnyWriteTransaction *)transaction
+               failedMessageType:(TSErrorMessageType)errorMessageType;
+
+- (instancetype)initWithTimestamp:(uint64_t)timestamp
+                           thread:(TSThread *)thread
+                failedMessageType:(TSErrorMessageType)errorMessageType
+                          address:(nullable SignalServiceAddress *)address NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)initWithThread:(TSThread *)thread
+             failedMessageType:(TSErrorMessageType)errorMessageType
+                       address:(nullable SignalServiceAddress *)address NS_DESIGNATED_INITIALIZER;
 
 // --- CODE GENERATION MARKER
 
@@ -83,7 +92,6 @@ extern NSUInteger TSErrorMessageSchemaVersion;
                   uniqueThreadId:(NSString *)uniqueThreadId
                    attachmentIds:(NSArray<NSString *> *)attachmentIds
                             body:(nullable NSString *)body
-                      bodyRanges:(nullable MessageBodyRanges *)bodyRanges
                     contactShare:(nullable OWSContact *)contactShare
                  expireStartedAt:(uint64_t)expireStartedAt
                        expiresAt:(uint64_t)expiresAt
@@ -98,9 +106,7 @@ extern NSUInteger TSErrorMessageSchemaVersion;
                        errorType:(TSErrorMessageType)errorType
                             read:(BOOL)read
                 recipientAddress:(nullable SignalServiceAddress *)recipientAddress
-                          sender:(nullable SignalServiceAddress *)sender
-             wasIdentityVerified:(BOOL)wasIdentityVerified
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:bodyRanges:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:errorType:read:recipientAddress:sender:wasIdentityVerified:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp:sortId:timestamp:uniqueThreadId:attachmentIds:body:contactShare:expireStartedAt:expiresAt:expiresInSeconds:isViewOnceComplete:isViewOnceMessage:linkPreview:messageSticker:quotedMessage:storedShouldStartExpireTimer:wasRemotelyDeleted:errorType:read:recipientAddress:));
 
 // clang-format on
 
@@ -118,28 +124,10 @@ NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:receivedAtTimestamp
 + (instancetype)missingSessionWithEnvelope:(SSKProtoEnvelope *)envelope
                            withTransaction:(SDSAnyWriteTransaction *)transaction;
 
-+ (instancetype)sessionRefreshWithEnvelope:(SSKProtoEnvelope *)envelope
-                           withTransaction:(SDSAnyWriteTransaction *)transaction;
-
-+ (instancetype)nonblockingIdentityChangeInThread:(TSThread *)thread
-                                          address:(SignalServiceAddress *)address
-                              wasIdentityVerified:(BOOL)wasIdentityVerified;
-
-+ (instancetype)failedDecryptionForEnvelope:(SSKProtoEnvelope *)envelope
-                           untrustedGroupId:(nullable NSData *)untrustedGroupId
-                            withTransaction:(SDSAnyWriteTransaction *)transaction;
-
-+ (instancetype)failedDecryptionForSender:(nullable SignalServiceAddress *)sender
-                                   thread:(TSThread *)thread
-                                timestamp:(uint64_t)timestamp
-                              transaction:(SDSAnyWriteTransaction *)transaction;
++ (instancetype)nonblockingIdentityChangeInThread:(TSThread *)thread address:(SignalServiceAddress *)address;
 
 @property (nonatomic, readonly) TSErrorMessageType errorType;
-@property (nullable, nonatomic, readonly) SignalServiceAddress *sender;
 @property (nullable, nonatomic, readonly) SignalServiceAddress *recipientAddress;
-
-// This property only applies if errorType == .nonBlockingIdentityChange.
-@property (nonatomic, readonly) BOOL wasIdentityVerified;
 
 @end
 

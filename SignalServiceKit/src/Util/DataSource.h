@@ -4,8 +4,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class ImageMetadata;
-
 // A base class that abstracts away a source of NSData
 // and allows us to:
 //
@@ -33,8 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly) BOOL isValidVideo;
 
 @property (nonatomic, readonly) BOOL hasStickerLikeProperties;
-
-@property (nonatomic, readonly) ImageMetadata *imageMetadata;
 
 // Returns YES on success.
 - (BOOL)writeToUrl:(NSURL *)dstUrl error:(NSError **)error;

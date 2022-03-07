@@ -1,9 +1,10 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 import Photos
+import PromiseKit
 
 protocol ImagePickerGridControllerDelegate: AnyObject {
     func imagePickerDidCompleteSelection(_ imagePicker: ImagePickerGridController)
@@ -14,6 +15,7 @@ protocol ImagePickerGridControllerDelegate: AnyObject {
     func imagePicker(_ imagePicker: ImagePickerGridController, didDeselectAsset asset: PHAsset)
 
     var isInBatchSelectMode: Bool { get }
+    var isPickingAsDocument: Bool { get }
     func imagePickerCanSelectMoreItems(_ imagePicker: ImagePickerGridController) -> Bool
     func imagePickerDidTryToSelectTooMany(_ imagePicker: ImagePickerGridController)
 }
@@ -24,7 +26,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
 
     private let library: PhotoLibrary = PhotoLibrary()
     private var photoCollection: PhotoCollection
-    private var photoCollectionContents: PhotoCollectionContents
+    var photoCollectionContents: PhotoCollectionContents
     private let photoMediaSize = PhotoMediaSize()
 
     var collectionViewFlowLayout: UICollectionViewFlowLayout
@@ -45,7 +47,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
     // MARK: - View Lifecycle
 
     override var prefersStatusBarHidden: Bool {
-        guard !CurrentAppContext().hasActiveCall else {
+        guard !OWSWindowManager.shared.hasCall else {
             return false
         }
 
@@ -196,7 +198,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
                 return
             }
 
-            let attachmentPromise: Promise<SignalAttachment> = photoCollectionContents.outgoingAttachment(for: asset)
+            let attachmentPromise: Promise<SignalAttachment> = photoCollectionContents.outgoingAttachment(for: asset, imageQuality: imageQuality)
             delegate.imagePicker(self, didSelectAsset: asset, attachmentPromise: attachmentPromise)
             collectionView.selectItem(at: indexPath, animated: true, scrollPosition: [])
         case .deselect:
@@ -207,6 +209,14 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
             delegate.imagePicker(self, didDeselectAsset: asset)
             collectionView.deselectItem(at: indexPath, animated: true)
         }
+    }
+
+    var imageQuality: TSImageQuality {
+        guard let delegate = delegate else {
+            return .medium
+        }
+
+        return delegate.isPickingAsDocument ? .original : .medium
     }
 
     override func viewWillLayoutSubviews() {
@@ -260,7 +270,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
     // MARK: 
 
     var lastPageYOffset: CGFloat {
-        let yOffset = collectionView.contentSize.height - collectionView.frame.height + collectionView.contentInset.bottom + view.safeAreaInsets.bottom
+        var yOffset = collectionView.contentSize.height - collectionView.frame.height + collectionView.contentInset.bottom + view.safeAreaInsets.bottom
         return yOffset
     }
 
@@ -334,7 +344,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
         let itemCount = floor(containerWidth / minItemWidth)
         let interSpaceWidth = (itemCount - 1) * type(of: self).kInterItemSpacing
 
-        let availableWidth = max(0, containerWidth - interSpaceWidth)
+        let availableWidth = containerWidth - interSpaceWidth
 
         let itemWidth = floor(availableWidth / CGFloat(itemCount))
         let newItemSize = CGSize(square: itemWidth)
@@ -479,7 +489,7 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
         }
 
         let asset: PHAsset = photoCollectionContents.asset(at: indexPath.item)
-        let attachmentPromise: Promise<SignalAttachment> = photoCollectionContents.outgoingAttachment(for: asset)
+        let attachmentPromise: Promise<SignalAttachment> = photoCollectionContents.outgoingAttachment(for: asset, imageQuality: imageQuality)
         delegate.imagePicker(self, didSelectAsset: asset, attachmentPromise: attachmentPromise)
 
         if !delegate.isInBatchSelectMode {
@@ -552,16 +562,23 @@ class ImagePickerGridController: UICollectionViewController, PhotoLibraryDelegat
 }
 
 extension ImagePickerGridController: UIGestureRecognizerDelegate {
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard gestureRecognizer == selectionPanGesture else {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Ensure we can still scroll the collectionView by allowing other gestures to
+        // take precedence.
+        guard otherGestureRecognizer == selectionPanGesture else {
             return true
         }
 
-        return ![.changed, .began].contains(collectionView.panGestureRecognizer.state)
+        // Once we've started the selectionPanGesture, don't allow scrolling
+        if otherGestureRecognizer.state == .began || otherGestureRecognizer.state == .changed {
+            return false
+        }
+
+        return true
     }
 }
 
-protocol TitleViewDelegate: AnyObject {
+protocol TitleViewDelegate: class {
     func titleViewWasTapped(_ titleView: TitleView)
 }
 
@@ -590,7 +607,7 @@ class TitleView: UIView {
         stackView.autoPinEdgesToSuperviewEdges()
 
         label.textColor = .ows_gray05
-        label.font = UIFont.ows_dynamicTypeBody.ows_semibold
+        label.font = UIFont.ows_dynamicTypeBody.ows_semibold()
 
         iconView.tintColor = .ows_gray05
         iconView.image = UIImage(named: "navbar_disclosure_down")?.withRenderingMode(.alwaysTemplate)

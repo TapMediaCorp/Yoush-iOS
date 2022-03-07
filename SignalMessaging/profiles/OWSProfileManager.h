@@ -1,41 +1,29 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <SignalServiceKit/ProfileManagerProtocol.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern const NSUInteger kOWSProfileManager_MaxAvatarDiameterPixels;
-extern const NSString *kNSNotificationKey_UserProfileWriter;
+extern NSNotificationName const kNSNotificationNameProfileKeyDidChange;
 
-@class MessageSender;
+extern const NSUInteger kOWSProfileManager_NameDataLength;
+extern const NSUInteger kOWSProfileManager_MaxAvatarDiameter;
+extern const NSString *kNSNotificationKey_WasLocallyInitiated;
+
 @class OWSAES256Key;
+@class OWSMessageSender;
 @class OWSUserProfile;
 @class SDSAnyReadTransaction;
 @class SDSAnyWriteTransaction;
 @class SDSDatabaseStorage;
 @class SDSKeyValueStore;
 @class SignalServiceAddress;
+@class TSNetworkManager;
 @class TSThread;
 
 typedef void (^ProfileManagerFailureBlock)(NSError *error);
-
-@interface OWSProfileSnapshot : NSObject
-
-@property (nonatomic, readonly, nullable) NSString *givenName;
-@property (nonatomic, readonly, nullable) NSString *familyName;
-@property (nonatomic, readonly, nullable) NSString *fullName;
-@property (nonatomic, readonly, nullable) NSString *bio;
-@property (nonatomic, readonly, nullable) NSString *bioEmoji;
-@property (nonatomic, readonly, nullable) NSString *username;
-
-@property (nonatomic, readonly, nullable) NSData *avatarData;
-@property (nonatomic, readonly, nullable) NSArray<OWSUserProfileBadgeInfo *> *profileBadgeInfo;
-
-@end
-
-#pragma mark -
 
 // This class can be safely accessed and used from any thread.
 @interface OWSProfileManager : NSObject <ProfileManagerProtocol>
@@ -43,7 +31,6 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 @property (nonatomic, readonly) SDSKeyValueStore *whitelistedPhoneNumbersStore;
 @property (nonatomic, readonly) SDSKeyValueStore *whitelistedUUIDsStore;
 @property (nonatomic, readonly) SDSKeyValueStore *whitelistedGroupsStore;
-@property (nonatomic, readonly) BadgeStore *badgeStore;
 
 // This property is used by the Swift extension to ensure that
 // only one profile update is in flight at a time.  It should
@@ -54,6 +41,8 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 - (instancetype)init NS_UNAVAILABLE;
 
 - (instancetype)initWithDatabaseStorage:(SDSDatabaseStorage *)databaseStorage NS_DESIGNATED_INITIALIZER;
+
++ (instancetype)sharedManager;
 
 #pragma mark - Local Profile
 
@@ -70,12 +59,7 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 - (nullable UIImage *)localProfileAvatarImage;
 - (nullable NSData *)localProfileAvatarData;
 
-- (OWSProfileSnapshot *)localProfileSnapshotWithShouldIncludeAvatar:(BOOL)shouldIncludeAvatar
-    NS_SWIFT_NAME(localProfileSnapshot(shouldIncludeAvatar:));
-
-- (void)updateLocalUsername:(nullable NSString *)username
-          userProfileWriter:(UserProfileWriter)userProfileWriter
-                transaction:(SDSAnyWriteTransaction *)transaction;
+- (void)updateLocalUsername:(nullable NSString *)username transaction:(SDSAnyWriteTransaction *)transaction;
 
 - (BOOL)isProfileNameTooLong:(nullable NSString *)profileName;
 
@@ -100,6 +84,19 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 // Only use this method in profile manager methods on the swift extension.
 - (OWSUserProfile *)localUserProfile;
 
+// If avatarData is nil, we are clearing the avatar.
+- (void)updateServiceWithUnversionedProfileAvatarData:(nullable NSData *)avatarData
+                                              success:(void (^)(NSString *_Nullable avatarUrlPath))successBlock
+                                              failure:(ProfileManagerFailureBlock)failureBlock
+    NS_SWIFT_NAME(updateService(unversionedProfileAvatarData:success:failure:));
+
+// If profileName is nil, we are clearing the profileName.
+- (void)updateServiceWithUnversionedGivenName:(nullable NSString *)givenName
+                                   familyName:(nullable NSString *)familyName
+                                      success:(void (^)(void))successBlock
+                                      failure:(ProfileManagerFailureBlock)failureBlock
+    NS_SWIFT_NAME(updateService(unversionedGivenName:familyName:success:failure:));
+
 #pragma mark - Profile Whitelist
 
 // These methods are for debugging.
@@ -108,7 +105,7 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 - (void)logProfileWhitelist;
 - (void)debug_regenerateLocalProfileWithSneakyTransaction;
 - (void)setLocalProfileKey:(OWSAES256Key *)key
-         userProfileWriter:(UserProfileWriter)userProfileWriter
+       wasLocallyInitiated:(BOOL)wasLocallyInitiated
                transaction:(SDSAnyWriteTransaction *)transaction;
 
 - (void)setContactAddresses:(NSArray<SignalServiceAddress *> *)contactAddresses;
@@ -118,14 +115,8 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 // This method is for debugging.
 - (void)logUserProfiles;
 
-- (nullable NSString *)unfilteredGivenNameForAddress:(SignalServiceAddress *)address
-                                         transaction:(SDSAnyReadTransaction *)transaction;
-
 - (nullable NSString *)givenNameForAddress:(SignalServiceAddress *)address
                                transaction:(SDSAnyReadTransaction *)transaction;
-
-- (nullable NSString *)unfilteredFamilyNameForAddress:(SignalServiceAddress *)address
-                                          transaction:(SDSAnyReadTransaction *)transaction;
 
 - (nullable NSString *)familyNameForAddress:(SignalServiceAddress *)address
                                 transaction:(SDSAnyReadTransaction *)transaction;
@@ -139,26 +130,22 @@ typedef void (^ProfileManagerFailureBlock)(NSError *error);
 - (nullable NSString *)usernameForAddress:(SignalServiceAddress *)address
                               transaction:(SDSAnyReadTransaction *)transaction;
 
-- (nullable NSString *)profileBioForDisplayForAddress:(SignalServiceAddress *)address
-                                          transaction:(SDSAnyReadTransaction *)transaction;
-
 #pragma mark - Clean Up
 
 + (NSSet<NSString *> *)allProfileAvatarFilePathsWithTransaction:(SDSAnyReadTransaction *)transaction;
+
+#pragma mark - User Interface
+
+- (void)presentAddThreadToProfileWhitelist:(TSThread *)thread
+                        fromViewController:(UIViewController *)fromViewController
+                                   success:(void (^)(void))successHandler;
 
 #pragma mark -
 
 // This method is only exposed for usage by the Swift extensions.
 - (NSString *)generateAvatarFilename;
 
-- (NSString *)groupKeyForGroupId:(NSData *)groupId;
-
-#ifdef DEBUG
-+ (void)discardAllProfileKeysWithTransaction:(SDSAnyWriteTransaction *)transaction;
-
-- (void)logLocalProfile;
-#endif
-
+- (NSString*)localUserId;
 @end
 
 NS_ASSUME_NONNULL_END

@@ -1,9 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
-import SignalUI
 
 struct NewGroupMember {
     let recipient: PickedRecipient
@@ -11,6 +10,7 @@ struct NewGroupMember {
     let displayName: String
     let shortName: String
     let comparableName: String
+    let conversationColorName: ConversationColorName
 }
 
 // MARK: -
@@ -60,7 +60,7 @@ public class NewGroupMembersBar: UIView {
         collectionView.delegate = self
 
         collectionView.register(NewGroupMemberCell.self, forCellWithReuseIdentifier: NewGroupMemberCell.reuseIdentifier)
-        collectionView.backgroundColor = .clear
+        collectionView.backgroundColor = Theme.backgroundColor
         collectionView.showsHorizontalScrollIndicator = false
 
         addSubview(collectionView)
@@ -144,7 +144,7 @@ extension NewGroupMembersBar: UICollectionViewDelegate {
 
 // MARK: -
 
-public protocol NewGroupMemberCellDelegate: AnyObject {
+public protocol NewGroupMemberCellDelegate: class {
     func removeRecipient(_ recipient: PickedRecipient)
 }
 
@@ -154,13 +154,13 @@ private class NewGroupMemberCell: UICollectionViewCell {
 
     static let reuseIdentifier = "NewGroupMemberCell"
 
-    private let avatarView = ConversationAvatarView(sizeClass: avatarSizeClass, localUserDisplayMode: .asUser)
+    private let avatarImageView = AvatarImageView()
     private let textLabel = UILabel(frame: .zero)
 
     fileprivate weak var delegate: NewGroupMemberCellDelegate?
     fileprivate var member: NewGroupMember?
 
-    static let avatarSizeClass = ConversationAvatarView.Configuration.SizeClass.customDiameter(32)
+    static let minAvatarDiameter: UInt = 32
     static let vMargin: CGFloat = 6
     static let removeButtonXSize: CGFloat = 12
     static let removeButtonInset: CGFloat = 5
@@ -174,7 +174,7 @@ private class NewGroupMemberCell: UICollectionViewCell {
 
         self.layoutMargins = .zero
         contentView.layoutMargins = .zero
-        contentView.backgroundColor = Theme.isDarkThemeEnabled ? .ows_gray65 : .ows_gray15
+        contentView.backgroundColor = Theme.washColor
 
         textLabel.font = NewGroupMemberCell.nameFont
         textLabel.textColor = Theme.primaryTextColor
@@ -193,10 +193,12 @@ private class NewGroupMemberCell: UICollectionViewCell {
         removeButton.autoSetDimensions(to: CGSize(square: buttonSize))
         removeButton.setContentHuggingHigh()
 
-        contentView.addSubview(avatarView)
-        avatarView.autoPinEdge(toSuperviewEdge: .leading)
-        avatarView.autoPinEdge(toSuperviewMargin: .top, relation: .greaterThanOrEqual)
-        avatarView.autoPinEdge(toSuperviewMargin: .bottom, relation: .greaterThanOrEqual)
+        avatarImageView.autoSetDimensions(to: CGSize(square: CGFloat(Self.minAvatarDiameter)))
+        avatarImageView.setContentHuggingHigh()
+        contentView.addSubview(avatarImageView)
+        avatarImageView.autoPinEdge(toSuperviewEdge: .leading)
+        avatarImageView.autoPinEdge(toSuperviewMargin: .top, relation: .greaterThanOrEqual)
+        avatarImageView.autoPinEdge(toSuperviewMargin: .bottom, relation: .greaterThanOrEqual)
 
         let stackView = UIStackView(arrangedSubviews: [
             textLabel,
@@ -207,7 +209,7 @@ private class NewGroupMemberCell: UICollectionViewCell {
         stackView.layoutMargins = UIEdgeInsets(top: Self.vMargin, leading: 4, bottom: Self.vMargin, trailing: 2)
         stackView.isLayoutMarginsRelativeArrangement = true
         contentView.addSubview(stackView)
-        stackView.autoPinLeading(toTrailingEdgeOf: avatarView)
+        stackView.autoPinLeading(toTrailingEdgeOf: avatarImageView)
         stackView.autoPinEdges(toSuperviewMarginsExcludingEdge: .leading)
         stackView.setContentHuggingHorizontalLow()
         stackView.setCompressionResistanceHorizontalLow()
@@ -218,7 +220,7 @@ private class NewGroupMemberCell: UICollectionViewCell {
         contentView.layer.cornerRadius = contentView.height / 2
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     @objc
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
@@ -226,9 +228,11 @@ private class NewGroupMemberCell: UICollectionViewCell {
 
     func configure(member: NewGroupMember) {
         self.member = member
-        avatarView.updateWithSneakyTransactionIfNecessary { config in
-            config.dataSource = .address(member.address)
-        }
+
+        let avatarBuilder = OWSContactAvatarBuilder(address: member.address,
+                                                    colorName: member.conversationColorName,
+                                                    diameter: Self.minAvatarDiameter)
+        avatarImageView.image = avatarBuilder.build()
         textLabel.text = member.shortName
     }
 
@@ -236,7 +240,7 @@ private class NewGroupMemberCell: UICollectionViewCell {
         super.prepareForReuse()
 
         member = nil
-        avatarView.reset()
+        avatarImageView.image = nil
         textLabel.text = nil
         delegate = nil
     }
@@ -263,7 +267,7 @@ extension NewGroupMembersBar: NewGroupMembersBarLayoutDelegate {
 
 // MARK: -
 
-private protocol NewGroupMembersBarLayoutDelegate: AnyObject {
+private protocol NewGroupMembersBarLayoutDelegate: class {
     func cellForLayoutMeasurement(at indexPath: IndexPath) -> UICollectionViewCell
 }
 
@@ -284,7 +288,7 @@ private class NewGroupMembersBarLayout: UICollectionViewLayout {
         super.init()
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init?(coder aDecoder: NSCoder) {
         notImplemented()
     }

@@ -1,48 +1,24 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class SDSAnyReadTransaction;
-@class SDSAnyWriteTransaction;
-@class SSKProtoCallMessage;
 @class SSKProtoCallMessageAnswer;
 @class SSKProtoCallMessageBusy;
 @class SSKProtoCallMessageHangup;
 @class SSKProtoCallMessageIceUpdate;
 @class SSKProtoCallMessageOffer;
-@class SSKProtoCallMessageOpaque;
-@class SSKProtoDataMessageGroupCallUpdate;
-@class SSKProtoEnvelope;
 @class SignalServiceAddress;
-@class TSGroupThread;
-
-typedef NS_ENUM(NSUInteger, OWSCallMessageAction) {
-    // This message should not be processed
-    OWSCallMessageActionIgnore,
-    // Process the message by deferring to -externallyHandleCallMessage...
-    OWSCallMessageActionHandoff,
-    // Process the message normally
-    OWSCallMessageActionProcess,
-};
+@class TSThread;
 
 @protocol OWSCallMessageHandler <NSObject>
 
-/// Informs caller of how the handler would like to handle this message
-- (OWSCallMessageAction)actionForEnvelope:(SSKProtoEnvelope *)envelope
-                              callMessage:(SSKProtoCallMessage *)message
-                  serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp;
-
 - (void)receivedOffer:(SSKProtoCallMessageOffer *)offer
-                 fromCaller:(SignalServiceAddress *)caller
-               sourceDevice:(uint32_t)device
-            sentAtTimestamp:(uint64_t)sentAtTimestamp
-    serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-    serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-          supportsMultiRing:(BOOL)supportsMultiRing
-                transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(receivedOffer(_:from:sourceDevice:sentAtTimestamp:serverReceivedTimestamp:serverDeliveryTimestamp:supportsMultiRing:transaction:));
+           fromCaller:(SignalServiceAddress *)caller
+         sourceDevice:(uint32_t)device
+      sentAtTimestamp:(uint64_t)sentAtTimestamp
+    supportsMultiRing:(BOOL)supportsMultiRing NS_SWIFT_NAME(receivedOffer(_:from:sourceDevice:sentAtTimestamp:supportsMultiRing:));
 
 - (void)receivedAnswer:(SSKProtoCallMessageAnswer *)answer
             fromCaller:(SignalServiceAddress *)caller
@@ -61,26 +37,10 @@ typedef NS_ENUM(NSUInteger, OWSCallMessageAction) {
           fromCaller:(SignalServiceAddress *)caller
         sourceDevice:(uint32_t)device NS_SWIFT_NAME(receivedBusy(_:from:sourceDevice:));
 
-- (void)receivedOpaque:(SSKProtoCallMessageOpaque *)opaque
-                 fromCaller:(SignalServiceAddress *)caller
-               sourceDevice:(uint32_t)device
-    serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-    serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-                transaction:(SDSAnyReadTransaction *)transaction
-    NS_SWIFT_NAME(receivedOpaque(_:from:sourceDevice:serverReceivedTimestamp:serverDeliveryTimestamp:transaction:));
+@optional
+- (void)receivedJitsiGroupCall:(TSThread*)thread data:(id)data NS_SWIFT_NAME(receivedJitsiGroupCall(_:data:));
 
-- (void)receivedGroupCallUpdateMessage:(SSKProtoDataMessageGroupCallUpdate *)update
-                             forThread:(TSGroupThread *)groupThread
-               serverReceivedTimestamp:(uint64_t)serverReceivedTimestamp
-        NS_SWIFT_NAME(receivedGroupCallUpdateMessage(_:for:serverReceivedTimestamp:));
-
-- (void)externallyHandleCallMessageWithEnvelope:(SSKProtoEnvelope *)envelope
-                                  plaintextData:(NSData *)plaintextData
-                                wasReceivedByUD:(BOOL)wasReceivedByUD
-                        serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
-                                    transaction:(SDSAnyWriteTransaction *)transaction
-    NS_SWIFT_NAME(externallyHandleCallMessage(envelope:plaintextData:wasReceivedByUD:serverDeliveryTimestamp:transaction:));
-
+- (void)receivedJitsiCall:(TSThread*)thread data:(id)data NS_SWIFT_NAME(receivedJitsiCall(_:data:));
 @end
 
 NS_ASSUME_NONNULL_END

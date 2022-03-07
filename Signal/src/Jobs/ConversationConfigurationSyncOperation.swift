@@ -1,16 +1,33 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 @objc
 class ConversationConfigurationSyncOperation: OWSOperation {
 
-    enum ColorSyncOperationError: Error, IsRetryableProvider {
+    enum ColorSyncOperationError: Error {
         case assertionError(description: String)
+    }
 
-        public var isRetryableProvider: Bool { false }
+    // MARK: - Dependencies
+
+    private var messageSenderJobQueue: MessageSenderJobQueue {
+        return SSKEnvironment.shared.messageSenderJobQueue
+    }
+
+    private var contactsManager: OWSContactsManager {
+        return Environment.shared.contactsManager
+    }
+
+    private var syncManager: SyncManagerProtocol {
+        return SSKEnvironment.shared.syncManager
+    }
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return SDSDatabaseStorage.shared
     }
 
     // MARK: -
@@ -34,12 +51,13 @@ class ConversationConfigurationSyncOperation: OWSOperation {
     }
 
     private func reportAssertionError(description: String) {
-        let error = ColorSyncOperationError.assertionError(description: description)
+        let error: NSError = ColorSyncOperationError.assertionError(description: description) as NSError
+        error.isRetryable = false
         self.reportError(error)
     }
 
     private func sync(contactThread: TSContactThread) {
-        guard let signalAccount: SignalAccount = self.contactsManagerImpl.fetchSignalAccount(for: contactThread.contactAddress) else {
+        guard let signalAccount: SignalAccount = self.contactsManager.fetchSignalAccount(for: contactThread.contactAddress) else {
             reportAssertionError(description: "unable to find signalAccount")
             return
         }
@@ -63,10 +81,10 @@ class ConversationConfigurationSyncOperation: OWSOperation {
         let syncMessage = OWSSyncGroupsMessage(thread: thread)
         do {
             let attachmentDataSource: DataSource = try self.databaseStorage.read { transaction in
-                guard let syncFileUrl = syncMessage.buildPlainTextAttachmentFile(transaction: transaction) else {
-                    throw OWSAssertionError("Could not serialize sync groups data.")
+                guard let messageData: Data = syncMessage.buildPlainTextAttachmentData(with: transaction) else {
+                    throw OWSAssertionError("could not serialize sync groups data")
                 }
-                return try DataSourcePath.dataSource(with: syncFileUrl, shouldDeleteOnDeallocation: false)
+                return try DataSourcePath.dataSourceWritingSyncMessageData(messageData)
             }
 
             self.sendConfiguration(attachmentDataSource: attachmentDataSource, syncMessage: syncMessage)

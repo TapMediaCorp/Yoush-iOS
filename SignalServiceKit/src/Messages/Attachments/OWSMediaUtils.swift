@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -9,37 +9,13 @@ public enum OWSMediaError: Error {
     case failure(description: String)
 }
 
-@objc
-public class OWSMediaUtils: NSObject {
+@objc public class OWSMediaUtils: NSObject {
 
-    @available(*, unavailable, message: "do not instantiate this class.")
+    @available(*, unavailable, message:"do not instantiate this class.")
     private override init() {
     }
 
-    private class func thumbnail(forImage image: UIImage, maxDimensionPixels: CGFloat) throws -> UIImage {
-        if image.pixelSize.width <= maxDimensionPixels,
-           image.pixelSize.height <= maxDimensionPixels {
-            let result = image.withNativeScale
-            return result
-        }
-        guard let thumbnailImage = image.resized(withMaxDimensionPixels: maxDimensionPixels) else {
-            throw OWSMediaError.failure(description: "Could not thumbnail image.")
-        }
-        guard nil != thumbnailImage.cgImage else {
-            throw OWSMediaError.failure(description: "Missing cgImage.")
-        }
-        let result = thumbnailImage.withNativeScale
-        return result
-    }
-
-    private class func thumbnail(forImage image: UIImage, maxDimensionPoints: CGFloat) throws -> UIImage {
-        let scale = UIScreen.main.scale
-        let maxDimensionPixels = maxDimensionPoints * scale
-        return try thumbnail(forImage: image, maxDimensionPixels: maxDimensionPixels)
-    }
-
-    @objc
-    public class func thumbnail(forImageAtPath path: String, maxDimensionPixels: CGFloat) throws -> UIImage {
+    @objc public class func thumbnail(forImageAtPath path: String, maxDimension: CGFloat) throws -> UIImage {
         Logger.verbose("thumbnailing image: \(path)")
 
         guard FileManager.default.fileExists(atPath: path) else {
@@ -51,39 +27,13 @@ public class OWSMediaUtils: NSObject {
         guard let originalImage = UIImage(contentsOfFile: path) else {
             throw OWSMediaError.failure(description: "Could not load original image.")
         }
-        return try thumbnail(forImage: originalImage, maxDimensionPixels: maxDimensionPixels)
+        guard let thumbnailImage = originalImage.resized(withMaxDimensionPoints: maxDimension) else {
+            throw OWSMediaError.failure(description: "Could not thumbnail image.")
+        }
+        return thumbnailImage
     }
 
-    @objc
-    public class func thumbnail(forImageAtPath path: String, maxDimensionPoints: CGFloat) throws -> UIImage {
-
-        guard FileManager.default.fileExists(atPath: path) else {
-            throw OWSMediaError.failure(description: "Media file missing.")
-        }
-        guard NSData.ows_isValidImage(atPath: path) else {
-            throw OWSMediaError.failure(description: "Invalid image.")
-        }
-        guard let originalImage = UIImage(contentsOfFile: path) else {
-            throw OWSMediaError.failure(description: "Could not load original image.")
-        }
-        return try thumbnail(forImage: originalImage, maxDimensionPoints: maxDimensionPoints)
-    }
-
-    @objc
-    public class func thumbnail(forImageData imageData: Data, maxDimensionPoints: CGFloat) throws -> UIImage {
-        Logger.verbose("thumbnailing image data.")
-
-        guard imageData.ows_isValidImage else {
-            throw OWSMediaError.failure(description: "Invalid image.")
-        }
-        guard let originalImage = UIImage(data: imageData) else {
-            throw OWSMediaError.failure(description: "Could not load original image.")
-        }
-        return try thumbnail(forImage: originalImage, maxDimensionPoints: maxDimensionPoints)
-    }
-
-    @objc
-    public class func thumbnail(forWebpAtPath path: String, maxDimensionPoints: CGFloat) throws -> UIImage {
+    @objc public class func thumbnail(forWebpAtPath path: String, maxDimension: CGFloat) throws -> UIImage {
         Logger.verbose("thumbnailing image: \(path)")
 
         guard FileManager.default.fileExists(atPath: path) else {
@@ -96,20 +46,20 @@ public class OWSMediaUtils: NSObject {
         guard let stillImage = data.stillForWebpData() else {
             throw OWSMediaError.failure(description: "Could not generate still.")
         }
-        return try thumbnail(forImage: stillImage, maxDimensionPoints: maxDimensionPoints)
+        guard let thumbnailImage = stillImage.resized(withMaxDimensionPoints: maxDimension) else {
+            throw OWSMediaError.failure(description: "Could not thumbnail image.")
+        }
+        return thumbnailImage
     }
 
-    @objc
-    public class func thumbnail(forVideoAtPath path: String, maxDimensionPoints: CGFloat) throws -> UIImage {
+    @objc public class func thumbnail(forVideoAtPath path: String, maxDimension: CGFloat) throws -> UIImage {
         Logger.verbose("thumbnailing video: \(path)")
 
         guard isVideoOfValidContentTypeAndSize(path: path) else {
             throw OWSMediaError.failure(description: "Media file has missing or invalid length.")
         }
 
-        let scale = UIScreen.main.scale
-        let maxDimensionPixels = maxDimensionPoints * scale
-        let maxSizePixels = CGSize(width: maxDimensionPixels, height: maxDimensionPixels)
+        let maxSize = CGSize(width: maxDimension, height: maxDimension)
         let url = URL(fileURLWithPath: path)
         let asset = AVURLAsset(url: url, options: nil)
         guard isValidVideo(asset: asset) else {
@@ -117,16 +67,15 @@ public class OWSMediaUtils: NSObject {
         }
 
         let generator = AVAssetImageGenerator(asset: asset)
-        generator.maximumSize = maxSizePixels
+        generator.maximumSize = maxSize
         generator.appliesPreferredTrackTransform = true
         let time: CMTime = CMTimeMake(value: 1, timescale: 60)
         let cgImage = try generator.copyCGImage(at: time, actualTime: nil)
-        let image = UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+        let image = UIImage(cgImage: cgImage)
         return image
     }
 
-    @objc
-    public class func isValidVideo(path: String) -> Bool {
+    @objc public class func isValidVideo(path: String) -> Bool {
         guard isVideoOfValidContentTypeAndSize(path: path) else {
             Logger.error("Media file has missing or invalid length.")
             return false
@@ -137,7 +86,7 @@ public class OWSMediaUtils: NSObject {
         return isValidVideo(asset: asset)
     }
 
-    public class func isVideoOfValidContentTypeAndSize(path: String) -> Bool {
+    private class func isVideoOfValidContentTypeAndSize(path: String) -> Bool {
         guard FileManager.default.fileExists(atPath: path) else {
             Logger.error("Media file missing.")
             return false
@@ -159,7 +108,7 @@ public class OWSMediaUtils: NSObject {
         return fileSize.uintValue <= kMaxFileSizeVideo
     }
 
-    public class func isValidVideo(asset: AVAsset) -> Bool {
+    private class func isValidVideo(asset: AVURLAsset) -> Bool {
         var maxTrackSize = CGSize.zero
         for track: AVAssetTrack in asset.tracks(withMediaType: .video) {
             let trackSize: CGSize = track.naturalSize
@@ -199,16 +148,12 @@ public class OWSMediaUtils: NSObject {
     public static let kMaxFileSizeAnimatedImage = UInt(25 * 1024 * 1024)
     @objc
     public static let kMaxFileSizeImage = UInt(8 * 1024 * 1024)
-    // Cloudflare limits uploads to 100 MB. To avoid hitting those limits,
-    // we use limits that are 5% lower for the unencrypted content.
     @objc
-    public static let kMaxFileSizeVideo = UInt(95 * 1000 * 1000)
+    public static let kMaxFileSizeVideo = UInt(100 * 1024 * 1024)
     @objc
-    public static let kMaxFileSizeAudio = UInt(95 * 1000 * 1000)
+    public static let kMaxFileSizeAudio = UInt(100 * 1024 * 1024)
     @objc
-    public static let kMaxFileSizeGeneric = UInt(95 * 1000 * 1000)
-    @objc
-    public static let kMaxAttachmentUploadSizeBytes = UInt(100 * 1000 * 1000)
+    public static let kMaxFileSizeGeneric = UInt(100 * 1024 * 1024)
 
     @objc
     public static let kMaxVideoDimensions: CGFloat = 3 * 1024

@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 import SignalServiceKit
 
 // Whenever we rotate our profile key, we need to update all
@@ -14,7 +15,35 @@ import SignalServiceKit
 //
 // This class has responsibility for tracking which groups
 // need to be updated and for updating them.
-class GroupsV2ProfileKeyUpdater: Dependencies {
+class GroupsV2ProfileKeyUpdater {
+
+    // MARK: - Dependencies
+
+    private var tsAccountManager: TSAccountManager {
+        return .sharedInstance()
+    }
+
+    private var databaseStorage: SDSDatabaseStorage {
+        return .shared
+    }
+
+    private var profileManager: OWSProfileManager {
+        return OWSProfileManager.shared()
+    }
+
+    private var groupsV2: GroupsV2Swift {
+        return SSKEnvironment.shared.groupsV2 as! GroupsV2Swift
+    }
+
+    private var messageProcessing: MessageProcessing {
+        return SSKEnvironment.shared.messageProcessing
+    }
+
+    private var reachabilityManager: SSKReachabilityManager {
+        return SSKEnvironment.shared.reachabilityManager
+    }
+
+    // MARK: -
 
     public required init() {
         NotificationCenter.default.addObserver(self,
@@ -32,7 +61,7 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
     @objc func didBecomeActive() {
         AssertIsOnMainThread()
 
-        AppReadiness.runNowOrWhenAppDidBecomeReadyAsync {
+        AppReadiness.runNowOrWhenAppDidBecomeReadyPolite {
             self.tryToUpdateNext()
         }
     }
@@ -40,7 +69,7 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
     @objc func reachabilityChanged() {
         AssertIsOnMainThread()
 
-        AppReadiness.runNowOrWhenAppDidBecomeReadyAsync {
+        AppReadiness.runNowOrWhenAppDidBecomeReadyPolite {
             self.tryToUpdateNext()
         }
     }
@@ -62,16 +91,11 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
         }
         self.tryToScheduleGroupForProfileKeyUpdate(groupThread: groupThread,
                                                    transaction: transaction)
-
-        transaction.addAsyncCompletionOffMain {
-            self.tryToUpdateNext()
-        }
     }
 
     public func scheduleAllGroupsV2ForProfileKeyUpdate(transaction: SDSAnyWriteTransaction) {
         TSGroupThread.anyEnumerate(transaction: transaction) { (thread, _) in
-            guard let groupThread = thread as? TSGroupThread,
-                  groupThread.isGroupV2Thread else {
+            guard let groupThread = thread as? TSGroupThread else {
                 return
             }
             self.tryToScheduleGroupForProfileKeyUpdate(groupThread: groupThread,
@@ -81,11 +105,6 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
 
     private func tryToScheduleGroupForProfileKeyUpdate(groupThread: TSGroupThread,
                                                        transaction: SDSAnyWriteTransaction) {
-        guard !CurrentAppContext().isRunningTests,
-              tsAccountManager.isRegisteredAndReady,
-              tsAccountManager.isPrimaryDevice else {
-            return
-        }
         guard let localAddress = tsAccountManager.localAddress else {
             owsFailDebug("missing local address")
             return
@@ -94,8 +113,8 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
         let groupMembership = groupThread.groupModel.groupMembership
         // We only need to update v2 groups of which we are a full member.
         guard groupThread.isGroupV2Thread,
-              groupMembership.isFullMember(localAddress) else {
-            return
+            groupMembership.isNonPendingMember(localAddress) else {
+                return
         }
         let groupId = groupThread.groupModel.groupId
         let key = self.key(for: groupId)
@@ -113,13 +132,13 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
     private var isUpdating = false
 
     private func tryToUpdateNext(retryDelay: TimeInterval = 1) {
-        guard CurrentAppContext().isMainAppAndActive,
-              !CurrentAppContext().isRunningTests,
-              tsAccountManager.isRegisteredAndReady,
-              tsAccountManager.isPrimaryDevice else {
+        guard CurrentAppContext().isMainAppAndActive else {
             return
         }
         guard reachabilityManager.isReachable else {
+            return
+        }
+        guard RemoteConfig.groupsV2GoodCitizen else {
             return
         }
 
@@ -136,7 +155,7 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
 
             self.isUpdating = true
 
-            firstly(on: .global()) { () -> Promise<Void> in
+            firstly {
                 self.tryToUpdate(groupId: groupId)
             }.done(on: .global() ) { _ in
                 Logger.verbose("Updated profile key in group.")
@@ -145,15 +164,12 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
             }.catch(on: .global() ) { error in
                 Logger.warn("Failed: \(error).")
 
-                guard !error.isNetworkConnectivityFailure else {
+                guard !IsNetworkConnectivityFailure(error) else {
                     // Retry later.
                     return self.didFail(groupId: groupId, retryDelay: retryDelay)
                 }
 
                 switch error {
-                case GroupsV2Error.unexpectedRevision:
-                    // Race with another client; retry later.
-                    return self.didFail(groupId: groupId, retryDelay: retryDelay)
                 case GroupsV2Error.shouldDiscard:
                     // If a non-recoverable error occurs (e.g. we've
                     // delete the thread from the database), give up.
@@ -161,12 +177,9 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
                 case GroupsV2Error.redundantChange:
                     // If the update is no longer necessary, skip it.
                     self.markAsComplete(groupId: groupId)
-                case GroupsV2Error.localUserNotInGroup:
-                    // If the update is no longer necessary, skip it.
-                    self.markAsComplete(groupId: groupId)
-                case is OWSHTTPError:
+                case is NetworkManagerError:
                     if let statusCode = error.httpStatusCode,
-                       400 <= statusCode && statusCode <= 599 {
+                        400 <= statusCode && statusCode <= 599 {
                         // If a non-recoverable error occurs (e.g. we've been kicked
                         // out of the group), give up.
                         Logger.info("Failed: \(statusCode)")
@@ -202,7 +215,8 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
         }
     }
 
-    private func didFail(groupId: Data, retryDelay: TimeInterval) {
+    private func didFail(groupId: Data,
+                         retryDelay: TimeInterval) {
         serialQueue.asyncAfter(deadline: DispatchTime.now() + retryDelay) {
             self.isUpdating = false
 
@@ -213,30 +227,29 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
 
     private func tryToUpdate(groupId: Data) -> Promise<Void> {
         let profileKeyData = profileManager.localProfileKey().keyData
-        guard let localAddress = tsAccountManager.localAddress,
-              let localUuid = tsAccountManager.localUuid else {
+        guard let localAddress = tsAccountManager.localAddress else {
             owsFailDebug("missing local address")
             return Promise(error: GroupsV2Error.shouldDiscard)
         }
 
         return firstly {
-            self.messageProcessor.fetchingAndProcessingCompletePromise()
+            self.messageProcessing.allMessageFetchingAndProcessingPromise()
         }.map(on: .global()) { () throws -> TSGroupThread in
-            try self.databaseStorage.read { transaction in
+            return try self.databaseStorage.read { transaction in
                 guard let groupThread = TSGroupThread.fetch(groupId: groupId, transaction: transaction) else {
                     throw GroupsV2Error.shouldDiscard
                 }
                 return groupThread
             }
-        }.then(on: .global()) { (groupThread: TSGroupThread) throws -> Promise<(TSGroupThread, UInt32)> in
+        }.then(on: .global()) { (groupThread: TSGroupThread) throws -> Promise<TSGroupThread> in
             // Get latest group state from service and verify that this update is still necessary.
-            firstly { () throws -> Promise<GroupV2Snapshot> in
+            return firstly { () throws -> Promise<GroupV2Snapshot> in
                 guard let groupModel = groupThread.groupModel as? TSGroupModelV2 else {
                     throw OWSAssertionError("Invalid group model.")
                 }
-                return self.groupsV2Impl.fetchCurrentGroupV2Snapshot(groupModel: groupModel)
-            }.map(on: .global()) { (groupV2Snapshot: GroupV2Snapshot) throws -> (TSGroupThread, UInt32) in
-                guard groupV2Snapshot.groupMembership.isFullMember(localAddress) else {
+                return self.groupsV2.fetchCurrentGroupV2Snapshot(groupModel: groupModel)
+            }.map(on: .global()) { (groupV2Snapshot: GroupV2Snapshot) throws -> TSGroupThread in
+                guard groupV2Snapshot.groupMembership.isNonPendingMember(localAddress) else {
                     // We're not a full member, no need to update profile key.
                     throw GroupsV2Error.redundantChange
                 }
@@ -244,47 +257,12 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
                     // Group state already has our current key.
                     throw GroupsV2Error.redundantChange
                 }
-                if DebugFlags.internalLogging {
-                    for (uuid, profileKey) in groupV2Snapshot.profileKeys {
-                        Logger.info("Existing profile key: \(profileKey.hexadecimalString), for uuid: \(uuid), is local: \(uuid == localUuid)")
-                    }
-                }
-                let checkedRevision = groupV2Snapshot.revision
-                return (groupThread, checkedRevision)
+                return groupThread
             }
-        }.then(on: .global()) { (groupThread: TSGroupThread, checkedRevision: UInt32) throws -> Promise<Void> in
-            if DebugFlags.internalLogging {
-                Logger.info("Updating profile key for group: \(groupThread.groupId.hexadecimalString), profileKey: \(profileKeyData.hexadecimalString), localUuid: \(localUuid), checkedRevision: \(checkedRevision)")
-            } else {
-                Logger.info("Updating profile key for group.")
-            }
-
+        }.then(on: .global()) { (groupThread: TSGroupThread) throws -> Promise<Void> in
             return firstly {
-                GroupManager.ensureLocalProfileHasCommitmentIfNecessary()
-            }.then(on: .global()) { () throws -> Promise<Void> in
-                // Before we can update the group state on the service,
-                // we need to ensure that the group state in the local
-                // database reflects the latest group state on the service.
-                guard let groupModel = groupThread.groupModel as? TSGroupModelV2 else {
-                    owsFailDebug("Invalid group model.")
-                    throw GroupsV2Error.shouldDiscard
-                }
-                let dbRevision = groupModel.revision
-                guard dbRevision != checkedRevision else {
-                    // Revisions match, so we can proceed immediately with
-                    // the profile update.
-                    return Promise.value(())
-                }
-                // If the revisions don't match, we want to update the group
-                // state in the local database before proceeding.  It's not
-                // safe to do so until we've finished message processing,
-                // but we've already blocked on fetchingAndProcessingCompletePromise
-                // above.
-                let groupId = groupThread.groupModel.groupId
-                let groupSecretParamsData = groupModel.secretParamsData
-                return Self.groupV2Updates.tryToRefreshV2GroupUpToCurrentRevisionImmediately(groupId: groupId,
-                                                                                             groupSecretParamsData: groupSecretParamsData).asVoid()
-            }.map(on: .global()) { () throws -> GroupsV2OutgoingChanges in
+                return GroupManager.ensureLocalProfileHasCommitmentIfNecessary()
+            }.map(on: .global()) { () throws -> GroupsV2ChangeSet in
                 let groupId = groupThread.groupModel.groupId
 
                 guard let groupModel = groupThread.groupModel as? TSGroupModelV2 else {
@@ -292,42 +270,12 @@ class GroupsV2ProfileKeyUpdater: Dependencies {
                     throw GroupsV2Error.shouldDiscard
                 }
                 let groupSecretParamsData = groupModel.secretParamsData
-                let changes = GroupsV2OutgoingChangesImpl(groupId: groupId,
-                                                          groupSecretParamsData: groupSecretParamsData)
-                changes.setShouldUpdateLocalProfileKey()
-                return changes
-            }.then(on: DispatchQueue.global()) { (changes: GroupsV2OutgoingChanges) -> Promise<TSGroupThread> in
-                self.groupsV2Impl.updateExistingGroupOnService(changes: changes,
-                                                               requiredRevision: checkedRevision)
-            }.then(on: .global()) { (groupThread: TSGroupThread) -> Promise<TSGroupThread> in
-                // Confirm that the updated snapshot has the new profile key.
-                firstly(on: .global()) { () -> Promise<GroupV2Snapshot> in
-                    guard let groupModel = groupThread.groupModel as? TSGroupModelV2 else {
-                        throw OWSAssertionError("Invalid group model.")
-                    }
-                    return self.groupsV2Impl.fetchCurrentGroupV2Snapshot(groupModel: groupModel)
-                }.map(on: .global()) { (groupV2Snapshot: GroupV2Snapshot) throws -> Void in
-                    if DebugFlags.internalLogging {
-                        Logger.info("updated revision: \(groupV2Snapshot.revision)")
-                        for (uuid, profileKey) in groupV2Snapshot.profileKeys {
-                            Logger.info("Existing profile key: \(profileKey.hexadecimalString), for uuid: \(uuid), is local: \(uuid == localUuid)")
-                        }
-                    }
-                    guard groupV2Snapshot.groupMembership.isFullMember(localAddress) else {
-                        owsFailDebug("Not a full member.")
-                        return
-                    }
-                    guard groupV2Snapshot.profileKeys.values.contains(profileKeyData) else {
-                        owsFailDebug("Update failed.")
-                        self.databaseStorage.write { transaction in
-                            self.versionedProfiles.clearProfileKeyCredential(for: localAddress,
-                                                                             transaction: transaction)
-                        }
-                        return
-                    }
-                }.map(on: .global()) { () -> TSGroupThread in
-                    groupThread
-                }
+                let changeSet = GroupsV2ChangeSetImpl(groupId: groupId,
+                                                      groupSecretParamsData: groupSecretParamsData)
+                changeSet.setShouldUpdateLocalProfileKey()
+                return changeSet
+            }.then(on: DispatchQueue.global()) { (changeSet: GroupsV2ChangeSet) -> Promise<TSGroupThread> in
+                return self.groupsV2.updateExistingGroupOnService(changeSet: changeSet)
             }.asVoid()
         }
     }

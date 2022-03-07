@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugUIMessagesAction.h"
@@ -25,6 +25,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation DebugUIMessagesAction
 
+#pragma mark - Dependencies
+
+- (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
+
+#pragma mark -
+
 - (DebugUIMessagesSingleAction *)nextActionToPerform
 {
     return (DebugUIMessagesSingleAction *)self;
@@ -43,7 +52,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)prepareAndPerformNTimes:(NSUInteger)count
 {
     OWSLogInfo(@"%@ prepareAndPerformNTimes: %zd", self.label, count);
-    OWSLogFlush();
+    [DDLog flushLog];
 
     [self prepare:^{
         [self performNTimes:count
@@ -62,7 +71,7 @@ NS_ASSUME_NONNULL_BEGIN
     OWSAssertDebug(failure);
 
     OWSLogInfo(@"%@ performNTimes: %zd", self.label, countParam);
-    OWSLogFlush();
+    [DDLog flushLog];
 
     if (countParam < 1) {
         success();
@@ -244,7 +253,7 @@ NS_ASSUME_NONNULL_BEGIN
     DebugUIMessagesAction *nextAction = unpreparedSubactions.lastObject;
     [unpreparedSubactions removeLastObject];
     OWSLogInfo(@"preparing: %@", nextAction.label);
-    OWSLogFlush();
+    [DDLog flushLog];
     [nextAction prepare:^{
         [self prepareSubactions:unpreparedSubactions success:success failure:failure];
     }

@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TestAppContext.h"
-#import "OWSFileSystem.h"
+#import <SignalServiceKit/OWSFileSystem.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -26,6 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
 @synthesize mainWindow = _mainWindow;
 @synthesize appLaunchTime = _appLaunchTime;
 @synthesize buildTime = _buildTime;
+@synthesize hideConversationPinCode = _hideConversationPinCode;
 
 - (instancetype)init
 {
@@ -36,18 +37,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     self.testKeychainStorage = [SSKTestKeychainStorage new];
 
-    // Avoid using OWSTemporaryDirectory(); it can consult the current app context.
-    NSString *dirName = [NSString stringWithFormat:@"ows_temp_%@", NSUUID.UUID.UUIDString];
-    NSString *temporaryDirectory = [NSTemporaryDirectory() stringByAppendingPathComponent:dirName];
-    NSError *error = nil;
-    [[NSFileManager defaultManager] createDirectoryAtPath:temporaryDirectory
-                              withIntermediateDirectories:YES
-                                               attributes:nil
-                                                    error:&error];
-    if (error) {
-        OWSFail(@"Failed to create directory: %@, error: %@", temporaryDirectory, error);
-    }
-
+    NSString *temporaryDirectory = OWSTemporaryDirectory();
     self.mockAppDocumentDirectoryPath = [temporaryDirectory stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
     self.mockAppSharedDataDirectoryPath = [temporaryDirectory stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
     self.appUserDefaults = [[NSUserDefaults alloc] init];
@@ -71,11 +61,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)isMainAppAndActive
 {
     return YES;
-}
-
-- (BOOL)isNSE
-{
-    return NO;
 }
 
 - (UIApplicationState)mainApplicationStateOnLaunch
@@ -132,8 +117,9 @@ NS_ASSUME_NONNULL_BEGIN
     return nil;
 }
 
-- (void)openSystemSettings
+- (nullable UIAlertAction *)openSystemSettingsActionWithCompletion:(void (^_Nullable)(void))completion
 {
+    return nil;
 }
 
 - (BOOL)isRunningTests
@@ -213,23 +199,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)didLastLaunchNotTerminate
 {
     return NO;
-}
-
-- (BOOL)hasActiveCall
-{
-    return NO;
-}
-
-- (NSString *)debugLogsDirPath
-{
-    return TestAppContext.testDebugLogsDirPath;
-}
-
-+ (NSString *)testDebugLogsDirPath
-{
-    NSString *dirPath = [OWSTemporaryDirectory() stringByAppendingPathComponent:@"TestLogs"];
-    [OWSFileSystem ensureDirectoryExists:dirPath];
-    return dirPath;
 }
 
 @end

@@ -1,8 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
+import PromiseKit
 
 class DownloadStickerPackOperation: CDNDownloadOperation {
 
@@ -13,8 +14,8 @@ class DownloadStickerPackOperation: CDNDownloadOperation {
     @objc public required init(stickerPackInfo: StickerPackInfo,
                                success : @escaping (StickerPack) -> Void,
                                failure : @escaping (Error) -> Void) {
-        owsAssertDebug(stickerPackInfo.packId.count > 0)
-        owsAssertDebug(stickerPackInfo.packKey.count > 0)
+        assert(stickerPackInfo.packId.count > 0)
+        assert(stickerPackInfo.packKey.count > 0)
 
         self.stickerPackInfo = stickerPackInfo
         self.success = success
@@ -34,38 +35,40 @@ class DownloadStickerPackOperation: CDNDownloadOperation {
 
         Logger.verbose("Downloading: \(stickerPackInfo).")
 
-        // https://cdn.signal.org/stickers/<pack_id>/manifest.proto
-        let urlPath = "stickers/\(stickerPackInfo.packId.hexadecimalString)/manifest.proto"
+        // https://cdn.tapofthink.com/stickers/<pack_id>/manifest.proto
+       let urlPath = "stickers/\(stickerPackInfo.packId.hexadecimalString)/manifest.proto"
+        // let urlPath = "stickers/\(stickerPackInfo.packId.hexadecimalString).proto"
 
         firstly {
-            try tryToDownload(urlPath: urlPath, maxDownloadSize: kMaxStickerPackDownloadSize)
-        }.done(on: .global()) { [weak self] (url: URL) in
+            try tryToDownload(urlPath: urlPath, maxDownloadSize: kMaxStickerDownloadSize)
+        }.done(on: DispatchQueue.global()) { [weak self] data in
             guard let self = self else {
                 return
             }
 
             do {
-                let url = try StickerManager.decrypt(at: url, packKey: self.stickerPackInfo.packKey)
-                let plaintext = try Data(contentsOf: url)
+                let plaintext = try StickerManager.decrypt(ciphertext: data, packKey: self.stickerPackInfo.packKey)
 
                 let stickerPack = try self.parseStickerPackManifest(stickerPackInfo: self.stickerPackInfo,
                                                                     manifestData: plaintext)
 
                 self.success(stickerPack)
                 self.reportSuccess()
-            } catch {
+            } catch let error as NSError {
                 owsFailDebug("Decryption failed: \(error)")
 
                 self.markUrlPathAsCorrupt(urlPath)
 
                 // Fail immediately; do not retry.
-                return self.reportError(SSKUnretryableError.stickerDecryptionFailure)
+                error.isRetryable = false
+                return self.reportError(error)
             }
-        }.catch(on: .global()) { [weak self] error in
+        }.catch(on: DispatchQueue.global()) { [weak self] error in
             guard let self = self else {
                 return
             }
-            if error.hasFatalHttpStatusCode() {
+            let nsError = error as NSError
+            if nsError.hasFatalAFStatusCode() {
                 StickerManager.markStickerPackAsMissing(stickerPackInfo: self.stickerPackInfo)
             }
             return self.reportError(withUndefinedRetry: error)
@@ -74,11 +77,11 @@ class DownloadStickerPackOperation: CDNDownloadOperation {
 
     private func parseStickerPackManifest(stickerPackInfo: StickerPackInfo,
                                           manifestData: Data) throws -> StickerPack {
-        owsAssertDebug(manifestData.count > 0)
+        assert(manifestData.count > 0)
 
         let manifestProto: SSKProtoPack
         do {
-            manifestProto = try SSKProtoPack(serializedData: manifestData)
+            manifestProto = try SSKProtoPack.parseData(manifestData)
         } catch let error as NSError {
             owsFailDebug("Couldn't parse protos: \(error)")
             throw StickerError.invalidInput
@@ -115,8 +118,7 @@ class DownloadStickerPackOperation: CDNDownloadOperation {
         }
         let stickerId = proto.id
         let emojiString = parseOptionalString(proto.emoji) ?? ""
-        let contentType = parseOptionalString(proto.contentType) ?? ""
-        return StickerPackItem(stickerId: stickerId, emojiString: emojiString, contentType: contentType)
+        return StickerPackItem(stickerId: stickerId, emojiString: emojiString)
     }
 
     override public func didFail(error: Error) {

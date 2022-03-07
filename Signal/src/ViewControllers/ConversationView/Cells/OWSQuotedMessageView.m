@@ -1,15 +1,17 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSQuotedMessageView.h"
-#import "Signal-Swift.h"
-#import <SignalMessaging/Environment.h>
+#import "ConversationViewItem.h"
+#import "Environment.h"
+#import "OWSBubbleView.h"
+#import "Yoush-Swift.h"
 #import <SignalMessaging/OWSContactsManager.h>
 #import <SignalMessaging/SignalMessaging-Swift.h>
+#import <SignalMessaging/UIView+OWS.h>
 #import <SignalServiceKit/TSAttachmentStream.h>
 #import <SignalServiceKit/TSMessage.h>
-#import <SignalUI/UIView+SignalUI.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -60,16 +62,7 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
 
     DisplayableText *_Nullable displayableQuotedText = nil;
     if (quotedMessage.body.length > 0) {
-        __block DisplayableText *displayableText;
-        [SDSDatabaseStorage.shared readWithBlock:^(SDSAnyReadTransaction *transaction) {
-            displayableText = [DisplayableText
-                displayableTextWithMessageBody:[[MessageBody alloc]
-                                                   initWithText:quotedMessage.body
-                                                         ranges:quotedMessage.bodyRanges ?: MessageBodyRanges.empty]
-                                  mentionStyle:MentionStyleQuotedReply
-                                   transaction:transaction];
-        }];
-        displayableQuotedText = displayableText;
+        displayableQuotedText = [DisplayableText displayableText:quotedMessage.body];
     }
 
     OWSQuotedMessageView *instance = [[OWSQuotedMessageView alloc]
@@ -127,7 +120,9 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
 
 - (UIColor *)highlightColor
 {
-    return [self.conversationStyle quotedReplyHighlightColor];
+    BOOL isQuotingSelf = self.quotedMessage.authorAddress.isLocalAddress;
+    return (isQuotingSelf ? [self.conversationStyle bubbleColorWithIsIncoming:NO]
+                          : [self.conversationStyle quotingSelfHighlightColor]);
 }
 
 #pragma mark -
@@ -162,33 +157,33 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
     self.clipsToBounds = YES;
 
     CAShapeLayer *maskLayer = [CAShapeLayer new];
-    UIRectCorner sharpCorners = [UIView uiRectCornerForOWSDirectionalRectCorner:self.sharpCorners];
+    OWSDirectionalRectCorner sharpCorners = self.sharpCorners;
 
     OWSLayerView *innerBubbleView = [[OWSLayerView alloc]
          initWithFrame:CGRectZero
         layoutCallback:^(UIView *layerView) {
+            CGRect layerFrame = layerView.bounds;
+
+            const CGFloat bubbleLeft = 0.f;
+            const CGFloat bubbleRight = layerFrame.size.width;
+            const CGFloat bubbleTop = 0.f;
+            const CGFloat bubbleBottom = layerFrame.size.height;
+
             const CGFloat sharpCornerRadius = 4;
             const CGFloat wideCornerRadius = 12;
-            UIBezierPath *bezierPath = [UIBezierPath roundedRect:layerView.bounds
-                                                    sharpCorners:sharpCorners
-                                               sharpCornerRadius:sharpCornerRadius
-                                                wideCornerRadius:wideCornerRadius];
+
+            UIBezierPath *bezierPath = [OWSBubbleView roundedBezierRectWithBubbleTop:bubbleTop
+                                                                          bubbleLeft:bubbleLeft
+                                                                        bubbleBottom:bubbleBottom
+                                                                         bubbleRight:bubbleRight
+                                                                   sharpCornerRadius:sharpCornerRadius
+                                                                    wideCornerRadius:wideCornerRadius
+                                                                        sharpCorners:sharpCorners];
+
             maskLayer.path = bezierPath.CGPath;
         }];
     innerBubbleView.layer.mask = maskLayer;
-
-    // Background
-    CVColorOrGradientView *chatColorView = [CVColorOrGradientView buildWithConversationStyle:self.conversationStyle
-                                                                               referenceView:self];
-    chatColorView.shouldDeactivateConstraints = NO;
-    [innerBubbleView addSubview:chatColorView];
-    [chatColorView autoPinEdgesToSuperviewEdges];
-    UIView *tintView = [UIView new];
-    tintView.backgroundColor = (self.conversationStyle.isDarkThemeEnabled ? [UIColor colorWithWhite:0 alpha:0.4]
-                                                                          : [UIColor colorWithWhite:1 alpha:0.6]);
-    [innerBubbleView addSubview:tintView];
-    [tintView autoPinEdgesToSuperviewEdges];
-
+    innerBubbleView.backgroundColor = self.conversationStyle.quotedReplyBubbleColor;
     [self addSubview:innerBubbleView];
     [innerBubbleView autoPinLeadingToSuperviewMarginWithInset:self.bubbleHMargin];
     [innerBubbleView autoPinTrailingToSuperviewMarginWithInset:self.bubbleHMargin];
@@ -202,11 +197,10 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
     hStackView.spacing = self.hSpacing;
 
     UIView *stripeView = [UIView new];
-    if (self.isForPreview || self.isOutgoing) {
-        stripeView.backgroundColor = UIColor.ows_whiteColor;
+    if (self.isForPreview) {
+        stripeView.backgroundColor = [self.conversationStyle quotedReplyStripeColorWithIsIncoming:YES];
     } else {
-        // We render the stripe by manipulating the chat color overlay.
-        stripeView.backgroundColor = UIColor.clearColor;
+        stripeView.backgroundColor = [self.conversationStyle quotedReplyStripeColorWithIsIncoming:!self.isOutgoing];
     }
     [stripeView autoSetDimension:ALDimensionWidth toSize:self.stripeThickness];
     [stripeView setContentHuggingHigh];
@@ -250,7 +244,7 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
                 [quotedAttachmentView addSubview:contentImageView];
                 [contentImageView autoCenterInSuperview];
             }
-        } else if (self.quotedMessage.failedThumbnailAttachmentPointer) {
+        } else if (self.quotedMessage.thumbnailDownloadFailed) {
             // TODO design review icon and color
             UIImage *contentIcon =
                 [[UIImage imageNamed:@"btnRefresh--white"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -270,12 +264,11 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
             [quotedAttachmentView addGestureRecognizer:tapGesture];
             quotedAttachmentView.userInteractionEnabled = YES;
         } else {
-            // TODO: Should we overlay the file extension like we do with CVComponentGenericAttachment
             UIImage *contentIcon = [UIImage imageNamed:@"generic-attachment"];
             UIImageView *contentImageView = [self imageViewForImage:contentIcon];
             contentImageView.contentMode = UIViewContentModeScaleAspectFit;
 
-            UIView *wrapper = [UIView transparentContainer];
+            UIView *wrapper = [UIView containerView];
             [wrapper addSubview:contentImageView];
             [contentImageView autoCenterInSuperview];
             [contentImageView autoSetDimension:ALDimensionWidth toSize:self.quotedAttachmentSize * 0.5f];
@@ -290,7 +283,7 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
         // If there's no attachment, add an empty view so that
         // the stack view's spacing serves as a margin between
         // the text views and the trailing edge.
-        UIView *emptyView = [UIView transparentContainer];
+        UIView *emptyView = [UIView containerView];
         [hStackView addArrangedSubview:emptyView];
         [emptyView setContentHuggingHigh];
         [emptyView autoSetDimension:ALDimensionWidth toSize:0.f];
@@ -385,13 +378,18 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
 {
     OWSLogDebug(@"in didTapFailedThumbnailDownload");
 
-    if (!self.quotedMessage.failedThumbnailAttachmentPointer) {
+    if (!self.quotedMessage.thumbnailDownloadFailed) {
+        OWSFailDebug(@"thumbnailDownloadFailed was unexpectedly false");
+        return;
+    }
+
+    if (!self.quotedMessage.thumbnailAttachmentPointer) {
         OWSFailDebug(@"thumbnailAttachmentPointer was unexpectedly nil");
         return;
     }
 
     [self.delegate didTapQuotedReply:self.quotedMessage
-        failedThumbnailDownloadAttachmentPointer:self.quotedMessage.failedThumbnailAttachmentPointer];
+        failedThumbnailDownloadAttachmentPointer:self.quotedMessage.thumbnailAttachmentPointer];
 }
 
 - (nullable UIImage *)tryToLoadThumbnailImage
@@ -426,45 +424,40 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
 {
     OWSAssertDebug(self.quotedTextLabel);
 
-    NSAttributedString *attributedText;
+    UIColor *textColor = self.quotedTextColor;
+    SUPPRESS_DEADSTORE_WARNING(textColor);
+    UIFont *font = self.quotedTextFont;
+    SUPPRESS_DEADSTORE_WARNING(font);
+    NSString *text = @"";
 
     NSString *_Nullable fileTypeForSnippet = [self fileTypeForSnippet];
     NSString *_Nullable sourceFilename = [self.quotedMessage.sourceFilename filterStringForDisplay];
 
-    if (self.displayableQuotedText.displayAttributedText.length > 0) {
-        NSMutableAttributedString *mutableText = [self.displayableQuotedText.displayAttributedText mutableCopy];
-        [mutableText addAttributes:@{
-            NSFontAttributeName : self.quotedTextFont,
-            NSForegroundColorAttributeName : self.quotedTextColor
-        }
-                             range:NSMakeRange(0, mutableText.length)];
-        attributedText = mutableText;
+    if (self.displayableQuotedText.displayText.length > 0) {
+        text = self.displayableQuotedText.displayText;
+        textColor = self.quotedTextColor;
+        font = self.quotedTextFont;
     } else if (fileTypeForSnippet) {
-        attributedText = [[NSAttributedString alloc] initWithString:fileTypeForSnippet
-                                                         attributes:@{
-                                                             NSFontAttributeName : self.fileTypeFont,
-                                                             NSForegroundColorAttributeName : self.fileTypeTextColor,
-                                                         }];
+        text = fileTypeForSnippet;
+        textColor = self.fileTypeTextColor;
+        font = self.fileTypeFont;
     } else if (sourceFilename) {
-        attributedText = [[NSAttributedString alloc] initWithString:sourceFilename
-                                                         attributes:@{
-                                                             NSFontAttributeName : self.filenameFont,
-                                                             NSForegroundColorAttributeName : self.filenameTextColor,
-                                                         }];
+        text = sourceFilename;
+        textColor = self.filenameTextColor;
+        font = self.filenameFont;
     } else {
-        attributedText = [[NSAttributedString alloc]
-            initWithString:NSLocalizedString(@"QUOTED_REPLY_TYPE_ATTACHMENT",
-                               @"Indicates this message is a quoted reply to an attachment of unknown type.")
-                attributes:@{
-                    NSFontAttributeName : self.fileTypeFont,
-                    NSForegroundColorAttributeName : self.fileTypeTextColor,
-                }];
+        text = NSLocalizedString(
+                                 @"QUOTED_REPLY_TYPE_ATTACHMENT", @"Indicates this message is a quoted reply to an attachment of unknown type.");
+        textColor = self.fileTypeTextColor;
+        font = self.fileTypeFont;
     }
 
     self.quotedTextLabel.numberOfLines = self.isForPreview ? 1 : 2;
     self.quotedTextLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    self.quotedTextLabel.text = text;
     self.quotedTextLabel.textAlignment = self.displayableQuotedText.displayTextNaturalAlignment;
-    self.quotedTextLabel.attributedText = attributedText;
+    self.quotedTextLabel.textColor = textColor;
+    self.quotedTextLabel.font = font;
 
     return self.quotedTextLabel;
 }
@@ -494,23 +487,15 @@ const CGFloat kRemotelySourcedContentRowSpacing = 3;
     if ([MIMETypeUtil isAudio:contentType]) {
         return NSLocalizedString(
             @"QUOTED_REPLY_TYPE_AUDIO", @"Indicates this message is a quoted reply to an audio file.");
-    } else if ([MIMETypeUtil isAnimated:contentType]) {
-        if ([contentType caseInsensitiveCompare:OWSMimeTypeImageGif] == NSOrderedSame) {
-            return NSLocalizedString(
-                @"QUOTED_REPLY_TYPE_GIF", @"Indicates this message is a quoted reply to animated GIF file.");
-        } else {
-            return NSLocalizedString(
-                @"QUOTED_REPLY_TYPE_IMAGE", @"Indicates this message is a quoted reply to an image file.");
-        }
-    } else if (self.quotedMessage.attachmentStream.isLoopingVideo) {
-        return NSLocalizedString(
-            @"QUOTED_REPLY_TYPE_GIF", @"Indicates this message is a quoted reply to animated GIF file.");
     } else if ([MIMETypeUtil isVideo:contentType]) {
         return NSLocalizedString(
             @"QUOTED_REPLY_TYPE_VIDEO", @"Indicates this message is a quoted reply to a video file.");
     } else if ([MIMETypeUtil isImage:contentType]) {
         return NSLocalizedString(
-            @"QUOTED_REPLY_TYPE_PHOTO", @"Indicates this message is a quoted reply to a photo file.");
+            @"QUOTED_REPLY_TYPE_IMAGE", @"Indicates this message is a quoted reply to an image file.");
+    } else if ([MIMETypeUtil isAnimated:contentType]) {
+        return NSLocalizedString(
+            @"QUOTED_REPLY_TYPE_GIF", @"Indicates this message is a quoted reply to animated GIF file.");
     }
     return nil;
 }

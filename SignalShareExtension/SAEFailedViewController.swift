@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import UIKit
@@ -7,7 +7,7 @@ import SignalMessaging
 import PureLayout
 
 // All Observer methods will be invoked from the main thread.
-protocol SAEFailedViewDelegate: AnyObject {
+protocol SAEFailedViewDelegate: class {
     func shareViewWasCancelled()
 }
 
@@ -27,7 +27,7 @@ class SAEFailedViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
     }
 
-    @available(*, unavailable, message: "use other constructor instead.")
+    @available(*, unavailable, message:"use other constructor instead.")
     required init?(coder aDecoder: NSCoder) {
         notImplemented()
     }
@@ -42,13 +42,13 @@ class SAEFailedViewController: UIViewController {
 
         self.view.backgroundColor = Theme.launchScreenBackground
 
-        let logoImage = UIImage(named: "signal-logo-128-launch-screen")
-        let logoImageView = UIImageView(image: logoImage)
-        self.view.addSubview(logoImageView)
-        logoImageView.autoCenterInSuperview()
-        let logoSize = CGFloat(120)
-        logoImageView.autoSetDimension(.width, toSize: logoSize)
-        logoImageView.autoSetDimension(.height, toSize: logoSize)
+        // let logoImage = UIImage(named: "3-flash-screen")
+        // let logoImageView = UIImageView(image: logoImage)
+        // self.view.addSubview(logoImageView)
+        // logoImageView.autoCenterInSuperview()
+        // let logoSize = CGFloat(120)
+        // logoImageView.autoSetDimension(.width, toSize: logoSize)
+        // logoImageView.autoSetDimension(.height, toSize: logoSize)
 
         let titleLabel = UILabel()
         titleLabel.textColor = UIColor.white
@@ -60,7 +60,7 @@ class SAEFailedViewController: UIViewController {
         self.view.addSubview(titleLabel)
         titleLabel.autoPinEdge(toSuperviewEdge: .leading, withInset: 20)
         titleLabel.autoPinEdge(toSuperviewEdge: .trailing, withInset: 20)
-        titleLabel.autoPinEdge(.top, to: .bottom, of: logoImageView, withOffset: 25)
+        // titleLabel.autoPinEdge(.top, to: .bottom, of: logoImageView, withOffset: 25)
 
         let messageLabel = UILabel()
         messageLabel.textColor = UIColor.white

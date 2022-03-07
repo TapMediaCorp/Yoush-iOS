@@ -1,2 +1,0 @@
-• Okunmamış sohbetlerin daha net görülmesini sağlamak için, sohbet listesine biraz çeki düzen verdik
-• Arama ve fotoğraflara zoom yapmayla ilgili bazı sorunlar için düzeltmeler

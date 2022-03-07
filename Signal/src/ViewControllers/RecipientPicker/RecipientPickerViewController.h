@@ -1,13 +1,14 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalUI/OWSViewController.h>
+#import <SignalMessaging/OWSViewController.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
 @protocol RecipientPickerDelegate;
 
+@class ContactsViewHelper;
 @class PickedRecipient;
 
 @interface RecipientPickerViewController : OWSViewController
@@ -31,18 +32,18 @@ NS_ASSUME_NONNULL_BEGIN
 /// Defaults to `NO`
 @property (nonatomic) BOOL showUseAsyncSelection;
 
+/// Defaults to `NO`
+@property (nonatomic) BOOL showDeviceContact;
+
 @property (nonatomic, nullable) NSString *findByPhoneNumberButtonTitle;
 
-@property (nonatomic, nullable) NSArray<PickedRecipient *> *pickedRecipients;
+@property (nonatomic, readonly) ContactsViewHelper *contactsViewHelper;
 
-@property (nonatomic) UITableView *tableView;
+@property (nonatomic, nullable) NSArray<PickedRecipient *> *pickedRecipients;
 
 - (void)reloadContent;
 
 - (void)clearSearchText;
-
-- (void)applyThemeToViewController:(UIViewController *)viewController;
-- (void)removeThemeFromViewController:(UIViewController *)viewController;
 
 @end
 

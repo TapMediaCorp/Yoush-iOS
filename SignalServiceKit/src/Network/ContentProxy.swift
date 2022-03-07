@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,37 +8,89 @@ import SignalCoreKit
 @objc
 public class ContentProxy: NSObject {
 
-    @available(*, unavailable, message: "do not instantiate this class.")
+    @available(*, unavailable, message:"do not instantiate this class.")
     private override init() {
     }
 
     @objc
     public class func sessionConfiguration() -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
-        let proxyHost = "contentproxy.signal.org"
+        let proxyHost = "contentproxy.tapofthink.com"
         let proxyPort = 443
+//        configuration.connectionProxyDictionary = [
+//            "HTTPEnable": 1,
+//            "HTTPProxy": proxyHost,
+//            "HTTPPort": proxyPort,
+//            "HTTPSEnable": 1,
+//            "HTTPSProxy": proxyHost,
+//            "HTTPSPort": proxyPort
+//        ]
         configuration.connectionProxyDictionary = [
             "HTTPEnable": 1,
-            "HTTPProxy": proxyHost,
-            "HTTPPort": proxyPort,
-            "HTTPSEnable": 1,
-            "HTTPSProxy": proxyHost,
-            "HTTPSPort": proxyPort
+            "HTTPSEnable": 1
         ]
         return configuration
     }
 
-    public static let userAgent = "Signal iOS (+https://signal.org/download)"
+    public class func sessionManager(baseUrl: URL) -> AFHTTPSessionManager {
+        return AFHTTPSessionManager(baseURL: baseUrl,
+                                    sessionConfiguration: sessionConfiguration())
+    }
+
+    public class func jsonSessionManager(baseUrl: URL) -> AFHTTPSessionManager {
+        let jsonSessionManager = sessionManager(baseUrl: baseUrl)
+        jsonSessionManager.requestSerializer = AFJSONRequestSerializer()
+        jsonSessionManager.responseSerializer = AFJSONResponseSerializer()
+        return jsonSessionManager
+    }
+
+    static let userAgent = "Signal iOS (+https://tapofthink.com/download)"
 
     public class func configureProxiedRequest(request: inout URLRequest) -> Bool {
-        // Replace user-agent.
-        let headers = OWSHttpHeaders(httpHeaders: request.allHTTPHeaderFields)
-        headers.addHeader(OWSHttpHeaders.userAgentHeaderKey, value: userAgent, overwriteOnConflict: true)
-        request.allHTTPHeaderFields = headers.headers
+        request.addValue(userAgent, forHTTPHeaderField: "User-Agent")
 
         padRequestSize(request: &request)
 
-        return request.url?.scheme?.lowercased() == "https"
+        guard let url = request.url,
+        let scheme = url.scheme,
+            scheme.lowercased() == "https" else {
+                return false
+        }
+        return true
+    }
+
+    // This mutates the session manager state, so its the caller's obligation to avoid conflicts by:
+    //
+    // * Using a new session manager for each request.
+    // * Pooling session managers.
+    // * Using a single session manager on a single queue.
+    @objc
+    public class func configureSessionManager(sessionManager: AFHTTPSessionManager,
+                                              forUrl urlString: String) -> Bool {
+
+        guard let url = URL(string: urlString, relativeTo: sessionManager.baseURL) else {
+            owsFailDebug("Invalid URL query: \(urlString).")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+
+        guard configureProxiedRequest(request: &request) else {
+            owsFailDebug("Invalid URL query: \(urlString).")
+            return false
+        }
+
+        // Remove all headers from the request.
+        for headerField in sessionManager.requestSerializer.httpRequestHeaders.keys {
+            sessionManager.requestSerializer.setValue(nil, forHTTPHeaderField: headerField)
+        }
+        // Honor the request's headers.
+        if let allHTTPHeaderFields = request.allHTTPHeaderFields {
+            for (headerField, headerValue) in allHTTPHeaderFields {
+                sessionManager.requestSerializer.setValue(headerValue, forHTTPHeaderField: headerField)
+            }
+        }
+        return true
     }
 
     public class func padRequestSize(request: inout URLRequest) {

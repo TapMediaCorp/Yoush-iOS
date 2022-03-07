@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/BaseModel.h>
+#import "BaseModel.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -17,7 +17,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readonly, nullable) NSData *plaintextData;
 @property (nonatomic, readonly) BOOL wasReceivedByUD;
 @property (nonatomic, readonly, nullable) NSData *groupId;
-@property (nonatomic, readonly) uint64_t serverDeliveryTimestamp;
 
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
@@ -28,8 +27,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithEnvelopeData:(NSData *)envelopeData
                        plaintextData:(NSData *_Nullable)plaintextData
                              groupId:(NSData *_Nullable)groupId
-                     wasReceivedByUD:(BOOL)wasReceivedByUD
-             serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp NS_DESIGNATED_INITIALIZER;
+                     wasReceivedByUD:(BOOL)wasReceivedByUD NS_DESIGNATED_INITIALIZER;
 
 // --- CODE GENERATION MARKER
 
@@ -43,9 +41,8 @@ NS_ASSUME_NONNULL_BEGIN
                     envelopeData:(NSData *)envelopeData
                          groupId:(nullable NSData *)groupId
                    plaintextData:(nullable NSData *)plaintextData
-         serverDeliveryTimestamp:(uint64_t)serverDeliveryTimestamp
                  wasReceivedByUD:(BOOL)wasReceivedByUD
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:createdAt:envelopeData:groupId:plaintextData:serverDeliveryTimestamp:wasReceivedByUD:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:createdAt:envelopeData:groupId:plaintextData:wasReceivedByUD:));
 
 // clang-format on
 

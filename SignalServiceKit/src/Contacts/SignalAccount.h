@@ -1,8 +1,8 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
-#import <SignalServiceKit/BaseModel.h>
+#import "BaseModel.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -31,27 +31,31 @@ NS_ASSUME_NONNULL_BEGIN
 // non-contact account.
 @property (nonatomic, nullable, readonly) Contact *contact;
 
+// We cache the contact avatar data on this class.
+//
 // contactAvatarHash is the hash of the original avatar
 // data (if any) from the system contact.  We use it for
 // change detection.
 //
+// contactAvatarJpegData contains the data we'll sync
+// to Desktop. We only want to send valid avatar images.
+// Converting the avatars to JPEGs isn't deterministic
+// and our contact sync de-bouncing logic is based
+// on the actual data sent over the wire, so we need
+// to cache this as well.
+//
 // This property is optional and will not be set for
 // non-contact account.
 @property (nonatomic, nullable, readonly) NSData *contactAvatarHash;
-
-// This property is obsolete.
-@property (nonatomic, nullable, readonly) NSData *contactAvatarJpegDataObsolete;
+@property (nonatomic, nullable, readonly) NSData *contactAvatarJpegData;
 
 // For contacts with more than one signal account,
 // this is a label for the account.
 @property (nonatomic, readonly) NSString *multipleAccountLabelText;
 
-- (nullable NSString *)contactPreferredDisplayName;
 - (nullable NSString *)contactFullName;
 - (nullable NSString *)contactFirstName;
 - (nullable NSString *)contactLastName;
-- (nullable NSString *)contactNicknameIfAvailable;
-- (nullable NSPersonNameComponents *)contactPersonNameComponents;
 
 + (instancetype)new NS_UNAVAILABLE;
 - (instancetype)init NS_UNAVAILABLE;
@@ -62,24 +66,18 @@ NS_ASSUME_NONNULL_BEGIN
 // Convenience initializer which is neither "designated" nor "unavailable".
 - (instancetype)initWithSignalRecipient:(SignalRecipient *)signalRecipient
                                 contact:(nullable Contact *)contact
-                      contactAvatarHash:(nullable NSData *)contactAvatarHash
                multipleAccountLabelText:(nullable NSString *)multipleAccountLabelText;
 
 // Convenience initializer which is neither "designated" nor "unavailable".
 - (instancetype)initWithSignalServiceAddress:(SignalServiceAddress *)address NS_SWIFT_NAME(init(address:));
 
-// Convenience initializer which is neither "designated" nor "unavailable".
 - (instancetype)initWithSignalServiceAddress:(SignalServiceAddress *)serviceAddress
                                      contact:(nullable Contact *)contact
-                    multipleAccountLabelText:(nullable NSString *)multipleAccountLabelText;
-
-- (instancetype)initWithSignalServiceAddress:(SignalServiceAddress *)serviceAddress
-                                     contact:(nullable Contact *)contact
-                           contactAvatarHash:(nullable NSData *)contactAvatarHash
                     multipleAccountLabelText:(nullable NSString *)multipleAccountLabelText NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)initWithContact:(nullable Contact *)contact
               contactAvatarHash:(nullable NSData *)contactAvatarHash
+          contactAvatarJpegData:(nullable NSData *)contactAvatarJpegData
        multipleAccountLabelText:(NSString *)multipleAccountLabelText
            recipientPhoneNumber:(nullable NSString *)recipientPhoneNumber
                   recipientUUID:(nullable NSString *)recipientUUID NS_DESIGNATED_INITIALIZER;
@@ -94,17 +92,19 @@ NS_ASSUME_NONNULL_BEGIN
                       uniqueId:(NSString *)uniqueId
                          contact:(nullable Contact *)contact
                contactAvatarHash:(nullable NSData *)contactAvatarHash
-   contactAvatarJpegDataObsolete:(nullable NSData *)contactAvatarJpegDataObsolete
+           contactAvatarJpegData:(nullable NSData *)contactAvatarJpegData
         multipleAccountLabelText:(NSString *)multipleAccountLabelText
             recipientPhoneNumber:(nullable NSString *)recipientPhoneNumber
                    recipientUUID:(nullable NSString *)recipientUUID
-NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:contact:contactAvatarHash:contactAvatarJpegDataObsolete:multipleAccountLabelText:recipientPhoneNumber:recipientUUID:));
+NS_DESIGNATED_INITIALIZER NS_SWIFT_NAME(init(grdbId:uniqueId:contact:contactAvatarHash:contactAvatarJpegData:multipleAccountLabelText:recipientPhoneNumber:recipientUUID:));
 
 // clang-format on
 
 // --- CODE GENERATION MARKER
 
 - (BOOL)hasSameContent:(SignalAccount *)other;
+
+- (void)tryToCacheContactAvatarData;
 
 - (void)updateWithContact:(nullable Contact *)contact
               transaction:(SDSAnyWriteTransaction *)transaction NS_SWIFT_NAME(updateWithContact(_:transaction:));

@@ -1,9 +1,9 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
-import CoreServices
+import PromiseKit
 
 protocol PhotoCaptureDelegate: AnyObject {
 
@@ -33,8 +33,6 @@ protocol PhotoCaptureDelegate: AnyObject {
 
 }
 
-// MARK: -
-
 @objc
 class PhotoCapture: NSObject {
 
@@ -43,8 +41,7 @@ class PhotoCapture: NSObject {
     // There can only ever be one `CapturePreviewView` per AVCaptureSession
     lazy private(set) var previewView = CapturePreviewView(session: session)
 
-    fileprivate static let sessionQueue = DispatchQueue(label: "PhotoCapture.sessionQueue")
-    private var sessionQueue: DispatchQueue { PhotoCapture.sessionQueue }
+    private let sessionQueue = DispatchQueue(label: "PhotoCapture.sessionQueue")
 
     private var currentCaptureInput: AVCaptureDeviceInput?
     private let captureOutput: CaptureOutput
@@ -84,6 +81,12 @@ class PhotoCapture: NSObject {
         DispatchQueue.main.async {
             self.delegate?.photoCapture(self, didCompleteFocusingAtPoint: focusPoint)
         }
+    }
+
+    // MARK: - Dependencies
+
+    private var audioSession: OWSAudioSession {
+        return Environment.shared.audioSession
     }
 
     private var audioDeviceInput: AVCaptureDeviceInput?
@@ -156,7 +159,7 @@ class PhotoCapture: NSObject {
         videoConnection.videoOrientation = orientation
     }
 
-    public func prepareVideoCapture() -> Promise<Void> {
+    public func startVideoCapture() -> Promise<Void> {
         AssertIsOnMainThread()
         guard !Platform.isSimulator else {
             // Trying to actually set up the capture session will fail on a simulator
@@ -177,6 +180,7 @@ class PhotoCapture: NSObject {
 
         return sessionQueue.async(.promise) { [weak self] in
             guard let self = self else { return }
+            guard let delegate = self.delegate else { return }
 
             self.session.beginConfiguration()
             defer { self.session.commitConfiguration() }
@@ -223,20 +227,15 @@ class PhotoCapture: NSObject {
             } else {
                 owsFailDebug("couldn't add audioDataOutput")
             }
+        }.done(on: sessionQueue) {
+            self.session.startRunning()
         }
     }
 
     @discardableResult
     public func stopCapture() -> Guarantee<Void> {
-        sessionQueue.async(.promise) { [session] in
-            session.stopRunning()
-        }
-    }
-
-    @discardableResult
-    public func resumeCapture() -> Guarantee<Void> {
-        sessionQueue.async(.promise) { [session] in
-            session.startRunning()
+        return sessionQueue.async(.promise) {
+            self.session.stopRunning()
         }
     }
 
@@ -384,7 +383,7 @@ class PhotoCapture: NSObject {
     private var previousZoomFactor: CGFloat = 1.0
 
     public func updateZoom(alpha: CGFloat) {
-        owsAssertDebug(alpha >= 0 && alpha <= 1)
+        assert(alpha >= 0 && alpha <= 1)
         sessionQueue.async {
             guard let captureDevice = self.captureDevice else {
                 owsFailDebug("captureDevice was unexpectedly nil")
@@ -468,18 +467,6 @@ class PhotoCapture: NSObject {
 
     // MARK: - Video
 
-    private var _lastMovieRecordingEndDate: Date?
-    private var lastMovieRecordingEndDate: Date? {
-        get {
-            AssertIsOnMainThread()
-            return _lastMovieRecordingEndDate
-        }
-        set {
-            AssertIsOnMainThread()
-            _lastMovieRecordingEndDate = newValue
-        }
-    }
-
     private func beginMovieCapture() {
         AssertIsOnMainThread()
         Logger.verbose("")
@@ -491,154 +478,44 @@ class PhotoCapture: NSObject {
         }
 
         let aspectRatio = captureOutputAspectRatio
-        firstly(on: captureOutput.movieRecordingQueue) { () -> Promise<Void> in
-            let movieRecordingBox = self.captureOutput.newMovieRecordingBox()
-            return firstly(on: self.sessionQueue) {
-                self.session.beginConfiguration()
-                defer { self.session.commitConfiguration() }
+        sessionQueue.async(.promise) {
+            self.session.beginConfiguration()
+            defer { self.session.commitConfiguration() }
 
-                self.shouldHaveAudioCapture = true
-                self.setTorchMode(self.flashMode.toTorchMode)
-                return try self.captureOutput.beginMovie(delegate: self, aspectRatio: aspectRatio)
-            }.done(on: self.captureOutput.movieRecordingQueue) { movieRecording in
-                movieRecordingBox.set(movieRecording)
-            }.done {
-                // Don't mark recording as begun if recording has already been cancelled
-                // or superceded by another recording.
-                let shouldBegin: Bool = {
-                    if let lastMovieRecordingEndDate = self.lastMovieRecordingEndDate,
-                       lastMovieRecordingEndDate > movieRecordingBox.startDate {
-                        return false
-                    }
-                    return true
-                }()
-                guard shouldBegin else {
-                    throw PhotoCaptureError.invalidVideo
-                }
-
-                self.delegate?.photoCaptureDidBeginMovie(self)
-            }
+            try self.startAudioCapture()
+            return try self.captureOutput.beginMovie(delegate: self, aspectRatio: aspectRatio)
+        }.done(on: captureOutput.movieRecordingQueue) { movieRecording in
+            self.captureOutput.movieRecording = movieRecording
+        }.done {
+            self.delegate?.photoCaptureDidBeginMovie(self)
         }.catch { error in
-            self.handleMovieCaptureError(error)
+            self.delegate?.photoCapture(self, processingDidError: error)
         }
     }
 
     private func completeMovieCapture() {
         Logger.verbose("")
         BenchEventStart(title: "Movie Processing", eventId: "Movie Processing")
-        firstly(on: captureOutput.movieRecordingQueue) { () -> Date in
-            guard let movieRecordingStartDate = self.captureOutput.currentMovieRecordingStartDate else {
-                throw PhotoCaptureError.invalidVideo
-            }
+        captureOutput.movieRecordingQueue.async(.promise) {
             self.captureOutput.completeMovie(delegate: self)
-            return movieRecordingStartDate
-        }.done(on: .main) { movieRecordingStartDate in
-            AssertIsOnMainThread()
-
-            // Don't mark recording as complete if recording has already been cancelled
-            // or superceded by another recording.
-            let shouldComplete: Bool = {
-                if let lastMovieRecordingEndDate = self.lastMovieRecordingEndDate,
-                   lastMovieRecordingEndDate > movieRecordingStartDate {
-                    return false
-                }
-                return true
-            }()
-            guard shouldComplete else {
-                throw PhotoCaptureError.invalidVideo
-            }
-
-            self.sessionQueue.async {
-                self.setTorchMode(.off)
-                self.shouldHaveAudioCapture = false
-            }
-
-            // Inform UI that capture is stopping.
-            self.lastMovieRecordingEndDate = movieRecordingStartDate
-            self.delegate?.photoCaptureDidCompleteMovie(self)
-        }.catch { error in
-            self.handleMovieCaptureError(error)
+        }.done(on: sessionQueue) {
+            self.stopAudioCapture()
         }
-    }
 
-    private func handleMovieCaptureError(_ error: Error) {
         AssertIsOnMainThread()
-        if case PhotoCaptureError.invalidVideo = error {
-            Logger.warn("Error: \(error)")
-        } else {
-            owsFailDebug("Error: \(error)")
-        }
-        self.sessionQueue.async {
-            self.setTorchMode(.off)
-            self.shouldHaveAudioCapture = false
-        }
-        self.lastMovieRecordingEndDate = Date()
-        self.delegate?.photoCapture(self, processingDidError: error)
+        // immediately inform UI that capture is stopping
+        delegate?.photoCaptureDidCompleteMovie(self)
     }
 
     private func cancelMovieCapture() {
         Logger.verbose("")
         AssertIsOnMainThread()
-
-        firstly(on: captureOutput.movieRecordingQueue) {
-            self.captureOutput.cancelVideo(delegate: self)
-        }.done(on: .main) {
-            AssertIsOnMainThread()
-
-            self.sessionQueue.async {
-                self.setTorchMode(.off)
-                self.shouldHaveAudioCapture = false
-            }
-
-            // Inform UI that capture is stopping.
-            self.lastMovieRecordingEndDate = Date()
-            self.delegate?.photoCaptureDidCancelMovie(self)
-        }.catch { error in
-            self.handleMovieCaptureError(error)
+        sessionQueue.async {
+            self.stopAudioCapture()
         }
-    }
-
-    private var _shouldHaveAudioCapture = false
-    private var shouldHaveAudioCapture: Bool {
-        get {
-            assertOnQueue(sessionQueue)
-            return _shouldHaveAudioCapture
-        }
-        set {
-            assertOnQueue(sessionQueue)
-            guard _shouldHaveAudioCapture != newValue else {
-                return
-            }
-            _shouldHaveAudioCapture = newValue
-
-            if newValue {
-                do {
-                    try self.startAudioCapture()
-                } catch {
-                    owsFailDebug("Error: \(error)")
-                    _shouldHaveAudioCapture = false
-                }
-            } else {
-                self.stopAudioCapture()
-            }
-        }
-    }
-
-    private func setTorchMode(_ mode: AVCaptureDevice.TorchMode) {
-        assertIsOnSessionQueue()
-
-        guard let captureDevice = captureDevice, captureDevice.hasTorch, captureDevice.isTorchModeSupported(mode) else { return }
-        do {
-            try captureDevice.lockForConfiguration()
-            captureDevice.torchMode = mode
-            captureDevice.unlockForConfiguration()
-        } catch {
-            owsFailDebug("Error setting torchMode: \(error)")
-        }
+        delegate?.photoCaptureDidCancelMovie(self)
     }
 }
-
-// MARK: -
 
 extension PhotoCapture: VolumeButtonObserver {
     func didPressVolumeButton(with identifier: VolumeButtons.Identifier) {
@@ -665,8 +542,6 @@ extension PhotoCapture: VolumeButtonObserver {
         cancelMovieCapture()
     }
 }
-
-// MARK: -
 
 extension PhotoCapture: CaptureButtonDelegate {
     func didTapCaptureButton(_ captureButton: CaptureButton) {
@@ -697,8 +572,6 @@ extension PhotoCapture: CaptureButtonDelegate {
         updateZoom(alpha: zoomAlpha)
     }
 }
-
-// MARK: -
 
 extension PhotoCapture: CaptureOutputDelegate {
 
@@ -734,7 +607,7 @@ extension PhotoCapture: CaptureOutputDelegate {
         case .success(let photoData):
             let dataSource = DataSourceValue.dataSource(with: photoData, utiType: kUTTypeJPEG as String)
 
-            let attachment = SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeJPEG as String)
+            let attachment = SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeJPEG as String, imageQuality: .medium)
             delegate.photoCapture(self, didFinishProcessingAttachment: attachment)
         }
     }
@@ -748,17 +621,13 @@ extension PhotoCapture: CaptureOutputDelegate {
 
         switch movieUrl {
         case .failure(let error):
-            self.handleMovieCaptureError(error)
+            delegate.photoCapture(self, processingDidError: error)
         case .success(let movieUrl):
-            guard OWSMediaUtils.isValidVideo(path: movieUrl.path) else {
-                self.handleMovieCaptureError(PhotoCaptureError.invalidVideo)
-                return
-            }
             guard let dataSource = try? DataSourcePath.dataSource(with: movieUrl, shouldDeleteOnDeallocation: true) else {
-                self.handleMovieCaptureError(PhotoCaptureError.captureFailed)
+                delegate.photoCapture(self, processingDidError: PhotoCaptureError.captureFailed)
                 return
             }
-            let attachment = SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeMPEG4 as String)
+            let attachment = SignalAttachment.attachment(dataSource: dataSource, dataUTI: kUTTypeMPEG4 as String, imageQuality: .original)
 
             BenchEventComplete(eventId: "Movie Processing")
             delegate.photoCapture(self, didFinishProcessingAttachment: attachment)
@@ -791,8 +660,6 @@ protocol CaptureOutputDelegate: AnyObject {
     var captureOutputPhotoRect: CGRect { get }
 }
 
-// MARK: -
-
 protocol ImageCaptureOutput: AnyObject {
     var avOutput: AVCaptureOutput { get }
     var flashMode: AVCaptureDevice.FlashMode { get set }
@@ -801,8 +668,6 @@ protocol ImageCaptureOutput: AnyObject {
     func takePhoto(delegate: CaptureOutputDelegate, captureRect: CGRect)
 }
 
-// MARK: -
-
 class CaptureOutput: NSObject {
 
     let imageOutput: ImageCaptureOutput
@@ -810,56 +675,8 @@ class CaptureOutput: NSObject {
     let videoDataOutput: AVCaptureVideoDataOutput
     let audioDataOutput: AVCaptureAudioDataOutput
 
-    static let movieRecordingQueue = DispatchQueue(label: "CaptureOutput.movieRecordingQueue", qos: .userInitiated)
-    var movieRecordingQueue: DispatchQueue { CaptureOutput.movieRecordingQueue }
-
-    // A user might cancel movie recording before recording has
-    // begun (e.g. an instance of MovieRecording has been created),
-    // with a very short long press gesture.
-    // We handle that case by marking that recording as aborted
-    // before it exists using this box.
-    struct MovieRecordingBox {
-        let startDate = Date()
-
-        private let invalidated = AtomicBool(false)
-        private let movieRecording = AtomicOptional<MovieRecording>(nil)
-
-        func set(_ value: MovieRecording) {
-            movieRecording.set(value)
-        }
-
-        @discardableResult
-        func invalidate() -> MovieRecording? {
-            let value = self.value
-            invalidated.set(true)
-            return value
-        }
-
-        var value: MovieRecording? {
-            guard !invalidated.get() else {
-                return nil
-            }
-            return movieRecording.get()
-        }
-    }
-    private let _movieRecordingBox = AtomicOptional<MovieRecordingBox>(nil)
-    var currentMovieRecordingStartDate: Date? {
-        _movieRecordingBox.get()?.startDate
-    }
-    var currentMovieRecording: MovieRecording? {
-        _movieRecordingBox.get()?.value
-    }
-    @discardableResult
-    func clearMovieRecording() -> MovieRecording? {
-        let box = _movieRecordingBox.swap(nil)
-        return box?.invalidate()
-    }
-    func newMovieRecordingBox() -> MovieRecordingBox {
-        let newBox = MovieRecordingBox()
-        let oldBox = _movieRecordingBox.swap(newBox)
-        oldBox?.invalidate()
-        return newBox
-    }
+    let movieRecordingQueue = DispatchQueue(label: "CaptureOutput.movieRecordingQueue", qos: .userInitiated)
+    var movieRecording: MovieRecording?
 
     // MARK: - Init
 
@@ -921,7 +738,7 @@ class CaptureOutput: NSObject {
         let videoOrientation = delegate.captureOrientation
         videoConnection.videoOrientation = videoOrientation
 
-        owsAssertDebug(currentMovieRecording == nil)
+        assert(movieRecording == nil)
         let outputURL = OWSFileSystem.temporaryFileUrl(fileExtension: "mp4")
         let assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
@@ -947,7 +764,7 @@ class CaptureOutput: NSObject {
             AVVideoWidthKey: outputSize.width,
             AVVideoHeightKey: outputSize.height,
             AVVideoScalingModeKey: AVVideoScalingModeResizeAspectFill,
-            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoCodecKey: AVVideoCodecH264,
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: 2000000,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264Baseline41,
@@ -961,7 +778,7 @@ class CaptureOutput: NSObject {
         videoInput.expectsMediaDataInRealTime = true
         assetWriter.add(videoInput)
 
-        let audioSettings: [String: Any]? = self.audioDataOutput.recommendedAudioSettingsForAssetWriter(writingTo: .mp4)
+        let audioSettings: [String: Any]? =  self.audioDataOutput.recommendedAudioSettingsForAssetWriter(writingTo: .mp4) as? [String: Any]
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInput.expectsMediaDataInRealTime = true
         if audioSettings != nil {
@@ -974,18 +791,12 @@ class CaptureOutput: NSObject {
     }
 
     func completeMovie(delegate: CaptureOutputDelegate) {
-        assertOnQueue(movieRecordingQueue)
-
         firstly { () -> Promise<URL> in
             assertOnQueue(movieRecordingQueue)
-            guard let movieRecording = self.clearMovieRecording() else {
-                // If the user cancels a video before recording begins,
-                // the instance of MovieRecording might not be set yet.
-                // clearMovieRecording() will ensure that race does not
-                // cause problems.
-                Logger.warn("Movie recording is nil.")
-                throw PhotoCaptureError.invalidVideo
+            guard let movieRecording = self.movieRecording else {
+                throw OWSAssertionError("movie recording was unexpectedly nil")
             }
+            self.movieRecording = nil
             return movieRecording.finish()
         }.done { outputUrl in
             delegate.captureOutputDidCapture(movieUrl: .success(outputUrl))
@@ -995,13 +806,11 @@ class CaptureOutput: NSObject {
     }
 
     func cancelVideo(delegate: CaptureOutputDelegate) {
-        assertOnQueue(movieRecordingQueue)
-
-        self.clearMovieRecording()
+        delegate.assertIsOnSessionQueue()
+        // There's currently no user-visible way to cancel, if so, we may need to do some cleanup here.
+        owsFailDebug("video was unexpectedly canceled.")
     }
 }
-
-// MARK: -
 
 class MovieRecording {
     let assetWriter: AVAssetWriter
@@ -1034,41 +843,28 @@ class MovieRecording {
     }
 
     func finish() -> Promise<URL> {
-        assertOnQueue(CaptureOutput.movieRecordingQueue)
-
         Logger.verbose("")
         switch state {
         case .recording:
             state = .finished
             audioInput.markAsFinished()
             videoInput.markAsFinished()
-            return Promise<URL> { future -> Void in
-                let assetWriter = self.assetWriter
-                assetWriter.finishWriting {
-                    if assetWriter.status == .completed,
-                       assetWriter.error == nil {
-                        future.resolve(self.assetWriter.outputURL)
-                    } else {
-                        // If the user cancels a video right after recording
-                        // begins, recording is expected to fail.
-                        future.reject(PhotoCaptureError.invalidVideo)
-                    }
+            return Promise<URL> { resolver -> Void in
+                self.assetWriter.finishWriting {
+                    resolver.fulfill(self.assetWriter.outputURL)
                 }
             }
         default:
-            Logger.warn("Unexpected state: \(state)")
-            return Promise(error: PhotoCaptureError.invalidVideo)
+            return Promise(error: OWSAssertionError("unexpected state: \(state)"))
         }
     }
 }
-
-// MARK: -
 
 extension CaptureOutput: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         assertOnQueue(movieRecordingQueue)
 
-        guard let movieRecording = currentMovieRecording else {
+        guard let movieRecording = movieRecording else {
             // `movieRecording` is assigned async after the capture pipeline has been set up.
             // We'll drop a few frames before we're ready to start recording.
             return
@@ -1080,7 +876,7 @@ extension CaptureOutput: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
             }
 
             guard movieRecording.state == .recording else {
-                owsAssertDebug(movieRecording.state == .finished)
+                assert(movieRecording.state == .finished)
                 Logger.verbose("ignoring samples since recording has finished.")
                 return
             }
@@ -1113,8 +909,6 @@ extension CaptureOutput: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapture
         Logger.error("dropped sampleBuffer from connection: \(connection)")
     }
 }
-
-// MARK: -
 
 class PhotoCaptureOutputAdaptee: NSObject, ImageCaptureOutput {
 
@@ -1184,7 +978,7 @@ class PhotoCaptureOutputAdaptee: NSObject, ImageCaptureOutput {
                     throw error
                 }
                 guard let rawData = photo.fileDataRepresentation()  else {
-                    throw OWSAssertionError("photo data was unexpectedly empty")
+                    throw OWSAssertionError("photo data was unexpectely empty")
                 }
 
                 let resizedData = try crop(photoData: rawData, toOutputRect: captureRect)
@@ -1199,8 +993,6 @@ class PhotoCaptureOutputAdaptee: NSObject, ImageCaptureOutput {
         }
     }
 }
-
-// MARK: -
 
 extension AVCaptureVideoOrientation {
     init?(deviceOrientation: UIDeviceOrientation) {
@@ -1234,8 +1026,6 @@ extension AVCaptureVideoOrientation {
     }
 }
 
-// MARK: -
-
 extension AVCaptureDevice.FocusMode: CustomStringConvertible {
     public var description: String {
         switch self {
@@ -1250,8 +1040,6 @@ extension AVCaptureDevice.FocusMode: CustomStringConvertible {
         }
     }
 }
-
-// MARK: -
 
 extension AVCaptureDevice.ExposureMode: CustomStringConvertible {
     public var description: String {
@@ -1270,8 +1058,6 @@ extension AVCaptureDevice.ExposureMode: CustomStringConvertible {
     }
 }
 
-// MARK: -
-
 extension AVCaptureVideoOrientation: CustomStringConvertible {
     public var description: String {
         switch self {
@@ -1288,8 +1074,6 @@ extension AVCaptureVideoOrientation: CustomStringConvertible {
         }
     }
 }
-
-// MARK: -
 
 extension UIDeviceOrientation: CustomStringConvertible {
     public var description: String {
@@ -1314,8 +1098,6 @@ extension UIDeviceOrientation: CustomStringConvertible {
     }
 }
 
-// MARK: -
-
 extension UIInterfaceOrientation: CustomStringConvertible {
     public var description: String {
         switch self {
@@ -1334,8 +1116,6 @@ extension UIInterfaceOrientation: CustomStringConvertible {
         }
     }
 }
-
-// MARK: -
 
 extension UIImage.Orientation: CustomStringConvertible {
     public var description: String {
@@ -1361,8 +1141,6 @@ extension UIImage.Orientation: CustomStringConvertible {
         }
     }
 }
-
-// MARK: -
 
 extension CGSize {
     func scaledToFit(max: CGFloat) -> CGSize {
@@ -1396,26 +1174,6 @@ extension CGSize {
         }
     }
 }
-
-// MARK: -
-
-extension AVCaptureDevice.FlashMode {
-    var toTorchMode: AVCaptureDevice.TorchMode {
-        switch self {
-        case .auto:
-            return .auto
-        case .on:
-            return .on
-        case .off:
-            return .off
-        @unknown default:
-            owsFailDebug("Unhandled AVCaptureDevice.FlashMode type: \(self)")
-            return .off
-        }
-    }
-}
-
-// MARK: -
 
 private func crop(photoData: Data, toOutputRect outputRect: CGRect) throws -> Data {
     guard let originalImage = UIImage(data: photoData) else {

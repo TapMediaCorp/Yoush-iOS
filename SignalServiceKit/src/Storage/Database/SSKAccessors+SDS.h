@@ -1,19 +1,16 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-@class MessageBodyRanges;
-
 // This header exposes private properties for SDS serialization.
 
 @interface TSThread (SDS)
 
 @property (nonatomic, copy, nullable, readonly) NSString *messageDraft;
-@property (nonatomic, readonly, nullable) MessageBodyRanges *messageDraftBodyRanges;
 
 @end
 
@@ -103,7 +100,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (atomic, nullable, readonly) NSNumber *isValidImageCached;
 @property (atomic, nullable, readonly) NSNumber *isValidVideoCached;
-@property (atomic, nullable, readonly) NSNumber *isAnimatedCached;
 
 @end
 
@@ -148,15 +144,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark -
 
-@interface TSGroupMember (SDS)
-
-@property (nonatomic, nullable, readonly) NSString *phoneNumber;
-@property (nonatomic, nullable, readonly) NSString *uuidString;
-
-@end
-
-#pragma mark -
-
 @interface OWSUserProfile (SDS)
 
 @property (atomic, nullable, readonly) NSString *recipientPhoneNumber;
@@ -171,18 +158,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, readonly, nullable) NSString *reactorE164;
 @property (nonatomic, readonly, nullable) NSString *reactorUUID;
-
-@end
-
-#pragma mark -
-
-@interface OWSGroupCallMessage (SDS)
-
-@property (nonatomic, getter=wasRead) BOOL read;
-@property (nonatomic, readonly, nullable) NSString *eraId;
-@property (nonatomic, nullable) NSArray<NSString *> *joinedMemberUuids;
-@property (nonatomic, nullable) NSString *creatorUuid;
-@property (nonatomic, readonly) BOOL hasEnded;
 
 @end
 

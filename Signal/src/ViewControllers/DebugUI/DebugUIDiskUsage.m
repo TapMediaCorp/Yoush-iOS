@@ -1,19 +1,26 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "DebugUIDiskUsage.h"
-#import "Signal-Swift.h"
+#import "OWSOrphanDataCleaner.h"
+#import "OWSTableViewController.h"
+#import "Yoush-Swift.h"
 #import <SignalCoreKit/NSDate+OWS.h>
-#import <SignalMessaging/OWSOrphanDataCleaner.h>
 #import <SignalServiceKit/TSInteraction.h>
-#import <SignalUI/OWSTableViewController.h>
 
 #ifdef DEBUG
 
 NS_ASSUME_NONNULL_BEGIN
 
 @implementation DebugUIDiskUsage
+
+#pragma mark - Dependencies
+
++ (SDSDatabaseStorage *)databaseStorage
+{
+    return SDSDatabaseStorage.shared;
+}
 
 #pragma mark - Factory Methods
 

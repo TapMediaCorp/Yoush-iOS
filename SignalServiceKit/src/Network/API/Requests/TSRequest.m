@@ -1,13 +1,13 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2020 Open Whisper Systems. All rights reserved.
 //
 
 #import "TSRequest.h"
-#import "SSKEnvironment.h"
 #import "TSAccountManager.h"
 #import "TSConstants.h"
 #import <SignalCoreKit/NSData+OWS.h>
 #import <SignalMetadataKit/SignalMetadataKit-Swift.h>
+#import <SignalServiceKit/SSKEnvironment.h>
 #import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -55,6 +55,7 @@ NS_ASSUME_NONNULL_BEGIN
 {
     OWSAssertDebug(URL);
     OWSAssertDebug(method.length > 0);
+    OWSAssertDebug(parameters);
 
     self = [super initWithURL:URL
                   cachePolicy:NSURLRequestReloadIgnoringLocalAndRemoteCacheData
@@ -75,6 +76,13 @@ NS_ASSUME_NONNULL_BEGIN
                     parameters:(nullable NSDictionary<NSString *, id> *)parameters
 {
     return [[TSRequest alloc] initWithURL:url method:method parameters:parameters];
+}
+
+#pragma mark - Dependencies
+
+- (TSAccountManager *)tsAccountManager
+{
+    return SSKEnvironment.shared.tsAccountManager;
 }
 
 #pragma mark - Authorization
@@ -126,11 +134,7 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (NSString *)description {
-    if (self.shouldRedactUrlInLogs) {
-        return [NSString stringWithFormat:@"{ %@: [REDACTED] }", self.HTTPMethod];
-    } else {
-        return [NSString stringWithFormat:@"{ %@: %@ }", self.HTTPMethod, self.URL];
-    }
+    return [NSString stringWithFormat:@"{ %@: %@ }", self.HTTPMethod, self.URL];
 }
 
 @end

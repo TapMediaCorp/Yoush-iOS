@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,7 +8,7 @@ import AVFoundation
 public enum OWSThumbnailError: Error {
     case failure(description: String)
     case assertionFailure(description: String)
-    case externalError(description: String, underlyingError: Error)
+    case externalError(description: String, underlyingError:Error)
 }
 
 @objc public class OWSLoadedThumbnail: NSObject {
@@ -20,9 +20,7 @@ public enum OWSThumbnailError: Error {
 
     @objc
     public init(image: UIImage, filePath: String) {
-        // Always preload thumbnail images for rendering.
-        self.image = image.preloadForRendering()
-
+        self.image = image
         self.dataSourceBlock = {
             return try Data(contentsOf: URL(fileURLWithPath: filePath))
         }
@@ -59,10 +57,7 @@ private struct OWSThumbnailRequest {
     }
 }
 
-// MARK: - 
-
-@objc
-public class OWSThumbnailService: NSObject {
+@objc public class OWSThumbnailService: NSObject {
 
     // MARK: - Singleton class
 
@@ -72,10 +67,7 @@ public class OWSThumbnailService: NSObject {
     public typealias SuccessBlock = (OWSLoadedThumbnail) -> Void
     public typealias FailureBlock = (Error) -> Void
 
-    @objc
-    public static let serialQueue = DispatchQueue(label: "OWSThumbnailService")
-
-    private var serialQueue: DispatchQueue { OWSThumbnailService.serialQueue }
+    private let serialQueue = DispatchQueue(label: "OWSThumbnailService")
 
     // This property should only be accessed on the serialQueue.
     //
@@ -96,14 +88,11 @@ public class OWSThumbnailService: NSObject {
     // success and failure will be called async _off_ the main thread.
     @objc
     public func ensureThumbnail(forAttachment attachment: TSAttachmentStream,
-                                thumbnailDimensionPoints: UInt,
-                                success: @escaping SuccessBlock,
-                                failure: @escaping FailureBlock) {
+                                                     thumbnailDimensionPoints: UInt,
+                                                     success: @escaping SuccessBlock,
+                                                     failure: @escaping FailureBlock) {
         serialQueue.async {
-            let thumbnailRequest = OWSThumbnailRequest(attachment: attachment,
-                                                       thumbnailDimensionPoints: thumbnailDimensionPoints,
-                                                       success: success,
-                                                       failure: failure)
+            let thumbnailRequest = OWSThumbnailRequest(attachment: attachment, thumbnailDimensionPoints: thumbnailDimensionPoints, success: success, failure: failure)
             self.thumbnailRequestStack.append(thumbnailRequest)
 
             self.processNextRequestSync()
@@ -150,21 +139,7 @@ public class OWSThumbnailService: NSObject {
             throw OWSThumbnailError.failure(description: "Cannot thumbnail attachment.")
         }
 
-        // Sticker type metadata isn't reliable and default to
-        // a webp MIME type. Therefore for all nominally webp
-        // image attachments, determine the MIME type by examining
-        // the actual attachment data.
-        var contentType = attachment.contentType
-        let mightBeWebp = attachment.contentType == OWSMimeTypeImageWebp
-        if mightBeWebp,
-           let filePath = attachment.originalFilePath {
-            let imageMetadata = NSData.imageMetadata(withPath: filePath, mimeType: nil)
-            if imageMetadata.imageFormat != .unknown,
-               let mimeType = imageMetadata.mimeType {
-                contentType = mimeType
-            }
-        }
-        let isWebp = contentType == OWSMimeTypeImageWebp
+        let isWebp = attachment.contentType == OWSMimeTypeImageWebp
 
         let thumbnailPath = attachment.path(forThumbnailDimensionPoints: thumbnailRequest.thumbnailDimensionPoints)
         if FileManager.default.fileExists(atPath: thumbnailPath) {
@@ -183,17 +158,14 @@ public class OWSThumbnailService: NSObject {
         guard let originalFilePath = attachment.originalFilePath else {
             throw OWSThumbnailError.failure(description: "Missing original file path.")
         }
-        let maxDimensionPoints = CGFloat(thumbnailRequest.thumbnailDimensionPoints)
+        let maxDimension = CGFloat(thumbnailRequest.thumbnailDimensionPoints)
         let thumbnailImage: UIImage
         if isWebp {
-            thumbnailImage = try OWSMediaUtils.thumbnail(forWebpAtPath: originalFilePath,
-                                                         maxDimensionPoints: maxDimensionPoints)
+            thumbnailImage = try OWSMediaUtils.thumbnail(forWebpAtPath: originalFilePath, maxDimension: maxDimension)
         } else if attachment.isImage || attachment.isAnimated {
-            thumbnailImage = try OWSMediaUtils.thumbnail(forImageAtPath: originalFilePath,
-                                                         maxDimensionPoints: maxDimensionPoints)
+            thumbnailImage = try OWSMediaUtils.thumbnail(forImageAtPath: originalFilePath, maxDimension: maxDimension)
         } else if attachment.isVideo {
-            thumbnailImage = try OWSMediaUtils.thumbnail(forVideoAtPath: originalFilePath,
-                                                         maxDimensionPoints: maxDimensionPoints)
+            thumbnailImage = try OWSMediaUtils.thumbnail(forVideoAtPath: originalFilePath, maxDimension: maxDimension)
         } else {
             throw OWSThumbnailError.assertionFailure(description: "Invalid attachment type.")
         }

@@ -1,11 +1,11 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
 
-import SignalClient
 import SignalMetadataKit
+import PromiseKit
 import CommonCrypto
 
 public struct ProvisionMessage {
@@ -26,26 +26,22 @@ public enum ProvisioningError: Error {
 public class ProvisioningCipher {
 
     public var secondaryDevicePublicKey: ECPublicKey {
-        return ECPublicKey(secondaryDeviceKeyPair.publicKey)
+        return try! secondaryDeviceKeyPair.ecPublicKey()
     }
 
-    let secondaryDeviceKeyPair: IdentityKeyPair
-    init(secondaryDeviceKeyPair: IdentityKeyPair) {
+    let secondaryDeviceKeyPair: ECKeyPair
+    init(secondaryDeviceKeyPair: ECKeyPair) {
         self.secondaryDeviceKeyPair = secondaryDeviceKeyPair
     }
 
     public class func generate() -> ProvisioningCipher {
-        return ProvisioningCipher(secondaryDeviceKeyPair: IdentityKeyPair.generate())
-    }
-
-    internal class var messageInfo: String {
-        return "TextSecure Provisioning Message"
+        return ProvisioningCipher(secondaryDeviceKeyPair: Curve25519.generateKeyPair())
     }
 
     // MARK: 
 
     public func decrypt(envelope: ProvisioningProtoProvisionEnvelope) throws -> ProvisionMessage {
-        let primaryDeviceEphemeralPublicKey = try PublicKey(envelope.publicKey)
+        let primaryDeviceEphemeralPublicKey = try ECPublicKey(serializedKeyData: envelope.publicKey)
         let bytes = [UInt8](envelope.body)
 
         let versionLength = 1
@@ -65,18 +61,18 @@ public class ProvisioningCipher {
         let theirMac = bytes.suffix(32)
         let messageToAuthenticate = bytes[0..<(bytes.count - 32)]
         let ciphertext = Array(bytes[17..<(bytes.count - 32)])
+        let agreement = try Curve25519.generateSharedSecret(fromPublicKey: primaryDeviceEphemeralPublicKey.keyData,
+                                                            privateKey: try secondaryDeviceKeyPair.ecPrivateKey().keyData)
 
-        let agreement = secondaryDeviceKeyPair.privateKey.keyAgreement(
-            with: primaryDeviceEphemeralPublicKey)
-
-        let keyBytes = try Self.messageInfo.utf8.withContiguousStorageIfAvailable {
-            try hkdf(outputLength: 64, version: 3, inputKeyMaterial: agreement, salt: [], info: $0)
-        }!
+        let info = "TextSecure Provisioning Message".data(using: .utf8)!
+        let salt = Data([UInt8](repeating: 0, count: 32))
+        let keys = try HKDFKit.deriveKey(agreement, info: info, salt: salt, outputSize: 64)
+        let keyBytes = [UInt8](keys)
 
         let cipherKey = Array(keyBytes[0..<32])
         let macKey = keyBytes[32..<64]
 
-        guard let ourHMAC = Cryptography.computeSHA256HMAC(Data(messageToAuthenticate), key: Data(macKey)) else {
+        guard let ourHMAC = Cryptography.computeSHA256HMAC(Data(messageToAuthenticate), withHMACKey: Data(macKey)) else {
             throw OWSAssertionError("ourHMAC was unexpectedly nil")
         }
 
@@ -103,10 +99,9 @@ public class ProvisioningCipher {
         }
 
         let plaintext = Data(plaintextBuffer.prefix(upTo: bytesDecrypted))
-        let proto = try ProvisioningProtoProvisionMessage(serializedData: plaintext)
+        let proto = try ProvisioningProtoProvisionMessage.parseData(plaintext)
 
-        let identityKeyPair = try IdentityKeyPair(publicKey: PublicKey(proto.identityKeyPublic),
-                                                  privateKey: PrivateKey(proto.identityKeyPrivate))
+        let identityKeyPair = try ECKeyPair(serializedPublicKeyData: proto.identityKeyPublic, privateKeyData: proto.identityKeyPrivate)
         guard let profileKey = OWSAES256Key(data: proto.profileKey) else {
             throw ProvisioningError.invalidProvisionMessage("invalid profileKey - count: \(proto.profileKey.count)")
         }
@@ -129,11 +124,18 @@ public class ProvisioningCipher {
 
         return ProvisionMessage(uuid: uuid,
                                 phoneNumber: phoneNumber,
-                                identityKeyPair: ECKeyPair(identityKeyPair),
+                                identityKeyPair: identityKeyPair,
                                 profileKey: profileKey,
                                 areReadReceiptsEnabled: areReadReceiptsEnabled,
                                 primaryUserAgent: primaryUserAgent,
                                 provisioningCode: provisioningCode,
                                 provisioningVersion: provisioningVersion)
+    }
+}
+
+private extension ECKeyPair {
+    convenience init(serializedPublicKeyData: Data, privateKeyData: Data) throws {
+        let publicKey = try (serializedPublicKeyData as NSData).removeKeyType() as Data
+        try self.init(publicKeyData: publicKey, privateKeyData: privateKeyData)
     }
 }

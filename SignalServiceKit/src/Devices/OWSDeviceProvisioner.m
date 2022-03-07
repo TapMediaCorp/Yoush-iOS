@@ -1,11 +1,12 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSDeviceProvisioner.h"
+#import "OWSDeviceProvisioningCodeService.h"
+#import "OWSDeviceProvisioningService.h"
 #import "OWSError.h"
 #import "OWSProvisioningMessage.h"
-#import <SignalServiceKit/SignalServiceKit-Swift.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -99,9 +100,7 @@ NS_ASSUME_NONNULL_BEGIN
 
     NSData *_Nullable messageBody = [message buildEncryptedMessageBody];
     if (messageBody == nil) {
-        NSError *error = [OWSError withError:OWSErrorCodeFailedToEncryptMessage
-                                 description:@"Failed building provisioning message"
-                                 isRetryable:NO];
+        NSError *error = OWSErrorWithCodeDescription(OWSErrorCodeFailedToEncryptMessage, @"Failed building provisioning message");
         failureCallback(error);
         return;
     }

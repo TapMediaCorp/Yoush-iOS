@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 import Foundation
@@ -8,12 +8,20 @@ import SignalServiceKit
 
 class ThreadPerformanceTest: PerformanceBaseTest {
 
-    let threadCount = DebugFlags.fastPerfTests ? 2 : 10
-    let interactionCount: UInt = DebugFlags.fastPerfTests ? 5 : 100
+    let threadCount = 10
+    let interactionCount: UInt = 100
 
     // MARK: - writeThreadAndInteractions
 
-    func testPerf_writeThreadAndInteractions() {
+    func testYDBPerf_writeThreadAndInteractions() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            writeThreadAndInteractions()
+        }
+    }
+
+    func testGRDBPerf_writeThreadAndInteractions() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             writeThreadAndInteractions()
         }
@@ -41,7 +49,15 @@ class ThreadPerformanceTest: PerformanceBaseTest {
 
     // MARK: - writeAndDeleteThreadAndInteractions
 
-    func testPerf_writeAndDeleteThreadAndInteractions() {
+    func testYDBPerf_writeAndDeleteThreadAndInteractions() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            writeAndDeleteThreadAndInteractions()
+        }
+    }
+
+    func testGRDBPerf_writeAndDeleteThreadAndInteractions() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             writeAndDeleteThreadAndInteractions()
         }
@@ -66,7 +82,15 @@ class ThreadPerformanceTest: PerformanceBaseTest {
 
     // MARK: - writeAndUpdateAndDeleteThreadAndInteractions
 
-    func testPerf_writeAndUpdateAndDeleteThreadAndInteractions() {
+    func testYDBPerf_writeAndUpdateAndDeleteThreadAndInteractions() {
+        storageCoordinator.useYDBForTests()
+        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            writeAndUpdateAndDeleteThreadAndInteractions()
+        }
+    }
+
+    func testGRDBPerf_writeAndUpdateAndDeleteThreadAndInteractions() {
+        storageCoordinator.useGRDBForTests()
         measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
             writeAndUpdateAndDeleteThreadAndInteractions()
         }

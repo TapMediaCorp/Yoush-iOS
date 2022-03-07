@@ -1,5 +1,5 @@
 //
-//  Copyright (c) 2021 Open Whisper Systems. All rights reserved.
+//  Copyright (c) 2019 Open Whisper Systems. All rights reserved.
 //
 
 #import "OWSScrubbingLogFormatter.h"
@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
     dispatch_once(&onceToken, ^{
         NSError *error;
         regex = [NSRegularExpression regularExpressionWithPattern:@"\\+\\d{7,12}(\\d{3})"
-                                                          options:0
+                                                          options:NSRegularExpressionCaseInsensitive
                                                             error:&error];
         if (error || !regex) {
             OWSFail(@"could not compile regular expression: %@", error);
@@ -42,14 +42,13 @@ NS_ASSUME_NONNULL_BEGIN
     });
     return regex;
 }
-
 - (NSRegularExpression *)dataRegex
 {
     static NSRegularExpression *regex = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSError *error;
-        regex = [NSRegularExpression regularExpressionWithPattern:@"<([\\da-f]{2})[\\da-f]{0,6}( [\\da-f]{2,8})*>"
+        regex = [NSRegularExpression regularExpressionWithPattern:@"<([\\da-f]{2})[\\da-f]{6}( [\\da-f]{8})*>"
                                                           options:NSRegularExpressionCaseInsensitive
                                                             error:&error];
         if (error || !regex) {
@@ -58,7 +57,6 @@ NS_ASSUME_NONNULL_BEGIN
     });
     return regex;
 }
-
 - (NSRegularExpression *)ios13DataRegex
 {
     static NSRegularExpression *regex = nil;
@@ -84,24 +82,6 @@ NS_ASSUME_NONNULL_BEGIN
         // NOTE: The group matches the last quad of the IPv4 address.
         NSError *error;
         regex = [NSRegularExpression regularExpressionWithPattern:@"\\d+\\.\\d+\\.\\d+\\.(\\d+)"
-                                                          options:NSRegularExpressionCaseInsensitive
-                                                            error:&error];
-        if (error || !regex) {
-            OWSFail(@"could not compile regular expression: %@", error);
-        }
-    });
-    return regex;
-}
-
-- (NSRegularExpression *)longHexRegex
-{
-    static NSRegularExpression *regex = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        // Any hex string of 14 chars (7 bytes) or more.
-        // Example: A321CCE01BA2C85D
-        NSError *error;
-        regex = [NSRegularExpression regularExpressionWithPattern:@"[\\da-f]{11,}([\\da-f]{3})"
                                                           options:NSRegularExpressionCaseInsensitive
                                                             error:&error];
         if (error || !regex) {
@@ -151,12 +131,6 @@ NS_ASSUME_NONNULL_BEGIN
                                                            options:0
                                                              range:NSMakeRange(0, [logString length])
                                                       withTemplate:@"[ REDACTED_IPV4_ADDRESS:...$1 ]"];
-
-    NSRegularExpression *longHexRegex = self.longHexRegex;
-    logString = [longHexRegex stringByReplacingMatchesInString:logString
-                                                       options:0
-                                                         range:NSMakeRange(0, [logString length])
-                                                  withTemplate:@"[ REDACTED_HEX:...$1 ]"];
 
     return logString;
 }

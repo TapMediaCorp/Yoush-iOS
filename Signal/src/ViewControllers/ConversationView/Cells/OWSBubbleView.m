@@ -91,11 +91,12 @@ const CGFloat kOWSMessageCellCornerRadius_Small = 4;
 
     if (didChangeSize) {
         [self updateLayers];
+        [self updatePartnerViews];
     }
-
     // We always need to inform the "bubble stroke view" (if any) if our
     // frame/bounds/center changes. Its contents are not in local coordinates.
-    [self updatePartnerViews];
+//    [self updatePartnerViews];
+
 }
 
 - (void)setBounds:(CGRect)bounds
@@ -108,20 +109,24 @@ const CGFloat kOWSMessageCellCornerRadius_Small = 4;
 
     if (didChangeSize) {
         [self updateLayers];
+        [self updatePartnerViews];
     }
 
     // We always need to inform the "bubble stroke view" (if any) if our
     // frame/bounds/center changes. Its contents are not in local coordinates.
-    [self updatePartnerViews];
+//    [self updatePartnerViews];
 }
 
 - (void)setCenter:(CGPoint)center
 {
+    BOOL didChange = !CGPointEqualToPoint(self.center, center);
     [super setCenter:center];
-
+    if (didChange) {
+        [self updatePartnerViews];
+    }
     // We always need to inform the "bubble stroke view" (if any) if our
     // frame/bounds/center changes. Its contents are not in local coordinates.
-    [self updatePartnerViews];
+//    [self updatePartnerViews];
 }
 
 - (void)setFillColor:(nullable UIColor *)fillColor

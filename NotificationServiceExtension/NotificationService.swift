@@ -53,9 +53,9 @@ class NotificationService: UNNotificationServiceExtension {
         DispatchQueue.main.sync { self.setupIfNecessary() }
 
         // Until we want to use this extension, crash if this path is hit.
-        guard FeatureFlags.notificationServiceExtension else {
-            owsFail("NSE should never be called.")
-        }
+        // guard FeatureFlags.notificationServiceExtension else {
+        //     owsFail("NSE should never be called.")
+        // }
 
         listenForMainAppLaunch()
 
@@ -125,10 +125,15 @@ class NotificationService: UNNotificationServiceExtension {
                 self?.versionMigrationsDidComplete()
             }
         )
-
+        
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(storageIsReady),
                                                name: .StorageIsReady,
+                                               object: nil)
+        
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(didAddNotificationRequest),
+                                               name: Notification.Name("didAddNotificationRequest"),
                                                object: nil)
 
         Logger.info("completed.")
@@ -155,7 +160,13 @@ class NotificationService: UNNotificationServiceExtension {
 
         checkIsAppReady()
     }
-
+    
+    @objc
+    func didAddNotificationRequest() {
+        self.isProcessingMessages.set(false)
+        self.completeSilenty()
+    }
+    
     @objc
     func checkIsAppReady() {
         AssertIsOnMainThread()
@@ -255,7 +266,6 @@ class NotificationService: UNNotificationServiceExtension {
         }.ensure {
             Logger.info("Message fetch completed.")
             self.isProcessingMessages.set(false)
-            self.completeSilenty()
         }
     }
 }

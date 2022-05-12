@@ -46,6 +46,7 @@ class FLManuallyCallKitManager: NSObject {
             JMCallKitProxy.enabled = newValue
         }
     }
+    
     func startOutgogingCall(_ call: SignalCall) {
         Environment.shared.audioSession.startAudioActivity(call.audioActivity)
         CALL_SERVIVE.isRTCAudioSessionEnabled = true
@@ -517,6 +518,10 @@ extension FLManuallyCallKitManager: CXProviderDelegate {
     public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         AssertIsOnMainThread()
         action.fulfill()
+        if let callVC = self.currentCallVC {
+            Logger.info("CXSetMutedCallAction changed => \(action.isMuted ? "muted" : "unmute")")
+            callVC.jitsiMeetView.setAudioMuted(action.isMuted)
+        }
     }
     
     public func provider(_ provider: CXProvider, perform action: CXSetGroupCallAction) {

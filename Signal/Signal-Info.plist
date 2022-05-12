@@ -5,15 +5,15 @@
 	<key>BuildDetails</key>
 	<dict>
 		<key>DateTime</key>
-		<string>Wed Feb 23 03:28:06 UTC 2022</string>
+		<string>Thu May 12 10:22:22 UTC 2022</string>
 		<key>OSXVersion</key>
-		<string>10.15.5</string>
+		<string>11.6.1</string>
 		<key>Timestamp</key>
-		<string>1645586886</string>
+		<string>1652350942</string>
 		<key>WebRTCCommit</key>
 		<string></string>
 		<key>XCodeVersion</key>
-		<string>1200.1240</string>
+		<string>1300.1320</string>
 	</dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>

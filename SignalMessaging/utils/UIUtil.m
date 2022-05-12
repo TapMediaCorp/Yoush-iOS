@@ -32,6 +32,15 @@
     UIToolbar.appearance.barTintColor = Theme.navbarBackgroundColor;
     UIToolbar.appearance.tintColor = Theme.primaryIconColor;
 
+    // White non-transucent navigatio bar, supports dark appearance
+    if (@available(iOS 15, *)) {
+        UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithOpaqueBackground];
+        UINavigationBar.appearance.backgroundColor = [UIColor colorWithRGBHex:0xdea859];
+//        self.navigationController.navigationBar.standardAppearance = appearance;
+//        self.navigationController.navigationBar.scrollEdgeAppearance = self.navigationController.navigationBar.standardAppearance;
+    }
+
     // We do _not_ specifiy BarButton.appearance.tintColor because it is sufficient to specify
     // UINavigationBar.appearance.tintColor. Furthermore, specifying the BarButtonItem's
     // apearence makes it more difficult to override the navbar theme, e.g. how we _always_

@@ -512,10 +512,10 @@ extension FLJitsiMeetCallVC {
                 //Only availabe on Jitsi 3.6.0
 //                builder.callUUID = call.localId
 //                builder.callHandle = "Yoush"
-                let userInfo = JitsiMeetUserInfo(displayName: displayName, andEmail: nil, andAvatar: nil)
+                let userInfo = JitsiMeetUserInfo(displayName: displayName, andEmail: "contact@tapofthink.com", andAvatar: nil)
                 builder.userInfo = userInfo
 
-                let disableFeature = ["chat.enabled", "invite.enabled", "add-people.enabled", "meeting-password.enabled", "live-streaming.enabled", "video-share.enabled", "recording.enabled","pip.enabled"]
+                let disableFeature = ["chat.enabled", "invite.enabled", "add-people.enabled", "meeting-password.enabled", "live-streaming.enabled", "video-share.enabled", "recording.enabled","pip.enabled", "call-integration.enabled"]
 
                 for feature in disableFeature {
                     builder.setFeatureFlag(feature, withBoolean: false)

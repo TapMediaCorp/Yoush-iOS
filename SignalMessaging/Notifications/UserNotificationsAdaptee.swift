@@ -114,6 +114,7 @@ extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
 
         guard tsAccountManager.isOnboarded() else {
             Logger.info("suppressing notification since user hasn't yet completed onboarding.")
+            NotificationCenter.default.post(name: Notification.Name("didAddNotificationRequest"), object: nil)
             return
         }
 
@@ -124,7 +125,7 @@ extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
         if let sound = sound, sound != OWSSound.none {
             content.sound = sound.notificationSound(isQuiet: isAppActive)
         }
-
+        //Update badge number if current app is not main app or main app does not active
         var notificationIdentifier: String = UUID().uuidString
         if let replacingIdentifier = replacingIdentifier {
             notificationIdentifier = replacingIdentifier
@@ -153,7 +154,14 @@ extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
             // Play sound and vibrate, but without a `body` no banner will show.
             Logger.debug("supressing notification body")
         }
-
+        
+        var badgeNumber = OWSMessageUtils.sharedManager().unreadMessagesCount()
+        if !CurrentAppContext().isMainApp ||
+            !CurrentAppContext().isMainAppAndActive{
+            badgeNumber += 1
+        }
+        content.badge = NSNumber(value: badgeNumber)
+        
         if let threadIdentifier = threadIdentifier {
             content.threadIdentifier = threadIdentifier
         }
@@ -162,16 +170,25 @@ extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
 
         Logger.debug("presenting notification with identifier: \(notificationIdentifier)")
         notificationCenter.add(request) { (error: Error?) in
+//            if (!CurrentAppContext().isMainApp) {
+//                OWSMessageUtils.sharedManager()
+//            }
             if let error = error {
                 owsFailDebug("Error: \(error)")
+                //Post notification to complete silent push notification
+                NotificationCenter.default.post(name: Notification.Name("didAddNotificationRequest"), object: nil)
                 return
             }
             guard notificationIdentifier != UserNotificationPresenterAdaptee.kMigrationNotificationId else {
+                //Post notification to complete silent push notification
+                NotificationCenter.default.post(name: Notification.Name("didAddNotificationRequest"), object: nil)
                 return
             }
             DispatchQueue.main.async {
                 // If we show any other notification, we can clear the "GRDB migration" notification.
                 self.clearNotificationForGRDBMigration()
+                //Post notification to complete silent push notification
+                NotificationCenter.default.post(name: Notification.Name("didAddNotificationRequest"), object: nil)
             }
         }
         notifications[notificationIdentifier] = request
@@ -263,7 +280,7 @@ extension UserNotificationPresenterAdaptee: NotificationPresenterAdaptee {
         let identifier = UserNotificationPresenterAdaptee.kMigrationNotificationId
         cancelNotification(identifier: identifier)
     }
-
+    
     func shouldPresentNotification(category: AppNotificationCategory, userInfo: [AnyHashable: Any]) -> Bool {
         AssertIsOnMainThread()
         guard CurrentAppContext().isMainAppAndActive else {

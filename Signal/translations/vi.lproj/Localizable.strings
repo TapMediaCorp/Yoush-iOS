@@ -2496,7 +2496,7 @@
 "ONBOARDING_SPLASH_TITLE" = "Life is secure !\nKeep your message private.";
 
 /* Label for the link that lets users change their phone number in the onboarding views. */
-"ONBOARDING_VERIFICATION_BACK_LINK" = "Số điện thoại đã sai";
+"ONBOARDING_VERIFICATION_BACK_LINK" = "Số điện thoại đã sai?";
 
 /* Format for the label of the 'sent code' label of the 'onboarding verification' view. Embeds {{the time until the code can be resent}}. */
 "ONBOARDING_VERIFICATION_CODE_COUNTDOWN_FORMAT" = "Tôi không nhận được mã xác minh (cho phép trong %@)";
